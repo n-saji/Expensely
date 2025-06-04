@@ -4,11 +4,11 @@ import com.example.expensely_backend.dto.AuthResponse;
 import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.service.UserService;
 import com.example.expensely_backend.utils.JwtUtil;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.ToString;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/users")
@@ -52,7 +52,10 @@ public class UserController {
                     return ResponseEntity.status(500).body("Error generating token");
                 }
 
-                return ResponseEntity.ok(new AuthResponse("User authenticated successfully!", token));
+                User authenticatedUser = userService.GetUserByEmailOrPhone(user.getEmail(), user.getPhone());
+                AuthResponse authResponse = new AuthResponse("User authenticated successfully!", token, authenticatedUser.getId().toString());
+                System.out.println("authResponse = " + authResponse);
+                return ResponseEntity.ok(authResponse);
             }
             else {
                 return ResponseEntity.status(401).body("Invalid credentials");

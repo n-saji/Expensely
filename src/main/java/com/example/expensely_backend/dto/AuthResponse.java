@@ -1,21 +1,21 @@
 package com.example.expensely_backend.dto;
 
-import org.springframework.context.annotation.Bean;
+import lombok.Getter;
 
 public class AuthResponse {
 
+    @Getter
     private String message;
+    @Getter
     private String token;
+    @Getter
+    private String id;
 
-    public AuthResponse(String message, String token) {
+    public AuthResponse(String message, String token, String id) {
         this.message = message;
         this.token = token;
-    }
-    public String getMessage() {
-        return message;
-    }
-    public String getToken() {
-        return token;
+        this.id = id;
+
     }
 
 }

@@ -22,7 +22,6 @@ public class UserService {
 
 
     public User save(User user){
-        user.setId(UUID.randomUUID());
         user.setPassword(passwordEncoder.encode(user.getPassword()));
 
         return userRepository.save(user);
@@ -30,14 +29,28 @@ public class UserService {
 
     public Boolean authenticate(String email, String phone,String password) {
 
+
+    User user = GetUserByEmailOrPhone(email, phone);
+        return passwordEncoder.matches(password, user.getPassword());
+
+    }
+
+    public User GetUserById(String id) {
+        UUID uuid = UUID.fromString(id);
+        return userRepository.findById(uuid).orElseThrow(() -> new IllegalArgumentException("User not found"));
+    }
+
+    public User GetUserByEmailOrPhone(String email, String phone) {
         Optional<User> userOpt = userRepository.findUserByEmailOrPhone(email, phone);
         if (userOpt.isEmpty()) {
             throw new IllegalArgumentException("User not found");
         }
 
         User user = userOpt.get();
-
-        return passwordEncoder.matches(password, user.getPassword());
+        if (user.getEmail() == null || user.getPhone() == null) {
+            throw new IllegalArgumentException("User email or phone is null");
+        }
+        return user;
 
     }
 
