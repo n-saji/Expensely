@@ -1,0 +1,34 @@
+package com.example.expensely_backend.utils;
+
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.Keys;
+import org.springframework.stereotype.Component;
+
+import java.security.Key;
+import java.util.Date;
+
+@Component
+public class JwtUtil {
+
+    public final Key key = Keys.secretKeyFor(SignatureAlgorithm.HS256);
+
+    public String GenerateToken(String string) {
+        long expirationTime = 1000 * 60 * 60 * 24; // 1 day in milliseconds
+        return Jwts.builder()
+                .setSubject(string)
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + expirationTime))
+                .signWith(key)
+                .compact();
+    }
+
+    public String GetStringFromToken(String token) {
+        return Jwts.parserBuilder()
+                .setSigningKey(key)
+                .build()
+                .parseClaimsJws(token)
+                .getBody()
+                .getSubject();
+    }
+}
