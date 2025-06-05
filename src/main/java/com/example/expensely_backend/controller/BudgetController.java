@@ -3,10 +3,7 @@ package com.example.expensely_backend.controller;
 import com.example.expensely_backend.model.Budget;
 import com.example.expensely_backend.service.BudgetService;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/budgets")
@@ -34,4 +31,44 @@ public class BudgetController {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
     }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<Budget> getBudgetById(@PathVariable String id) {
+        try {
+            Budget budget = budgetService.findById(id);
+            return ResponseEntity.ok(budget);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(null);
+        }
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<String> deleteBudgetById(@PathVariable String id) {
+        try {
+            budgetService.deleteById(id);
+            return ResponseEntity.ok("Budget deleted successfully!");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/all")
+    public ResponseEntity<?> getAllBudgets() {
+        try {
+            return ResponseEntity.ok(budgetService.findAll());
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<?> getBudgetsByUserId(@PathVariable String userId) {
+        try {
+            return ResponseEntity.ok(budgetService.getBudgetsByUserId(userId));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
+
+
 }

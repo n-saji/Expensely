@@ -10,9 +10,13 @@ import java.util.UUID;
 public class CategoryService {
     private final CategoryRepository categoryRepository;
     private final UserService userService;
-    public CategoryService(CategoryRepository categoryRepository, UserService userService) {
+
+
+    public CategoryService(CategoryRepository categoryRepository, UserService userService
+                           ) {
         this.categoryRepository = categoryRepository;
         this.userService = userService;
+
     }
 
     public Category save(Category category) {
@@ -31,5 +35,40 @@ public class CategoryService {
         return categoryRepository.findById(UUID.fromString(id))
                 .orElseThrow(() -> new IllegalArgumentException("Category not found"));
     }
+
+//    retaining category, no need to delete
+//    public void deleteCategoryById(String id) {
+//        try {
+//           check if category referenced by expense / budget
+//            if (categoryRepository.existsById(UUID.fromString(id))) {
+//                if (!expenseService.getExpensesByCategoryId(id).isEmpty()) {
+//                    throw new IllegalArgumentException("Cannot delete category, it is referenced by existing expenses");
+//                }
+//                if (!budgetService.getBudgetByCategoryId(id).isEmpty()) {
+//                    throw new IllegalArgumentException("Cannot delete category, it is referenced by existing budgets");
+//                }
+//            }
+//            categoryRepository.deleteById(UUID.fromString(id));
+//        } catch (Exception e) {
+//            throw new IllegalArgumentException("Error deleting category: " + e.getMessage());
+//        }
+//    }
+
+    public Iterable<Category> getAllCategories() {
+        var categories = categoryRepository.findAll();
+        if (!categories.iterator().hasNext()) {
+            throw new IllegalArgumentException("No categories found");
+        }
+        return categories;
+    }
+
+    public Iterable<Category> getCategoriesByUserId(String userId) {
+        var user = userService.GetUserById(userId);
+        if (user == null) {
+            throw new IllegalArgumentException("User not found");
+        }
+        return categoryRepository.findByUser(user);
+    }
+
 
 }

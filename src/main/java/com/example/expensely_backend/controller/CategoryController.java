@@ -3,10 +3,7 @@ package com.example.expensely_backend.controller;
 import com.example.expensely_backend.model.Category;
 import com.example.expensely_backend.service.CategoryService;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/categories")
@@ -33,4 +30,35 @@ public class CategoryController {
         }
 
     }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<Category> getCategoryById(@PathVariable String id) {
+        try {
+            Category category = categoryService.getCategoryById(id);
+            return ResponseEntity.ok(category);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(null);
+        }
+    }
+
+//    Not required for now, as categories are not deleted directly
+//    @DeleteMapping("/{id}")
+//    public ResponseEntity<String> deleteCategoryById(@PathVariable String id) {
+//        try {
+//            categoryService.deleteCategoryById(id);
+//            return ResponseEntity.ok("Category deleted successfully!");
+//        } catch (Exception e) {
+//            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+//        }
+//    }
+
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<?> getCategoriesByUserId(@PathVariable String userId) {
+        try {
+            return ResponseEntity.ok(categoryService.getCategoriesByUserId(userId));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
+
 }

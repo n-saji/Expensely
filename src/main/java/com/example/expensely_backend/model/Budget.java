@@ -15,6 +15,7 @@ import java.util.UUID;
 public class Budget {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
+    @Getter
     private UUID id;
     @ManyToOne
     @Setter @Getter
