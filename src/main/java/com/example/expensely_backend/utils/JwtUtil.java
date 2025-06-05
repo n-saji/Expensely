@@ -1,5 +1,6 @@
 package com.example.expensely_backend.utils;
 
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,11 +29,19 @@ public class JwtUtil {
     }
 
     public String GetStringFromToken(String token) {
-        return Jwts.parserBuilder()
-                .setSigningKey(key)
-                .build()
-                .parseClaimsJws(token)
-                .getBody()
-                .getSubject();
+        try {
+            return Jwts.parserBuilder()
+                    .setSigningKey(key)
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody()
+                    .getSubject();
+        } catch (ExpiredJwtException e) {
+            System.out.println("Token expired");
+            return null;
+        } catch (Exception e) {
+            System.out.println("Invalid token");
+            return null;
+        }
     }
 }

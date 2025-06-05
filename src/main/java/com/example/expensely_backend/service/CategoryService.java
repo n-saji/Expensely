@@ -4,6 +4,8 @@ import com.example.expensely_backend.model.Category;
 import com.example.expensely_backend.repository.CategoryRepository;
 import org.springframework.stereotype.Service;
 
+import java.util.UUID;
+
 @Service
 public class CategoryService {
     private final CategoryRepository categoryRepository;
@@ -24,4 +26,10 @@ public class CategoryService {
         category.setUser(user);
         return categoryRepository.save(category);
     }
+
+    public Category getCategoryById(String id) {
+        return categoryRepository.findById(UUID.fromString(id))
+                .orElseThrow(() -> new IllegalArgumentException("Category not found"));
+    }
+
 }
