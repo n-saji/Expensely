@@ -42,8 +42,8 @@ public class User {
     @Getter
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    @Column(nullable = false)
+    @Column(nullable = false )
     @Getter
-    private String currency;
+    private String currency = "USD"; // Default currency set to USD
 
 }

@@ -26,9 +26,10 @@ public class UserService {
         if (user.getEmail() == null || user.getPhone() == null || user.getPassword() == null) {
             throw new IllegalArgumentException("Email, phone, and password must be provided");
         }
-        if (user.getCurrency() == null) {
-            throw new IllegalArgumentException("Currency must be provided");
-        }
+//        default - USD
+//        if (user.getCurrency() == null) {
+//            throw new IllegalArgumentException("Currency must be provided");
+//        }
         try {
             Optional<User> existingUser = userRepository.findUserByEmailOrPhone(user.getEmail(), user.getPhone());
             if (existingUser.isPresent()) {
