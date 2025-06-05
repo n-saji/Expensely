@@ -61,7 +61,7 @@ public class UserService {
     public User GetUserByEmailOrPhone(String email, String phone) {
         Optional<User> userOpt = userRepository.findUserByEmailOrPhone(email, phone);
         if (userOpt.isEmpty()) {
-            throw new IllegalArgumentException("User not found");
+            throw new IllegalArgumentException("account not found");
         }
 
         User user = userOpt.get();

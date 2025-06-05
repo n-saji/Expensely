@@ -30,12 +30,13 @@ public class JwtUtil {
 
     public String GetStringFromToken(String token) {
         try {
-            return Jwts.parserBuilder()
+            String email =  Jwts.parserBuilder()
                     .setSigningKey(key)
                     .build()
                     .parseClaimsJws(token)
                     .getBody()
                     .getSubject();
+            return email;
         } catch (ExpiredJwtException e) {
             System.out.println("Token expired");
             return null;
@@ -44,4 +45,21 @@ public class JwtUtil {
             return null;
         }
     }
+
+    public boolean ValidateToken(String token) {
+        try {
+            Jwts.parserBuilder()
+                    .setSigningKey(key)
+                    .build()
+                    .parseClaimsJws(token);
+            return true;
+        } catch (ExpiredJwtException e) {
+            System.out.println("Token expired");
+            return false;
+        } catch (Exception e) {
+            System.out.println("Invalid token");
+            return false;
+        }
+    }
+
 }

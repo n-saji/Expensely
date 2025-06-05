@@ -10,12 +10,14 @@ public class AuthResponse {
     private String token;
     @Getter
     private String id;
+    @Getter
+    private String error;
 
-    public AuthResponse(String message, String token, String id) {
+    public AuthResponse(String message, String token, String id, String error) {
         this.message = message;
         this.token = token;
         this.id = id;
-
+        this.error = error;
     }
 
 }
