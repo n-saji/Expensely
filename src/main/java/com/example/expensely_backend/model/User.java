@@ -39,7 +39,11 @@ public class User {
     private String phone;
 
     @Column(nullable = false)
+    @Getter
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    @Column(nullable = false)
+    @Getter
+    private String currency;
 
 }

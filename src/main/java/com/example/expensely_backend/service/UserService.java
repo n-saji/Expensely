@@ -22,9 +22,27 @@ public class UserService {
 
 
     public void save(User user){
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
 
-        userRepository.save(user);
+        if (user.getEmail() == null || user.getPhone() == null || user.getPassword() == null) {
+            throw new IllegalArgumentException("Email, phone, and password must be provided");
+        }
+        if (user.getCurrency() == null) {
+            throw new IllegalArgumentException("Currency must be provided");
+        }
+        try {
+            Optional<User> existingUser = userRepository.findUserByEmailOrPhone(user.getEmail(), user.getPhone());
+            if (existingUser.isPresent()) {
+                throw new IllegalArgumentException("Email or phone already exists");
+            }
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Error checking email or phone: " + e.getMessage());
+        }
+        user.setPassword(passwordEncoder.encode(user.getPassword()));
+        try {
+            userRepository.save(user);
+        }catch (Exception e){
+            throw new IllegalArgumentException("Error saving user: " + e.getMessage());
+        }
     }
 
     public Boolean authenticate(String email, String phone,String password) {
