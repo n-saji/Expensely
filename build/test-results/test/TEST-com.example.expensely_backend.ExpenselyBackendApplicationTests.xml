@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.expensely_backend.ExpenselyBackendApplicationTests" tests="1" skipped="0" failures="0" errors="0" timestamp="2025-06-06T21:46:50.111Z" hostname="Nikhils-Mac.local" time="0.406">
+  <properties/>
+  <testcase name="contextLoads()" classname="com.example.expensely_backend.ExpenselyBackendApplicationTests" time="0.406"/>
+  <system-out><![CDATA[17:46:46.334 [Test worker] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.example.expensely_backend.ExpenselyBackendApplicationTests]: ExpenselyBackendApplicationTests does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+17:46:46.405 [Test worker] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.example.expensely_backend.ExpenselyBackendApplication for test class com.example.expensely_backend.ExpenselyBackendApplicationTests
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.5.0)
+
+2025-06-06T17:46:46.590-04:00  INFO 56303 --- [expensely_backend] [    Test worker] c.e.e.ExpenselyBackendApplicationTests   : Starting ExpenselyBackendApplicationTests using Java 17.0.15 with PID 56303 (started by nikhilsaji in /Users/nikhilsaji/Desktop/Practise/expensely_backend)
+2025-06-06T17:46:46.591-04:00  INFO 56303 --- [expensely_backend] [    Test worker] c.e.e.ExpenselyBackendApplicationTests   : No active profile set, falling back to 1 default profile: "default"
+2025-06-06T17:46:46.898-04:00  INFO 56303 --- [expensely_backend] [    Test worker] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2025-06-06T17:46:46.926-04:00  INFO 56303 --- [expensely_backend] [    Test worker] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 24 ms. Found 5 JPA repository interfaces.
+2025-06-06T17:46:47.129-04:00  INFO 56303 --- [expensely_backend] [    Test worker] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2025-06-06T17:46:47.148-04:00  INFO 56303 --- [expensely_backend] [    Test worker] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.6.15.Final
+2025-06-06T17:46:47.162-04:00  INFO 56303 --- [expensely_backend] [    Test worker] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2025-06-06T17:46:47.273-04:00  INFO 56303 --- [expensely_backend] [    Test worker] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2025-06-06T17:46:47.288-04:00  INFO 56303 --- [expensely_backend] [    Test worker] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2025-06-06T17:46:47.398-04:00  INFO 56303 --- [expensely_backend] [    Test worker] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@69ba72da
+2025-06-06T17:46:47.398-04:00  INFO 56303 --- [expensely_backend] [    Test worker] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2025-06-06T17:46:47.427-04:00  WARN 56303 --- [expensely_backend] [    Test worker] org.hibernate.orm.deprecation            : HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2025-06-06T17:46:47.438-04:00  INFO 56303 --- [expensely_backend] [    Test worker] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
+	Database JDBC URL [Connecting through datasource 'HikariDataSource (HikariPool-1)']
+	Database driver: undefined/unknown
+	Database version: 16.8
+	Autocommit mode: undefined/unknown
+	Isolation level: undefined/unknown
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2025-06-06T17:46:48.009-04:00  INFO 56303 --- [expensely_backend] [    Test worker] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2025-06-06T17:46:48.463-04:00  INFO 56303 --- [expensely_backend] [    Test worker] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2025-06-06T17:46:48.965-04:00  WARN 56303 --- [expensely_backend] [    Test worker] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2025-06-06T17:46:49.017-04:00  WARN 56303 --- [expensely_backend] [    Test worker] .s.s.UserDetailsServiceAutoConfiguration : 
+
+Using generated security password: 09f5cdd6-a98d-4600-8a05-605bfd85b1b3
+
+This generated password is for development use only. Your security configuration must be updated before running your application in production.
+
+2025-06-06T17:46:49.024-04:00  INFO 56303 --- [expensely_backend] [    Test worker] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with UserDetailsService bean with name inMemoryUserDetailsManager
+2025-06-06T17:46:50.094-04:00  INFO 56303 --- [expensely_backend] [    Test worker] c.e.e.ExpenselyBackendApplicationTests   : Started ExpenselyBackendApplicationTests in 3.629 seconds (process running for 4.221)
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
