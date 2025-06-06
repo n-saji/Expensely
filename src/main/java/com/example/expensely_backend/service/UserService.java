@@ -32,7 +32,7 @@ public class UserService {
 //        }
         try {
             Optional<User> existingUser = userRepository.findUserByEmailOrPhone(user.getEmail(), user.getPhone());
-            if (existingUser.isPresent()) {
+            if (existingUser.isPresent() && existingUser.get().getId() != user.getId()) {
                 throw new IllegalArgumentException("Email or phone already exists");
             }
         } catch (Exception e) {
@@ -70,7 +70,15 @@ public class UserService {
             throw new IllegalArgumentException("User email or phone is null");
         }
         return user;
+    }
 
+    public User UpdateUser(User user) {
+        try {
+            userRepository.save(user);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Error updating user: " + e.getMessage());
+        }
+        return user;
     }
 
 

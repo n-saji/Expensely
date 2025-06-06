@@ -156,5 +156,26 @@ public class UserController {
         }
     }
 
+    @PatchMapping("/update-profile")
+    public ResponseEntity<?> updateProfile(@RequestBody User user) {
+        try {
+            User existingUser = userService.GetUserById(user.getId().toString());
+            if (existingUser == null) {
+                return ResponseEntity.status(404).body(new UserRes(null, "User not found"));
+            }
+            // Update fields
+            if (user.getEmail() != null) existingUser.setEmail(user.getEmail());
+            if (user.getPhone() != null) existingUser.setPhone(user.getPhone());
+            if (user.getCurrency() != null) existingUser.setCurrency(user.getCurrency());
+            if (user.getName() != null) existingUser.setName(user.getName());
+            if (user.getCountry_code() != null) existingUser.setCountry_code(user.getCountry_code());
+            // Add other fields as necessary
+
+            userService.UpdateUser(existingUser);
+            return ResponseEntity.ok(new UserRes(existingUser, "Profile updated successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new UserRes(null, e.getMessage()));
+        }
+    }
 
 }
