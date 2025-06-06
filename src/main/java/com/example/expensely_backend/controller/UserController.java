@@ -1,6 +1,7 @@
 package com.example.expensely_backend.controller;
 
 import com.example.expensely_backend.dto.AuthResponse;
+import com.example.expensely_backend.dto.UserRes;
 import com.example.expensely_backend.model.ExpiredToken;
 import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.service.ExpiredTokenService;
@@ -139,6 +140,19 @@ public class UserController {
             return ResponseEntity.badRequest().body(
                     new AuthResponse("Error logging out: " + e.getMessage(), null, null, "internal server error")
             );
+        }
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getUserById(@PathVariable String id) {
+        try {
+            User user = userService.GetUserById(id);
+            if (user == null) {
+                return ResponseEntity.status(404).body(new UserRes(null, "User not found"));
+            }
+            return ResponseEntity.ok(new UserRes(user,null));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new UserRes(null, e.getMessage()));
         }
     }
 
