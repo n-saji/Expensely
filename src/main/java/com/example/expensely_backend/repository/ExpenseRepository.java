@@ -17,7 +17,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
 
     List<Expense> findByCategoryIdAndUserId(UUID categoryId, UUID userId);
 
-    @Query("SELECT e from Expense e where e.user.id = :userId and e.expenseDate >= :startDate and e.expenseDate < :endDate order by e.expenseDate desc")
+    @Query("SELECT e from Expense e where e.user.id = :userId and e.expenseDate >= :startDate and e.expenseDate < :endDate order by e.expenseDate")
     List<Expense> findByUserIdAndTimeFrame(
             @Param("userId") UUID userId,
             @Param("startDate") LocalDateTime startDate,

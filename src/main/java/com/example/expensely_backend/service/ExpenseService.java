@@ -1,6 +1,7 @@
 package com.example.expensely_backend.service;
 
 
+import com.example.expensely_backend.dto.ExpenseResponse;
 import com.example.expensely_backend.model.Category;
 import com.example.expensely_backend.model.Expense;
 import com.example.expensely_backend.model.User;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class ExpenseService {
@@ -117,13 +119,14 @@ public class ExpenseService {
         return expenseRepository.save(oldExpense);
     }
 
-    public List<Expense> getExpenseByUserIdAndStartDateAndEndDate(String userId, LocalDateTime startDate, LocalDateTime endDate) {
+    public List<ExpenseResponse> getExpenseByUserIdAndStartDateAndEndDate(String userId, LocalDateTime startDate, LocalDateTime endDate) {
         User user = userService.GetUserById(userId);
         if (user == null) {
             throw new IllegalArgumentException("User not found");
         }
         System.out.println("Getting expenses for user: " + userId + " from " + startDate + " to " + endDate);
 
-        return expenseRepository.findByUserIdAndTimeFrame(user.getId(), startDate, endDate);
+        List<Expense> expenses = expenseRepository.findByUserIdAndTimeFrame(user.getId(), startDate, endDate);
+        return expenses.stream().map(ExpenseResponse::new).collect(Collectors.toList());
     }
 }

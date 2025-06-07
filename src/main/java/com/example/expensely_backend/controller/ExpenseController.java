@@ -1,6 +1,7 @@
 package com.example.expensely_backend.controller;
 
 
+import com.example.expensely_backend.dto.ExpenseOverview;
 import com.example.expensely_backend.dto.UserRes;
 import com.example.expensely_backend.model.Expense;
 import com.example.expensely_backend.service.ExpenseService;
@@ -96,6 +97,24 @@ public class ExpenseController {
             @RequestParam("end_date") @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate) {
         try {
             return ResponseEntity.ok(expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, startDate, endDate));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/user/{userId}/overview")
+    public ResponseEntity<?> getExpensesOverviewByUserIdAndTimeFrame(
+            @PathVariable String userId,
+            @RequestParam(value = "start_date",required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startDate,
+            @RequestParam(value = "end_date",required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate) {
+        if (startDate == null) {
+            startDate = LocalDateTime.of(1970, 1, 1, 0, 0);
+        }
+        if (endDate == null) {
+            endDate = LocalDateTime.now();
+        }
+        try {
+            return ResponseEntity.ok(new ExpenseOverview(expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, startDate, endDate), userId));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
         }
