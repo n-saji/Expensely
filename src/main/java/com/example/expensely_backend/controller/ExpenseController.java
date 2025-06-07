@@ -1,16 +1,21 @@
 package com.example.expensely_backend.controller;
 
 
+import com.example.expensely_backend.dto.UserRes;
 import com.example.expensely_backend.model.Expense;
 import com.example.expensely_backend.service.ExpenseService;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping("/api/expenses")
 public class ExpenseController {
 
     private final ExpenseService expenseService;
+
     public ExpenseController(ExpenseService expenseService) {
         this.expenseService = expenseService;
     }
@@ -23,7 +28,7 @@ public class ExpenseController {
             expenseService.save(expense);
             return ResponseEntity.ok("Expense created successfully!");
 
-        }catch (Exception e) {
+        } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
     }
@@ -58,5 +63,42 @@ public class ExpenseController {
         }
     }
 
+    @PutMapping("/update/{id}")
+    public ResponseEntity<String> updateExpense(@PathVariable String id, @RequestBody Expense updatedExpense) {
+        try {
+            Expense existingExpense = expenseService.getExpenseById(id);
+            if (existingExpense == null) {
+                return ResponseEntity.badRequest().body("Expense not found");
+            }
+
+            // Save updated expense
+            expenseService.updateExpense(updatedExpense);
+            return ResponseEntity.ok("Expense updated successfully!");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/user/{userId}/category/{categoryId}")
+    public ResponseEntity<?> getExpensesByCategoryIdAndUserID(@PathVariable String categoryId, @PathVariable String userId) {
+        try {
+            return ResponseEntity.ok(expenseService.getExpensesByCategoryIdAndUserID(categoryId, userId));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
+
+        }
+    }
+
+    @GetMapping("/user/{userId}/timeframe")
+    public ResponseEntity<?> getExpensesByUserIdAndTimeFrame(
+            @PathVariable String userId,
+            @RequestParam("start_date") @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startDate,
+            @RequestParam("end_date") @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate) {
+        try {
+            return ResponseEntity.ok(expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, startDate, endDate));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
+        }
+    }
 
 }

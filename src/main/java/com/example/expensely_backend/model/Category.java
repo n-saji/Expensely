@@ -19,10 +19,10 @@ public class Category {
     private User user;
 
     @Column(nullable = false)
-@Getter @Setter
+    @Getter @Setter
     private String name;
 
     @Column(nullable = false)
-@Getter @Setter
+    @Getter @Setter
     private String type; // "expense" or "income"
 }

@@ -13,6 +13,7 @@ import java.util.UUID;
 public class Expense {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
+    @Getter @Setter
     private UUID id;
 
     @ManyToOne
@@ -24,12 +25,13 @@ public class Expense {
     private Category category;
 
     @Column(nullable = false)
-    @Getter
+    @Getter @Setter
     private BigDecimal amount;
 
-    @Getter
+    @Getter @Setter
     private String description;
 
     @Column(name = "expense_date")
-    private LocalDateTime expenseDate = LocalDateTime.now();
+    @Getter @Setter
+    private LocalDateTime expenseDate;
 }
