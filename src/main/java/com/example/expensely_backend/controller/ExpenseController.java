@@ -24,8 +24,10 @@ public class ExpenseController {
     @PostMapping("/create")
     public ResponseEntity<String> createExpense(@RequestBody Expense expense) {
         // Logic to create an expense
-        System.out.println("Creating expense: " + expense.getAmount());
         try {
+            if (expense.getExpenseDate() == null) {
+                expense.setExpenseDate(LocalDateTime.now());
+            }
             expenseService.save(expense);
             return ResponseEntity.ok("Expense created successfully!");
 

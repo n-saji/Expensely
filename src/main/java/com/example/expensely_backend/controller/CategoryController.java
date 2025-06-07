@@ -53,9 +53,10 @@ public class CategoryController {
 //    }
 
     @GetMapping("/user/{userId}")
-    public ResponseEntity<?> getCategoriesByUserId(@PathVariable String userId) {
+    public ResponseEntity<?> getCategoriesByUserId(@PathVariable String userId,
+                                                   @RequestParam(required = false) String type) {
         try {
-            return ResponseEntity.ok(categoryService.getCategoriesByUserId(userId));
+            return ResponseEntity.ok(categoryService.getCategoriesByUserId(userId,type));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }

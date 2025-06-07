@@ -62,12 +62,12 @@ public class CategoryService {
         return categories;
     }
 
-    public Iterable<Category> getCategoriesByUserId(String userId) {
+    public Iterable<Category> getCategoriesByUserId(String userId, String type) {
         var user = userService.GetUserById(userId);
         if (user == null) {
             throw new IllegalArgumentException("User not found");
         }
-        return categoryRepository.findByUser(user);
+        return categoryRepository.findByUserAndType(user,type);
     }
 
 
