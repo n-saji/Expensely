@@ -20,9 +20,7 @@ public class ExpenseService {
     private final CategoryService categoryService;
     private final UserService userService;
 
-    public ExpenseService(ExpenseRepository expenseRepository,
-                          CategoryService categoryService,
-                          UserService userService) {
+    public ExpenseService(ExpenseRepository expenseRepository, CategoryService categoryService, UserService userService) {
         this.expenseRepository = expenseRepository;
         this.categoryService = categoryService;
         this.userService = userService;
@@ -50,8 +48,7 @@ public class ExpenseService {
     }
 
     public Expense getExpenseById(String id) {
-        return expenseRepository.findById(UUID.fromString(id))
-                .orElseThrow(() -> new IllegalArgumentException("Expense not found"));
+        return expenseRepository.findById(UUID.fromString(id)).orElseThrow(() -> new IllegalArgumentException("Expense not found"));
     }
 
     public void deleteExpenseById(String id) {
@@ -90,8 +87,7 @@ public class ExpenseService {
 
         Expense oldExpense = getExpenseById(expense.getId().toString());
 
-        if (expense.getCategory() != null && expense.getCategory().getId() != null &&
-                !expense.getCategory().getId().equals(oldExpense.getCategory().getId())) {
+        if (expense.getCategory() != null && expense.getCategory().getId() != null && !expense.getCategory().getId().equals(oldExpense.getCategory().getId())) {
             Category category = categoryService.getCategoryById(expense.getCategory().getId().toString());
             if (category == null) {
                 throw new IllegalArgumentException("Category not found");
@@ -124,7 +120,6 @@ public class ExpenseService {
         if (user == null) {
             throw new IllegalArgumentException("User not found");
         }
-        System.out.println("Getting expenses for user: " + userId + " from " + startDate + " to " + endDate);
 
         List<Expense> expenses;
         if (order == null || order.equalsIgnoreCase("desc")) {
@@ -158,5 +153,45 @@ public class ExpenseService {
             }
         }
         expenseRepository.deleteAll(expenses);
+    }
+
+    public List<ExpenseResponse> fetchExpensesWithConditions(String userId, LocalDateTime startDate, LocalDateTime endDate, String order, String categoryId, int page, int limit) {
+        System.out.println("Fetching expenses with conditions: userId=" + userId + ", startDate=" + startDate + ", endDate=" + endDate + ", order=" + order + ", categoryId=" + categoryId + ", page=" + page + ", limit=" + limit);
+        User user = userService.GetUserById(userId);
+        if (user == null) {
+            throw new IllegalArgumentException("User not found");
+        }
+        if (page < 1) {
+            throw new IllegalArgumentException("Page must be greater than 0");
+        }
+        int offset = (page - 1) * limit;
+
+        List<Expense> expenses;
+        UUID categoryUUID = null;
+        if (categoryId != null) {
+            Category category = categoryService.getCategoryById(categoryId);
+            if (category == null) {
+                throw new IllegalArgumentException("Category not found");
+            }
+            categoryUUID = category.getId();
+            if (order == null || order.equalsIgnoreCase("desc")) {
+                expenses = expenseRepository.findByUserIdAndTimeFrameAndCategoryDesc(user.getId(), startDate, endDate, categoryUUID, limit, offset);
+            } else if (order.equalsIgnoreCase("asc")) {
+                expenses = expenseRepository.findByUserIdAndTimeFrameAndCategoryAsc(user.getId(), startDate, endDate, categoryUUID, limit, offset);
+            } else {
+                throw new IllegalArgumentException("Order must be 'asc' or 'desc'");
+            }
+        } else {
+            if (order == null || order.equalsIgnoreCase("desc")) {
+                expenses = expenseRepository.findByUserIdAndTimeFrameDescWithLimit(user.getId(), startDate, endDate, limit, offset);
+            } else if (order.equalsIgnoreCase("asc")) {
+                expenses = expenseRepository.findByUserIdAndTimeFrameAscWithLimit(user.getId(), startDate, endDate, limit, offset);
+            } else {
+                throw new IllegalArgumentException("Order must be 'asc' or 'desc'");
+            }
+        }
+
+
+        return expenses.stream().map(ExpenseResponse::new).collect(Collectors.toList());
     }
 }
