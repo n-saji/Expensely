@@ -1,6 +1,7 @@
 package com.example.expensely_backend.controller;
 
 
+import com.example.expensely_backend.dto.AuthResponse;
 import com.example.expensely_backend.dto.ExpenseOverview;
 import com.example.expensely_backend.dto.UserRes;
 import com.example.expensely_backend.model.Expense;
@@ -22,17 +23,17 @@ public class ExpenseController {
     }
 
     @PostMapping("/create")
-    public ResponseEntity<String> createExpense(@RequestBody Expense expense) {
+    public ResponseEntity<?> createExpense(@RequestBody Expense expense) {
         // Logic to create an expense
         try {
             if (expense.getExpenseDate() == null) {
                 expense.setExpenseDate(LocalDateTime.now());
             }
             expenseService.save(expense);
-            return ResponseEntity.ok("Expense created successfully!");
+            return ResponseEntity.ok(new AuthResponse("Expense created successfully!", null,null,""));
 
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+            return ResponseEntity.badRequest().body(new AuthResponse("Expense creation failed!", null,null,e.getMessage()));
         }
     }
 
