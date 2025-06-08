@@ -129,4 +129,25 @@ public class ExpenseService {
         List<Expense> expenses = expenseRepository.findByUserIdAndTimeFrame(user.getId(), startDate, endDate);
         return expenses.stream().map(ExpenseResponse::new).collect(Collectors.toList());
     }
+
+    public void deleteBuUserIDAndExpenseIds(String userId, List<Expense> expenses) {
+        User user = userService.GetUserById(userId);
+        if (user == null) {
+            throw new IllegalArgumentException("User not found");
+        }
+
+        for (int i = 0 ; i < expenses.size(); i++) {
+            if (expenses.get(i).getId() == null) {
+                throw new IllegalArgumentException("Expense ID must be provided");
+            }
+            expenses.set(i, getExpenseById(expenses.get(i).getId().toString()));
+        }
+
+        for (Expense expense : expenses) {
+            if (!expense.getUser().getId().equals(user.getId())) {
+                throw new IllegalArgumentException("Expense does not belong to user");
+            }
+        }
+        expenseRepository.deleteAll(expenses);
+    }
 }

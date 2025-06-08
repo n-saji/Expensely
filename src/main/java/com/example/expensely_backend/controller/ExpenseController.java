@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/expenses")
@@ -68,18 +69,18 @@ public class ExpenseController {
     }
 
     @PutMapping("/update/{id}")
-    public ResponseEntity<String> updateExpense(@PathVariable String id, @RequestBody Expense updatedExpense) {
+    public ResponseEntity<?> updateExpense(@PathVariable String id, @RequestBody Expense updatedExpense) {
         try {
             Expense existingExpense = expenseService.getExpenseById(id);
             if (existingExpense == null) {
-                return ResponseEntity.badRequest().body("Expense not found");
+                return ResponseEntity.badRequest().body(new AuthResponse("Expense not found!", null,null,""));
             }
 
             // Save updated expense
             expenseService.updateExpense(updatedExpense);
-            return ResponseEntity.ok("Expense updated successfully!");
+            return ResponseEntity.ok(new AuthResponse("Expense updated successfully!", null,null,""));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+            return ResponseEntity.badRequest().body(new AuthResponse("Expense update failed!", null,null,e.getMessage()));
         }
     }
 
@@ -120,6 +121,16 @@ public class ExpenseController {
             return ResponseEntity.ok(new ExpenseOverview(expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, startDate, endDate), userId));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/user/{userId}/bulk-delete")
+    public ResponseEntity<?> bulkDeleteExpensesByUserId(@PathVariable String userId,@RequestBody List<Expense> expenses) {
+        try {
+            expenseService.deleteBuUserIDAndExpenseIds(userId,expenses);
+            return ResponseEntity.ok(new AuthResponse("Bulk delete expenses successfully!", null,null,""));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new AuthResponse("Bulk delete expenses failed!", null,null,e.getMessage()));
         }
     }
 
