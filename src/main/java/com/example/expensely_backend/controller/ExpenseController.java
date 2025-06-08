@@ -31,10 +31,10 @@ public class ExpenseController {
                 expense.setExpenseDate(LocalDateTime.now());
             }
             expenseService.save(expense);
-            return ResponseEntity.ok(new AuthResponse("Expense created successfully!", null,null,""));
+            return ResponseEntity.ok(new AuthResponse("Expense created successfully!", null, null, ""));
 
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new AuthResponse("Expense creation failed!", null,null,e.getMessage()));
+            return ResponseEntity.badRequest().body(new AuthResponse("Expense creation failed!", null, null, e.getMessage()));
         }
     }
 
@@ -73,14 +73,14 @@ public class ExpenseController {
         try {
             Expense existingExpense = expenseService.getExpenseById(id);
             if (existingExpense == null) {
-                return ResponseEntity.badRequest().body(new AuthResponse("Expense not found!", null,null,""));
+                return ResponseEntity.badRequest().body(new AuthResponse("Expense not found!", null, null, ""));
             }
 
             // Save updated expense
             expenseService.updateExpense(updatedExpense);
-            return ResponseEntity.ok(new AuthResponse("Expense updated successfully!", null,null,""));
+            return ResponseEntity.ok(new AuthResponse("Expense updated successfully!", null, null, ""));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new AuthResponse("Expense update failed!", null,null,e.getMessage()));
+            return ResponseEntity.badRequest().body(new AuthResponse("Expense update failed!", null, null, e.getMessage()));
         }
     }
 
@@ -97,10 +97,17 @@ public class ExpenseController {
     @GetMapping("/user/{userId}/timeframe")
     public ResponseEntity<?> getExpensesByUserIdAndTimeFrame(
             @PathVariable String userId,
-            @RequestParam("start_date") @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startDate,
-            @RequestParam("end_date") @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate) {
+            @RequestParam(value = "start_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startDate,
+            @RequestParam(value = "end_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate ,
+    @RequestParam(value= "order", required = false, defaultValue = "desc") String order) {
+        if (startDate == null) {
+            startDate = LocalDateTime.of(1970, 1, 1, 0, 0);
+        }
+        if (endDate == null) {
+            endDate = LocalDateTime.now();
+        }
         try {
-            return ResponseEntity.ok(expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, startDate, endDate));
+            return ResponseEntity.ok(expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, startDate, endDate,order));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
         }
@@ -109,8 +116,8 @@ public class ExpenseController {
     @GetMapping("/user/{userId}/overview")
     public ResponseEntity<?> getExpensesOverviewByUserIdAndTimeFrame(
             @PathVariable String userId,
-            @RequestParam(value = "start_date",required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startDate,
-            @RequestParam(value = "end_date",required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate) {
+            @RequestParam(value = "start_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startDate,
+            @RequestParam(value = "end_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate) {
         if (startDate == null) {
             startDate = LocalDateTime.of(1970, 1, 1, 0, 0);
         }
@@ -118,19 +125,19 @@ public class ExpenseController {
             endDate = LocalDateTime.now();
         }
         try {
-            return ResponseEntity.ok(new ExpenseOverview(expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, startDate, endDate), userId));
+            return ResponseEntity.ok(new ExpenseOverview(expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, startDate, endDate,"desc"),userId));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
         }
     }
 
     @PostMapping("/user/{userId}/bulk-delete")
-    public ResponseEntity<?> bulkDeleteExpensesByUserId(@PathVariable String userId,@RequestBody List<Expense> expenses) {
+    public ResponseEntity<?> bulkDeleteExpensesByUserId(@PathVariable String userId, @RequestBody List<Expense> expenses) {
         try {
-            expenseService.deleteBuUserIDAndExpenseIds(userId,expenses);
-            return ResponseEntity.ok(new AuthResponse("Bulk delete expenses successfully!", null,null,""));
+            expenseService.deleteBuUserIDAndExpenseIds(userId, expenses);
+            return ResponseEntity.ok(new AuthResponse("Bulk delete expenses successfully!", null, null, ""));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new AuthResponse("Bulk delete expenses failed!", null,null,e.getMessage()));
+            return ResponseEntity.badRequest().body(new AuthResponse("Bulk delete expenses failed!", null, null, e.getMessage()));
         }
     }
 

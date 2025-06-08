@@ -119,14 +119,23 @@ public class ExpenseService {
         return expenseRepository.save(oldExpense);
     }
 
-    public List<ExpenseResponse> getExpenseByUserIdAndStartDateAndEndDate(String userId, LocalDateTime startDate, LocalDateTime endDate) {
+    public List<ExpenseResponse> getExpenseByUserIdAndStartDateAndEndDate(String userId, LocalDateTime startDate, LocalDateTime endDate, String order) {
         User user = userService.GetUserById(userId);
         if (user == null) {
             throw new IllegalArgumentException("User not found");
         }
         System.out.println("Getting expenses for user: " + userId + " from " + startDate + " to " + endDate);
 
-        List<Expense> expenses = expenseRepository.findByUserIdAndTimeFrame(user.getId(), startDate, endDate);
+        List<Expense> expenses;
+        if (order == null || order.equalsIgnoreCase("desc")) {
+            expenses = expenseRepository.findByUserIdAndTimeFrameDesc(user.getId(), startDate, endDate);
+        } else if (order.equalsIgnoreCase("asc")) {
+            expenses = expenseRepository.findByUserIdAndTimeFrameAsc(user.getId(), startDate, endDate);
+
+        } else {
+            throw new IllegalArgumentException("Order must be 'asc' or 'desc'");
+        }
+
         return expenses.stream().map(ExpenseResponse::new).collect(Collectors.toList());
     }
 
@@ -136,7 +145,7 @@ public class ExpenseService {
             throw new IllegalArgumentException("User not found");
         }
 
-        for (int i = 0 ; i < expenses.size(); i++) {
+        for (int i = 0; i < expenses.size(); i++) {
             if (expenses.get(i).getId() == null) {
                 throw new IllegalArgumentException("Expense ID must be provided");
             }
