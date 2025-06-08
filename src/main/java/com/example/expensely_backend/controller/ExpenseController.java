@@ -118,11 +118,12 @@ public class ExpenseController {
             @PathVariable String userId,
             @RequestParam(value = "start_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startDate,
             @RequestParam(value = "end_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate) {
+        int year = LocalDateTime.now().getYear();
         if (startDate == null) {
-            startDate = LocalDateTime.of(1970, 1, 1, 0, 0);
+            startDate = LocalDateTime.of(year, 1, 1, 0, 0);
         }
         if (endDate == null) {
-            endDate = LocalDateTime.now();
+            endDate = LocalDateTime.now().withHour(23).withMinute(59).withSecond(59);
         }
         try {
             return ResponseEntity.ok(new ExpenseOverview(expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, startDate, endDate, "desc"), userId));

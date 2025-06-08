@@ -27,8 +27,6 @@ public class ExpenseResponse {
     @Getter
     private final String currency;
 
-
-
     public ExpenseResponse(
             Expense expense
     ) {
