@@ -4,6 +4,7 @@ import com.example.expensely_backend.model.Category;
 import com.example.expensely_backend.repository.CategoryRepository;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -67,7 +68,16 @@ public class CategoryService {
         if (user == null) {
             throw new IllegalArgumentException("User not found");
         }
-        return categoryRepository.findByUserAndType(user,type);
+        List<Category> categories ;
+        if (type == null || type.isEmpty()) {
+            categories = categoryRepository.findByUserId(user.getId());
+        } else {
+            categories = categoryRepository.findByUserAndType(user, type);
+        }
+        categories.forEach((category1) -> {
+            category1.setUser(null);
+        });
+        return categories;
     }
 
 
