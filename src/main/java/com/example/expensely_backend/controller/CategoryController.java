@@ -1,5 +1,6 @@
 package com.example.expensely_backend.controller;
 
+import com.example.expensely_backend.dto.AuthResponse;
 import com.example.expensely_backend.model.Category;
 import com.example.expensely_backend.service.CategoryService;
 import org.springframework.http.ResponseEntity;
@@ -59,6 +60,16 @@ public class CategoryController {
             return ResponseEntity.ok(categoryService.getCategoriesByUserId(userId,type));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
+
+    @PatchMapping("/update/{id}")
+    public ResponseEntity<?> updateCategory(@PathVariable String id, @RequestBody Category category) {
+        try {
+                categoryService.updateCategory(id,category);
+            return ResponseEntity.ok(new AuthResponse("Category updated successfully!",null,null,null));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new AuthResponse("Error updating category", null, null, e.getMessage()));
         }
     }
 

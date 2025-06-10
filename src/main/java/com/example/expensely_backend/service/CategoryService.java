@@ -80,5 +80,24 @@ public class CategoryService {
         return categories;
     }
 
+    public void updateCategory(String c_id, Category category) {
+        if (c_id == null || c_id.isEmpty()) {
+            throw new IllegalArgumentException("Category ID must not be null");
+        }
+        var existingCategory = getCategoryById(c_id);
+        if (category.getName() != null && !category.getName().isEmpty()) {
+            existingCategory.setName(category.getName());
+        }
+        if (category.getType() != null && !category.getType().isEmpty()) {
+            existingCategory.setType(category.getType());
+        }
+        try{
+            categoryRepository.save(existingCategory);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Error updating category: " + e.getMessage());
+        }
+
+    }
+
 
 }
