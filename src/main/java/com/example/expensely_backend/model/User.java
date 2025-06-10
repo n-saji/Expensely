@@ -42,8 +42,33 @@ public class User {
     @Getter
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    @Column(nullable = false )
+    @Column(nullable = false)
     @Getter
     private String currency = "USD"; // Default currency set to USD
+
+    @Column(nullable = false, columnDefinition = "varchar(255) default 'light'")
+    @Getter
+    @Setter
+    private String theme = "light"; // Default theme set to light
+
+    @Column(nullable = false, columnDefinition = "varchar(255) default 'en'")
+    @Getter
+    @Setter
+    private String language = "en"; // Default language set to English
+
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    @Getter
+    @Setter
+    private Boolean isActive = true; // Default active status set to true
+
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    @Getter
+    @Setter
+    private Boolean isAdmin = false;
+
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    @Getter
+    @Setter
+    private Boolean NotificationsEnabled = true; // Default notifications enabled status set to true
 
 }

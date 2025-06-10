@@ -21,15 +21,11 @@ public class UserService {
     }
 
 
-    public void save(User user){
+    public void save(User user) {
 
         if (user.getEmail() == null || user.getPhone() == null || user.getPassword() == null) {
             throw new IllegalArgumentException("Email, phone, and password must be provided");
         }
-//        default - USD
-//        if (user.getCurrency() == null) {
-//            throw new IllegalArgumentException("Currency must be provided");
-//        }
         try {
             Optional<User> existingUser = userRepository.findUserByEmailOrPhone(user.getEmail(), user.getPhone());
             if (existingUser.isPresent() && existingUser.get().getId() != user.getId()) {
@@ -41,22 +37,29 @@ public class UserService {
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         try {
             userRepository.save(user);
-        }catch (Exception e){
+        } catch (Exception e) {
             throw new IllegalArgumentException("Error saving user: " + e.getMessage());
         }
     }
 
-    public Boolean authenticate(String email, String phone,String password) {
+    public Boolean authenticate(String email, String phone, String password) {
 
 
-    User user = GetUserByEmailOrPhone(email, phone);
+        User user = GetUserByEmailOrPhone(email, phone);
+        if (user.getIsActive() == null || !user.getIsActive()) {
+            throw new IllegalArgumentException("User is not active");
+        }
         return passwordEncoder.matches(password, user.getPassword());
 
     }
 
     public User GetUserById(String id) {
         UUID uuid = UUID.fromString(id);
-        return userRepository.findById(uuid).orElseThrow(() -> new IllegalArgumentException("User not found"));
+        User user =  userRepository.findById(uuid).orElseThrow(() -> new IllegalArgumentException("User not found"));
+        if (user.getIsActive() == null || !user.getIsActive()) {
+            throw new IllegalArgumentException("User is not active");
+        }
+        return user;
     }
 
     public User GetUserByEmailOrPhone(String email, String phone) {

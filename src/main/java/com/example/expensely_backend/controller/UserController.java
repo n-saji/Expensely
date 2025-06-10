@@ -172,7 +172,61 @@ public class UserController {
             // Add other fields as necessary
 
             userService.UpdateUser(existingUser);
-            return ResponseEntity.ok(new UserRes(existingUser, "Profile updated successfully"));
+            return ResponseEntity.ok(new UserRes(existingUser, null));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new UserRes(null, e.getMessage()));
+        }
+    }
+
+    @PatchMapping("/update-settings")
+    public ResponseEntity<?> updateSettings(@RequestBody User user) {
+        try {
+            User existingUser = userService.GetUserById(user.getId().toString());
+            if (existingUser == null) {
+                return ResponseEntity.status(404).body(new UserRes(null, "User not found"));
+            }
+            if (user.getNotificationsEnabled() != null) existingUser.setNotificationsEnabled(user.getNotificationsEnabled());
+            if (user.getLanguage() != null) existingUser.setLanguage(user.getLanguage());
+            if( user.getTheme() != null) existingUser.setTheme(user.getTheme());
+            if(user.getCurrency() != null) existingUser.setCurrency(user.getCurrency());
+            if (user.getIsActive() != null) existingUser.setIsActive(user.getIsActive());
+            if (user.getIsAdmin() != null) existingUser.setIsAdmin(user.getIsAdmin());
+
+            userService.UpdateUser(existingUser);
+            return ResponseEntity.ok(new UserRes(existingUser, null));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new UserRes(null, e.getMessage()));
+        }
+    }
+
+    @PatchMapping("/update-password")
+    public ResponseEntity<?> updatePassword(@RequestBody User user) {
+        try {
+            User existingUser = userService.GetUserById(user.getId().toString());
+            if (existingUser == null) {
+                return ResponseEntity.status(404).body(new UserRes(null, "User not found"));
+            }
+            if (user.getPassword() == null || user.getPassword().isEmpty()) {
+                return ResponseEntity.badRequest().body(new UserRes(null, "Password is required"));
+            }
+            existingUser.setPassword(user.getPassword());
+            userService.UpdateUser(existingUser);
+            return ResponseEntity.ok(new UserRes(existingUser, null));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new UserRes(null, e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/delete-account/{id}")
+    public ResponseEntity<?> deleteUser(@PathVariable String id) {
+        try {
+            User user = userService.GetUserById(id);
+            if (user == null) {
+                return ResponseEntity.status(404).body(new UserRes(null, "User not found"));
+            }
+            user.setIsActive(false);
+            userService.UpdateUser(user);
+            return ResponseEntity.ok(new UserRes(null, null));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new UserRes(null, e.getMessage()));
         }
