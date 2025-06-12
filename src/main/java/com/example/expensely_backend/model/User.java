@@ -71,4 +71,6 @@ public class User {
     @Setter
     private Boolean NotificationsEnabled = true; // Default notifications enabled status set to true
 
+    @Getter @Setter
+    private String profilePictureUrl;
 }

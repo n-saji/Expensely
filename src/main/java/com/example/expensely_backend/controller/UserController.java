@@ -232,4 +232,20 @@ public class UserController {
         }
     }
 
+    @PatchMapping("/{id}/update-profile-picture")
+    public ResponseEntity<?> updateProfilePicture(@PathVariable String id, @RequestParam("url") String picURL) {
+        try {
+            User user = userService.GetUserById(id);
+            if (user == null) {
+                return ResponseEntity.status(404).body(new UserRes(null, "User not found"));
+            }
+            user.setProfilePictureUrl(picURL);
+            userService.UpdateUser(user);
+            return ResponseEntity.ok(new UserRes(user, null));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new UserRes(null, e.getMessage()));
+        }
+    }
+
+
 }

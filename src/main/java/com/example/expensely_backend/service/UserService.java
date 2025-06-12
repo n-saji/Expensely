@@ -55,7 +55,7 @@ public class UserService {
 
     public User GetUserById(String id) {
         UUID uuid = UUID.fromString(id);
-        User user =  userRepository.findById(uuid).orElseThrow(() -> new IllegalArgumentException("User not found"));
+        User user = userRepository.findById(uuid).orElseThrow(() -> new IllegalArgumentException("User not found"));
         if (user.getIsActive() == null || !user.getIsActive()) {
             throw new IllegalArgumentException("User is not active");
         }
@@ -76,6 +76,7 @@ public class UserService {
     }
 
     public User UpdateUser(User user) {
+        if (user.getPassword() != null) user.setPassword(passwordEncoder.encode(user.getPassword()));
         try {
             userRepository.save(user);
         } catch (Exception e) {
