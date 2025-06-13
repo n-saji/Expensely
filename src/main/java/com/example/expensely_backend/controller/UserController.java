@@ -210,7 +210,7 @@ public class UserController {
                 return ResponseEntity.badRequest().body(new UserRes(null, "Password is required"));
             }
             existingUser.setPassword(user.getPassword());
-            userService.UpdateUser(existingUser);
+            userService.updatePassword(existingUser);
             return ResponseEntity.ok(new UserRes(existingUser, null));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new UserRes(null, e.getMessage()));
@@ -233,13 +233,13 @@ public class UserController {
     }
 
     @PatchMapping("/{id}/update-profile-picture")
-    public ResponseEntity<?> updateProfilePicture(@PathVariable String id, @RequestParam("url") String picURL) {
+    public ResponseEntity<?> updateProfilePicture(@PathVariable String id, @RequestParam("filepath") String filePath) {
         try {
             User user = userService.GetUserById(id);
             if (user == null) {
                 return ResponseEntity.status(404).body(new UserRes(null, "User not found"));
             }
-            user.setProfilePictureUrl(picURL);
+            user.setProfilePicFilePath(filePath);
             userService.UpdateUser(user);
             return ResponseEntity.ok(new UserRes(user, null));
         } catch (Exception e) {

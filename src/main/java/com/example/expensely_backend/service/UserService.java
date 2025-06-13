@@ -76,11 +76,24 @@ public class UserService {
     }
 
     public User UpdateUser(User user) {
-        if (user.getPassword() != null) user.setPassword(passwordEncoder.encode(user.getPassword()));
         try {
             userRepository.save(user);
         } catch (Exception e) {
             throw new IllegalArgumentException("Error updating user: " + e.getMessage());
+        }
+        return user;
+    }
+
+    public User updatePassword(User user) {
+        String password = user.getPassword();
+        if (password == null || password.isEmpty()) {
+            throw new IllegalArgumentException("Password cannot be null or empty");
+        }
+        user.setPassword(passwordEncoder.encode(password));
+        try {
+            userRepository.save(user);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Error updating password: " + e.getMessage());
         }
         return user;
     }

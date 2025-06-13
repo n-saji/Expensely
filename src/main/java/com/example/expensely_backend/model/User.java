@@ -71,6 +71,7 @@ public class User {
     @Setter
     private Boolean NotificationsEnabled = true; // Default notifications enabled status set to true
 
+    @Column(nullable = true, columnDefinition = "varchar(1000)")
     @Getter @Setter
-    private String profilePictureUrl;
+    private String profilePicFilePath;
 }
