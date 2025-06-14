@@ -7,6 +7,8 @@ import java.time.format.TextStyle;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static java.lang.Math.round;
+
 
 public class ExpenseOverview {
     @Getter
@@ -49,21 +51,30 @@ public class ExpenseOverview {
     public ExpenseOverview(List<ExpenseResponse> expenses, String userId) {
         this.userId = userId;
         this.TotalAmount = expenses.stream().mapToDouble(ExpenseResponse::getAmount).sum();
-        this.amountByCategory = expenses.stream().collect(Collectors.groupingBy(ExpenseResponse::getCategoryName, Collectors.summingDouble(ExpenseResponse::getAmount)));
+        Map<String, Double> rawSums = expenses.stream()
+                .collect(Collectors.groupingBy(
+                        ExpenseResponse::getCategoryName,
+                        Collectors.summingDouble(ExpenseResponse::getAmount)
+                ));
+        this.amountByCategory = rawSums.entrySet().stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        entry -> round(entry.getValue() * 100.0) / 100.0
+                ));
         this.totalCount = expenses.size();
 
         Map<Month, Double> monthMap = expenses.stream().collect(Collectors.groupingBy(expense -> expense.getExpenseDate().getMonth(), TreeMap::new, Collectors.summingDouble(ExpenseResponse::getAmount)));
-
         this.amountByMonth = monthMap.entrySet().stream().
-                collect(Collectors.toMap(entry -> entry.getKey().getDisplayName(TextStyle.FULL, Locale.ENGLISH), Map.Entry::getValue, (a, b) -> a, LinkedHashMap::new));
+                collect(Collectors.toMap(entry -> entry.getKey().getDisplayName(TextStyle.FULL, Locale.ENGLISH), entry -> round(entry.getValue() * 100.0) / 100.0, (a, b) -> a, LinkedHashMap::new));
+
 
         this.categoryCount = expenses.stream().collect(Collectors.groupingBy(ExpenseResponse::getCategoryName, Collectors.counting()));
         this.mostFrequentCategoryCount = categoryCount.values().stream().max(Long::compare).orElse(0L).intValue();
 
         Calendar calendar = Calendar.getInstance();
         int currentMonth = calendar.get(Calendar.MONTH);
-        this.thisMonthTotalExpense = monthMap.getOrDefault(Month.of(currentMonth + 1), 0.0);
-        this.comparedToLastMonthExpense = thisMonthTotalExpense - monthMap.getOrDefault(Month.of(currentMonth), 0.0);
+        this.thisMonthTotalExpense = round(monthMap.getOrDefault(Month.of(currentMonth + 1), 0.0) * 100.0) / 100.0;
+        this.comparedToLastMonthExpense = round( (thisMonthTotalExpense - monthMap.getOrDefault(Month.of(currentMonth), 0.0)) * 100.0) / 100.0;
         this.totalCategories = amountByCategory.size();
         this.mostFrequentCategory = categoryCount.entrySet().stream()
                 .max(Map.Entry.comparingByValue())
