@@ -44,8 +44,9 @@ public class ExpenseOverview {
     @Getter
     private final Double averageMonthlyExpense;
 
+
     @Getter
-    private final Map<String, Double> topTenMostExpenseiveItemThisMonth;
+    private final Map<String, Double> topFiveMostExpensiveItemThisMonth;
 
 
     public ExpenseOverview(List<ExpenseResponse> expenses, String userId) {
@@ -82,10 +83,10 @@ public class ExpenseOverview {
                 .orElse(null);
 
         this.averageMonthlyExpense = TotalAmount / (amountByMonth.size() == 0 ? 1 : amountByMonth.size());
-        this.topTenMostExpenseiveItemThisMonth = expenses.stream()
+        this.topFiveMostExpensiveItemThisMonth = expenses.stream()
                 .filter(expense -> expense.getExpenseDate().getMonth() == Month.of(currentMonth + 1))
                 .sorted(Comparator.comparingDouble(ExpenseResponse::getAmount).reversed())
-                .limit(10)
+                .limit(5) //only 5 is required
                 .collect(Collectors.toMap(ExpenseResponse::getDescription, ExpenseResponse::getAmount, (a, b) -> a, LinkedHashMap::new));
     }
 

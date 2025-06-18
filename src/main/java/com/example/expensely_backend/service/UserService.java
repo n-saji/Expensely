@@ -26,14 +26,11 @@ public class UserService {
         if (user.getEmail() == null || user.getPhone() == null || user.getPassword() == null) {
             throw new IllegalArgumentException("Email, phone, and password must be provided");
         }
-        try {
-            Optional<User> existingUser = userRepository.findUserByEmailOrPhone(user.getEmail(), user.getPhone());
-            if (existingUser.isPresent() && existingUser.get().getId() != user.getId()) {
-                throw new IllegalArgumentException("Email or phone already exists");
-            }
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Error checking email or phone: " + e.getMessage());
+        Optional<User> existingUser = userRepository.findUserByEmailOrPhone(user.getEmail(), user.getPhone());
+        if (existingUser.isPresent()) {
+            throw new IllegalArgumentException("Email or phone already exists");
         }
+
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         try {
             userRepository.save(user);

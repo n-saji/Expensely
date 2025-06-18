@@ -30,7 +30,7 @@ public class UserController {
             userService.save(user);
             return ResponseEntity.ok(new AuthResponse("User registered successfully!", null, user.getId().toString(), ""));
         }catch (Exception e) {
-            return ResponseEntity.badRequest().body(new AuthResponse("Something went wrong!", null, user.getId().toString(), e.getMessage()));
+            return ResponseEntity.badRequest().body(new AuthResponse(e.getMessage(), null, null, e.getMessage()));
         }
     }
 
