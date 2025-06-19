@@ -11,6 +11,7 @@ import static java.lang.Math.round;
 
 
 public class ExpenseOverview {
+
     @Getter
     private final String userId;
     @Getter
@@ -44,12 +45,15 @@ public class ExpenseOverview {
     @Getter
     private final Double averageMonthlyExpense;
 
+    @Getter
+    private final Map<String, Map<String, Double>> monthlyCategoryExpense;
+
 
     @Getter
     private final Map<String, Double> topFiveMostExpensiveItemThisMonth;
 
 
-    public ExpenseOverview(List<ExpenseResponse> expenses, String userId) {
+    public ExpenseOverview(List<ExpenseResponse> expenses, String userId, List<MonthlyCategoryExpense> monthlyCategoryExpenses) {
         this.userId = userId;
         this.TotalAmount = expenses.stream().mapToDouble(ExpenseResponse::getAmount).sum();
         Map<String, Double> rawSums = expenses.stream()
@@ -75,19 +79,41 @@ public class ExpenseOverview {
         Calendar calendar = Calendar.getInstance();
         int currentMonth = calendar.get(Calendar.MONTH);
         this.thisMonthTotalExpense = round(monthMap.getOrDefault(Month.of(currentMonth + 1), 0.0) * 100.0) / 100.0;
-        this.comparedToLastMonthExpense = round( (thisMonthTotalExpense - monthMap.getOrDefault(Month.of(currentMonth), 0.0)) * 100.0) / 100.0;
+        this.comparedToLastMonthExpense = round((thisMonthTotalExpense - monthMap.getOrDefault(Month.of(currentMonth), 0.0)) * 100.0) / 100.0;
         this.totalCategories = amountByCategory.size();
         this.mostFrequentCategory = categoryCount.entrySet().stream()
                 .max(Map.Entry.comparingByValue())
                 .map(Map.Entry::getKey)
                 .orElse(null);
 
-        this.averageMonthlyExpense = TotalAmount / (amountByMonth.size() == 0 ? 1 : amountByMonth.size());
+        this.averageMonthlyExpense = TotalAmount / (amountByMonth.isEmpty() ? 1 : amountByMonth.size());
         this.topFiveMostExpensiveItemThisMonth = expenses.stream()
                 .filter(expense -> expense.getExpenseDate().getMonth() == Month.of(currentMonth + 1))
                 .sorted(Comparator.comparingDouble(ExpenseResponse::getAmount).reversed())
                 .limit(5) //only 5 is required
                 .collect(Collectors.toMap(ExpenseResponse::getDescription, ExpenseResponse::getAmount, (a, b) -> a, LinkedHashMap::new));
+
+
+        this.monthlyCategoryExpense = new LinkedHashMap<>();
+
+        monthlyCategoryExpenses.sort(Comparator.comparingInt(dto ->
+                Month.valueOf(dto.getMonth().toUpperCase()).getValue()
+        ));
+
+        for (MonthlyCategoryExpense dto : monthlyCategoryExpenses) {
+            String month = dto.getMonth().trim();
+            String category = dto.getCategoryName();
+            Double amount = dto.getTotalAmount();
+
+            if (category == null) {
+                System.err.println("Null value found: month=" + month + ", category=" + category);
+                continue; // skip
+            }
+
+            monthlyCategoryExpense
+                    .computeIfAbsent(month, k -> new LinkedHashMap<>())
+                    .merge(category, amount, Double::sum);
+        }
     }
 
 

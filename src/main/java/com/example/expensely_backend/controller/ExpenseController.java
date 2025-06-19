@@ -126,7 +126,7 @@ public class ExpenseController {
             endDate = LocalDateTime.now().withHour(23).withMinute(59).withSecond(59);
         }
         try {
-            return ResponseEntity.ok(new ExpenseOverview(expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, startDate, endDate, "desc"), userId));
+            return ResponseEntity.ok(new ExpenseOverview(expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, startDate, endDate, "desc"), userId,expenseService.getMonthlyCategoryExpense(userId)));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
         }

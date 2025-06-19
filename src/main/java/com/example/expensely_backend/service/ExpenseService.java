@@ -1,7 +1,9 @@
 package com.example.expensely_backend.service;
 
 
+import com.example.expensely_backend.dto.ExpenseResList;
 import com.example.expensely_backend.dto.ExpenseResponse;
+import com.example.expensely_backend.dto.MonthlyCategoryExpense;
 import com.example.expensely_backend.model.Category;
 import com.example.expensely_backend.model.Expense;
 import com.example.expensely_backend.model.User;
@@ -155,8 +157,9 @@ public class ExpenseService {
         expenseRepository.deleteAll(expenses);
     }
 
-    public List<ExpenseResponse> fetchExpensesWithConditions(String userId, LocalDateTime startDate, LocalDateTime endDate, String order, String categoryId, int page, int limit) {
-        System.out.println("Fetching expenses with conditions: userId=" + userId + ", startDate=" + startDate + ", endDate=" + endDate + ", order=" + order + ", categoryId=" + categoryId + ", page=" + page + ", limit=" + limit);
+    public ExpenseResList fetchExpensesWithConditions(String userId, LocalDateTime startDate, LocalDateTime endDate, String order, String categoryId, int page, int limit) {
+        int totalPages, totalElements = 0;
+
         User user = userService.GetUserById(userId);
         if (user == null) {
             throw new IllegalArgumentException("User not found");
@@ -175,12 +178,13 @@ public class ExpenseService {
             }
             categoryUUID = category.getId();
             if (order == null || order.equalsIgnoreCase("desc")) {
-                expenses = expenseRepository.findByUserIdAndTimeFrameAndCategoryDesc(user.getId(), startDate, endDate, categoryUUID, limit, offset);
+                expenses = expenseRepository.findByUserIdAndTimeFrameAndCategoryDescWithLimit(user.getId(), startDate, endDate, categoryUUID, limit, offset);
             } else if (order.equalsIgnoreCase("asc")) {
-                expenses = expenseRepository.findByUserIdAndTimeFrameAndCategoryAsc(user.getId(), startDate, endDate, categoryUUID, limit, offset);
+                expenses = expenseRepository.findByUserIdAndTimeFrameAndCategoryAscWithLimit(user.getId(), startDate, endDate, categoryUUID, limit, offset);
             } else {
                 throw new IllegalArgumentException("Order must be 'asc' or 'desc'");
             }
+            totalElements = expenseRepository.countByUserIdAndTimeFrameAndCategory(user.getId(), startDate, endDate, categoryUUID);
         } else {
             if (order == null || order.equalsIgnoreCase("desc")) {
                 expenses = expenseRepository.findByUserIdAndTimeFrameDescWithLimit(user.getId(), startDate, endDate, limit, offset);
@@ -189,9 +193,20 @@ public class ExpenseService {
             } else {
                 throw new IllegalArgumentException("Order must be 'asc' or 'desc'");
             }
+            totalElements = expenseRepository.countByUserIdAndTimeFrame(user.getId(), startDate, endDate);
         }
 
+        totalPages = (int) Math.ceil((double) totalElements / limit);
+        return new ExpenseResList(expenses.stream().map(ExpenseResponse::new).collect(Collectors.toList()), totalPages, totalElements, page);
+    }
 
-        return expenses.stream().map(ExpenseResponse::new).collect(Collectors.toList());
+    public List<MonthlyCategoryExpense> getMonthlyCategoryExpense(String userId){
+        User user = userService.GetUserById(userId);
+        if (user == null) {
+            throw new IllegalArgumentException("User not found");
+        }
+
+        return expenseRepository.findMonthlyCategoryExpenseByUserId(user.getId());
+
     }
 }
