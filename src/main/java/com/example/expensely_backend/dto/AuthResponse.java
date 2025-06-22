@@ -5,19 +5,24 @@ import lombok.Getter;
 public class AuthResponse {
 
     @Getter
-    private String message;
+    private final String message;
     @Getter
-    private String token;
+    private final String token;
     @Getter
-    private String id;
+    private final String id;
     @Getter
-    private String error;
+    private final String error;
+    @Getter
+    private boolean profileIncomplete = false;
 
     public AuthResponse(String message, String token, String id, String error) {
         this.message = message;
         this.token = token;
         this.id = id;
         this.error = error;
+        if (message != null && message.contains("profile incomplete")) {
+            this.profileIncomplete = true;
+        }
     }
 
 }

@@ -29,7 +29,7 @@ public class SecurityConfig {
                 .csrf().disable()
                 .authorizeHttpRequests(
                         auth -> auth
-                                .requestMatchers("/api/users/register", "/api/users/login", "/ping").permitAll() // Allow public access to registration and login
+                                .requestMatchers("/api/users/register", "/api/users/login", "/ping","/api/users/verify-oauth-login").permitAll() // Allow public access to registration and login
                                 .anyRequest().authenticated() // All other requests require authentication
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

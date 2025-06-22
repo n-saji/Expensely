@@ -7,8 +7,16 @@ import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.service.ExpiredTokenService;
 import com.example.expensely_backend.service.UserService;
 import com.example.expensely_backend.utils.JwtUtil;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.jackson2.JacksonFactory;
+import org.springframework.core.env.Environment;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Collections;
 
 @RestController
 @RequestMapping("/api/users")
@@ -16,26 +24,29 @@ public class UserController {
     private final UserService userService;
     private final JwtUtil jwtUtil;
     private final ExpiredTokenService expiredTokenService;
+    private final Environment environment;
 
-    public UserController(UserService userService, JwtUtil jwtUtil, ExpiredTokenService expiredTokenService) {
+    public UserController(UserService userService, JwtUtil jwtUtil, ExpiredTokenService expiredTokenService, Environment environment) {
         this.userService = userService;
         this.jwtUtil = jwtUtil;
         this.expiredTokenService = expiredTokenService;
+        this.environment = environment;
     }
 
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody User user) {
-        try{
+        try {
+            user.setProfileComplete(true);
             userService.save(user);
             return ResponseEntity.ok(new AuthResponse("User registered successfully!", null, user.getId().toString(), ""));
-        }catch (Exception e) {
+        } catch (Exception e) {
             return ResponseEntity.badRequest().body(new AuthResponse(e.getMessage(), null, null, e.getMessage()));
         }
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?>login(@RequestBody User user) {
+    public ResponseEntity<?> login(@RequestBody User user) {
         if (user.getEmail() == null && user.getPhone() == null) {
             {
                 return ResponseEntity.badRequest().body(new AuthResponse("Email or Phone is required!", null, user.getId().toString(), "email or phone is required"));
@@ -48,7 +59,7 @@ public class UserController {
         }
 
         try {
-            if (userService.authenticate(user.getEmail(), user.getPhone(), user.getPassword())){
+            if (userService.authenticate(user.getEmail(), user.getPhone(), user.getPassword())) {
                 String email = user.getEmail() != null ? user.getEmail() : user.getPhone();
                 String token = jwtUtil.GenerateToken(email);
                 if (token == null) {
@@ -56,14 +67,13 @@ public class UserController {
                 }
 
                 User authenticatedUser = userService.GetUserByEmailOrPhone(user.getEmail(), user.getPhone());
-                AuthResponse authResponse = new AuthResponse("User authenticated successfully!", token, authenticatedUser.getId().toString(),"");
+                AuthResponse authResponse = new AuthResponse("User authenticated successfully!", token, authenticatedUser.getId().toString(), "");
                 return ResponseEntity.ok(authResponse);
-            }
-            else {
-                return ResponseEntity.status(401).body(new AuthResponse("Invalid credentials",null,null,"Invalid credentials"));
+            } else {
+                return ResponseEntity.status(401).body(new AuthResponse("Invalid credentials", null, null, "Invalid credentials"));
             }
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new AuthResponse("Something went wrong!",null,null,e.getMessage()));
+            return ResponseEntity.badRequest().body(new AuthResponse("Something went wrong!", null, null, e.getMessage()));
         }
     }
 
@@ -118,13 +128,14 @@ public class UserController {
                     ExpiredToken expiredToken = new ExpiredToken();
                     expiredToken.setToken(token);
                     expiredToken.setUser(user);
-                    try {expiredTokenService.saveExpiredToken(expiredToken);
+                    try {
+                        expiredTokenService.saveExpiredToken(expiredToken);
                     } catch (Exception e) {
                         return ResponseEntity.badRequest().body(new AuthResponse(
                                 "Error saving expired token: " + e.getMessage(), null, null, "internal server error"
                         ));
                     }
-                }catch (Exception e) {
+                } catch (Exception e) {
                     return ResponseEntity.badRequest().body(new AuthResponse(
                             "Error invalidating token: " + e.getMessage(), null, null, "internal server error"
                     ));
@@ -150,7 +161,7 @@ public class UserController {
             if (user == null) {
                 return ResponseEntity.status(404).body(new UserRes(null, "User not found"));
             }
-            return ResponseEntity.ok(new UserRes(user,null));
+            return ResponseEntity.ok(new UserRes(user, null));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new UserRes(null, e.getMessage()));
         }
@@ -185,10 +196,11 @@ public class UserController {
             if (existingUser == null) {
                 return ResponseEntity.status(404).body(new UserRes(null, "User not found"));
             }
-            if (user.getNotificationsEnabled() != null) existingUser.setNotificationsEnabled(user.getNotificationsEnabled());
+            if (user.getNotificationsEnabled() != null)
+                existingUser.setNotificationsEnabled(user.getNotificationsEnabled());
             if (user.getLanguage() != null) existingUser.setLanguage(user.getLanguage());
-            if( user.getTheme() != null) existingUser.setTheme(user.getTheme());
-            if(user.getCurrency() != null) existingUser.setCurrency(user.getCurrency());
+            if (user.getTheme() != null) existingUser.setTheme(user.getTheme());
+            if (user.getCurrency() != null) existingUser.setCurrency(user.getCurrency());
             if (user.getIsActive() != null) existingUser.setIsActive(user.getIsActive());
             if (user.getIsAdmin() != null) existingUser.setIsAdmin(user.getIsAdmin());
 
@@ -245,6 +257,54 @@ public class UserController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new UserRes(null, e.getMessage()));
         }
+    }
+
+    @PostMapping("/verify-oauth-login")
+    public ResponseEntity<?> verifyOAuthLogin(@RequestHeader("Authorization") String authHeader, @RequestBody User user) {
+        String token = authHeader.replace("Bearer ", "");
+        try {
+            System.out.println("Verifying OAuth token: " + token + " " + environment.getProperty("GOOGLE_CLIENT_ID"));
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
+                    new NetHttpTransport(),
+                    JacksonFactory.getDefaultInstance()
+            )
+                    .setAudience(Collections.singletonList(environment.getProperty(
+                            "GOOGLE_CLIENT_ID"
+                    )))
+                    .build();
+
+            GoogleIdToken idToken = verifier.verify(token);
+            if (idToken != null) {
+                GoogleIdToken.Payload payload = idToken.getPayload();
+                try {
+                    if (user.getEmail() == null && user.getPhone() == null) {
+                        return ResponseEntity.badRequest().body(new AuthResponse("Email or Phone is required!", null, null, "email or phone is required"));
+                    }
+
+
+                    if (userService.isUserPresent(user.getEmail(), user.getPhone())) {
+                        User existingUser = userService.GetUserByEmailOrPhone(user.getEmail(), user.getPhone());
+                        user.setOauth2User(true);
+                        String jwtToken = jwtUtil.GenerateToken(existingUser.getEmail());
+                        return ResponseEntity.ok(new AuthResponse("User authenticated successfully!", jwtToken, existingUser.getId().toString(), ""));
+                    } else {
+                        // Register new user
+                        user.setOauth2User(true);
+                        userService.save(user);
+                        String jwtToken = jwtUtil.GenerateToken(user.getEmail());
+                        return ResponseEntity.ok(new AuthResponse("profile incomplete", jwtToken, user.getId().toString(), ""));
+                    }
+                } catch (Exception e) {
+                    return ResponseEntity.badRequest().body(new AuthResponse("Something went wrong!", null, null, e.getMessage()));
+                }
+            } else {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new AuthResponse("Invalid ID token", null, null, "Invalid ID token"));
+            }
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new AuthResponse("Error verifying token:", null, null, "Error verifying token"));
+        }
+
     }
 
 

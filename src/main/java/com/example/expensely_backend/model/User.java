@@ -24,18 +24,18 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
-    @Column(nullable = false)
+    @Column()
     private String password;
 
     @Getter
     private String name;
 
     @Getter
-    @Column(nullable = false)
+    @Column()
     private String country_code;
 
     @Getter
-    @Column(nullable = false, unique = true)
+    @Column( unique = true)
     private String phone;
 
     @Column(nullable = false)
@@ -72,6 +72,17 @@ public class User {
     private Boolean NotificationsEnabled = true; // Default notifications enabled status set to true
 
     @Column(nullable = true, columnDefinition = "varchar(1000)")
-    @Getter @Setter
+    @Getter
+    @Setter
     private String profilePicFilePath;
+
+    @Column(columnDefinition = "boolean default false")
+    @Getter
+    @Setter
+    private boolean isOauth2User = false; // Default OAuth2 user status set to false
+
+    @Column(columnDefinition = "boolean default true")
+    @Getter
+    @Setter
+    private boolean isProfileComplete = false;
 }

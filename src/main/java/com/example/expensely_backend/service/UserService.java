@@ -23,15 +23,23 @@ public class UserService {
 
     public void save(User user) {
 
-        if (user.getEmail() == null || user.getPhone() == null || user.getPassword() == null) {
-            throw new IllegalArgumentException("Email, phone, and password must be provided");
+        if (user.getEmail() == null ) {
+            throw new IllegalArgumentException("Email must be provided");
+        }
+        if ((user.getPhone() == null || user.getPhone().isEmpty()) && !user.isOauth2User()) {
+            throw new IllegalArgumentException("Phone must be provided");
+        }
+        if ((user.getPassword() == null || user.getPassword().isEmpty()) && !user.isOauth2User()) {
+            throw new IllegalArgumentException("Password cannot be null or empty");
         }
         Optional<User> existingUser = userRepository.findUserByEmailOrPhone(user.getEmail(), user.getPhone());
         if (existingUser.isPresent()) {
             throw new IllegalArgumentException("Email or phone already exists");
         }
 
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
+        if (user.getPassword() != null) {
+            user.setPassword(passwordEncoder.encode(user.getPassword()));
+        }
         try {
             userRepository.save(user);
         } catch (Exception e) {
@@ -66,10 +74,19 @@ public class UserService {
         }
 
         User user = userOpt.get();
-        if (user.getEmail() == null || user.getPhone() == null) {
-            throw new IllegalArgumentException("User email or phone is null");
+        if (user.getEmail() == null) {
+            throw new IllegalArgumentException("User email  is null");
         }
+        if (user.getPhone() == null && !user.isOauth2User()) {
+            throw new IllegalArgumentException("User phone is null");
+        }
+
         return user;
+    }
+
+    public boolean isUserPresent(String email, String phone) {
+        Optional<User> userOpt = userRepository.findUserByEmailOrPhone(email, phone);
+        return userOpt.isPresent();
     }
 
     public User UpdateUser(User user) {
