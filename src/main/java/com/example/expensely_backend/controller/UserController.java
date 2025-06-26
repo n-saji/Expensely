@@ -180,6 +180,7 @@ public class UserController {
             if (user.getCurrency() != null) existingUser.setCurrency(user.getCurrency());
             if (user.getName() != null) existingUser.setName(user.getName());
             if (user.getCountry_code() != null) existingUser.setCountry_code(user.getCountry_code());
+            if (user.isProfileComplete()) existingUser.setProfileComplete(true);
             // Add other fields as necessary
 
             userService.UpdateUser(existingUser);
