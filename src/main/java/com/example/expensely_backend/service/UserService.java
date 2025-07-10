@@ -114,7 +114,7 @@ public class UserService {
     }
 
     public List<User> getAllUsers() {
-        List<User> users = userRepository.findAll();
+        List<User> users = userRepository.findAllOrderByCreatedAtDesc();
         for (User user : users) {
             user.setPassword(null);
         }
