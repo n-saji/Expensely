@@ -308,5 +308,14 @@ public class UserController {
 
     }
 
+    @GetMapping("/all")
+    public ResponseEntity<?> getAllUsers() {
+        try {
+            return ResponseEntity.ok(userService.getAllUsers());
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new UserRes(null, e.getMessage()));
+        }
+    }
+
 
 }

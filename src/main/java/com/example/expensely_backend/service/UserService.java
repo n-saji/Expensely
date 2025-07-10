@@ -5,6 +5,7 @@ import com.example.expensely_backend.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -110,6 +111,17 @@ public class UserService {
             throw new IllegalArgumentException("Error updating password: " + e.getMessage());
         }
         return user;
+    }
+
+    public List<User> getAllUsers() {
+        List<User> users = userRepository.findAll();
+        for (User user : users) {
+            user.setPassword(null);
+        }
+        if (users.isEmpty()) {
+            throw new IllegalArgumentException("No users found");
+        }
+        return users;
     }
 
 
