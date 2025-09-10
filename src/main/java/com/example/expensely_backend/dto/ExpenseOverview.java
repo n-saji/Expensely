@@ -1,5 +1,6 @@
 package com.example.expensely_backend.dto;
 
+import com.example.expensely_backend.model.Category;
 import lombok.Getter;
 
 import java.time.Month;
@@ -53,7 +54,7 @@ public class ExpenseOverview {
     private final Map<String, Double> topFiveMostExpensiveItemThisMonth;
 
 
-    public ExpenseOverview(List<ExpenseResponse> expenses, String userId, List<MonthlyCategoryExpense> monthlyCategoryExpenses) {
+    public ExpenseOverview(List<ExpenseResponse> expenses, String userId, List<MonthlyCategoryExpense> monthlyCategoryExpenses, Iterable<Category> categories) {
         this.userId = userId;
         this.TotalAmount = expenses.stream().mapToDouble(ExpenseResponse::getAmount).sum();
         Map<String, Double> rawSums = expenses.stream()
@@ -102,17 +103,21 @@ public class ExpenseOverview {
 
         for (MonthlyCategoryExpense dto : monthlyCategoryExpenses) {
             String month = dto.getMonth().trim();
+
+            monthlyCategoryExpense.computeIfAbsent(month, k -> {
+                Map<String, Double> categoryMap = new LinkedHashMap<>();
+                for (Category cat : categories) {
+                    categoryMap.put(cat.getName(), 0.0);
+                }
+                return categoryMap;
+            });
+
             String category = dto.getCategoryName();
             Double amount = dto.getTotalAmount();
 
-            if (category == null) {
-                System.err.println("Null value found: month=" + month + ", category=" + category);
-                continue; // skip
+            if (category != null) {
+                monthlyCategoryExpense.get(month).merge(category, amount, Double::sum);
             }
-
-            monthlyCategoryExpense
-                    .computeIfAbsent(month, k -> new LinkedHashMap<>())
-                    .merge(category, amount, Double::sum);
         }
     }
 

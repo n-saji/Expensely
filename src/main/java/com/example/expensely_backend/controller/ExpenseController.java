@@ -5,6 +5,7 @@ import com.example.expensely_backend.dto.AuthResponse;
 import com.example.expensely_backend.dto.ExpenseOverview;
 import com.example.expensely_backend.dto.UserRes;
 import com.example.expensely_backend.model.Expense;
+import com.example.expensely_backend.service.CategoryService;
 import com.example.expensely_backend.service.ExpenseService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -18,9 +19,11 @@ import java.util.List;
 public class ExpenseController {
 
     private final ExpenseService expenseService;
+    private final CategoryService categoryService;
 
-    public ExpenseController(ExpenseService expenseService) {
+    public ExpenseController(ExpenseService expenseService , CategoryService categoryService) {
         this.expenseService = expenseService;
+        this.categoryService = categoryService;
     }
 
     @PostMapping("/create")
@@ -126,7 +129,7 @@ public class ExpenseController {
             endDate = LocalDateTime.now().withHour(23).withMinute(59).withSecond(59);
         }
         try {
-            return ResponseEntity.ok(new ExpenseOverview(expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, startDate, endDate, "desc"), userId,expenseService.getMonthlyCategoryExpense(userId)));
+            return ResponseEntity.ok(new ExpenseOverview(expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, startDate, endDate, "desc"), userId,expenseService.getMonthlyCategoryExpense(userId),categoryService.getCategoriesByUserId(userId,"expense")));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
         }
