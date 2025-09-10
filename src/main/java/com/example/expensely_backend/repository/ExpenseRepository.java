@@ -1,5 +1,6 @@
 package com.example.expensely_backend.repository;
 
+import com.example.expensely_backend.dto.DailyExpense;
 import com.example.expensely_backend.dto.MonthlyCategoryExpense;
 import com.example.expensely_backend.model.Expense;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -94,12 +95,27 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
              FROM expenses e\s
              JOIN categories c on e.category_id  = c.id\s
              WHERE e.user_id = :userId\s
+                AND  e.expense_date >= :startDate and e.expense_date < :endDate
                AND EXTRACT(YEAR FROM e.expense_date) = EXTRACT(YEAR FROM NOW())\s
              GROUP BY month,c."name"\s
              ORDER BY MIN(e.expense_date)
             \s""", nativeQuery = true)
-    List<MonthlyCategoryExpense> findMonthlyCategoryExpenseByUserId(@Param("userId") UUID userId);
+    List<MonthlyCategoryExpense> findMonthlyCategoryExpenseByUserId(@Param("userId") UUID userId, @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 
+    @Query(value = """
+    SELECT
+        TO_CHAR(e.expense_date, 'YYYY-MM-DD') AS expenseDate,
+        SUM(e.amount) AS totalAmount
+    FROM expenses e
+    WHERE e.user_id = :userId
+      AND e.expense_date >= :startDate
+      AND e.expense_date < :endDate
+    GROUP BY expenseDate
+    ORDER BY expenseDate
+""", nativeQuery = true)
+    List<DailyExpense> findDailyExpenseByUserIdAndTimeFrame(@Param("userId") UUID userId,
+                                                            @Param("startDate") LocalDateTime startDate,
+                                                            @Param("endDate") LocalDateTime endDate);
 
 }
 

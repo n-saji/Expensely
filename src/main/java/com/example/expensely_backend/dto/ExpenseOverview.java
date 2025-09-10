@@ -3,6 +3,7 @@ package com.example.expensely_backend.dto;
 import com.example.expensely_backend.model.Category;
 import lombok.Getter;
 
+import java.time.LocalDate;
 import java.time.Month;
 import java.time.format.TextStyle;
 import java.util.*;
@@ -53,8 +54,11 @@ public class ExpenseOverview {
     @Getter
     private final Map<String, Double> topFiveMostExpensiveItemThisMonth;
 
+    @Getter
+    private final Map<String,Double> overTheDaysThisMonth;
 
-    public ExpenseOverview(List<ExpenseResponse> expenses, String userId, List<MonthlyCategoryExpense> monthlyCategoryExpenses, Iterable<Category> categories) {
+
+    public ExpenseOverview(List<ExpenseResponse> expenses, String userId, List<MonthlyCategoryExpense> monthlyCategoryExpenses, Iterable<Category> categories, List<DailyExpense> dailyExpenses) {
         this.userId = userId;
         this.TotalAmount = expenses.stream().mapToDouble(ExpenseResponse::getAmount).sum();
         Map<String, Double> rawSums = expenses.stream()
@@ -119,6 +123,20 @@ public class ExpenseOverview {
                 monthlyCategoryExpense.get(month).merge(category, amount, Double::sum);
             }
         }
+
+        Double totalSum = 0.0;
+        this.overTheDaysThisMonth = new LinkedHashMap<>();
+
+        for (DailyExpense dailyExpense : dailyExpenses) {
+            Double amount = dailyExpense.getTotalAmount() != null ? dailyExpense.getTotalAmount() : 0.0;
+            totalSum += amount;
+
+            LocalDate date = LocalDate.parse(dailyExpense.getExpenseDate()); // safer
+            String day = String.valueOf(date.getDayOfMonth());
+
+            overTheDaysThisMonth.put(day, round(totalSum * 100.0) / 100.0);
+        }
+
     }
 
 

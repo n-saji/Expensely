@@ -122,6 +122,7 @@ public class ExpenseController {
             @RequestParam(value = "start_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startDate,
             @RequestParam(value = "end_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate) {
         int year = LocalDateTime.now().getYear();
+        int month = LocalDateTime.now().getMonthValue();
         if (startDate == null) {
             startDate = LocalDateTime.of(year, 1, 1, 0, 0);
         }
@@ -129,7 +130,11 @@ public class ExpenseController {
             endDate = LocalDateTime.now().withHour(23).withMinute(59).withSecond(59);
         }
         try {
-            return ResponseEntity.ok(new ExpenseOverview(expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, startDate, endDate, "desc"), userId,expenseService.getMonthlyCategoryExpense(userId),categoryService.getCategoriesByUserId(userId,"expense")));
+            return ResponseEntity.ok(
+                    new ExpenseOverview(expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, startDate, endDate, "desc"),
+                            userId,expenseService.getMonthlyCategoryExpense(userId,startDate,endDate),
+                            categoryService.getCategoriesByUserId(userId,"expense"),
+                            expenseService.getDailyExpense(userId,LocalDateTime.of(year,month,1,0,0),endDate)));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
         }

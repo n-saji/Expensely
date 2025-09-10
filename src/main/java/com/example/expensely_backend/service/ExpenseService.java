@@ -1,6 +1,7 @@
 package com.example.expensely_backend.service;
 
 
+import com.example.expensely_backend.dto.DailyExpense;
 import com.example.expensely_backend.dto.ExpenseResList;
 import com.example.expensely_backend.dto.ExpenseResponse;
 import com.example.expensely_backend.dto.MonthlyCategoryExpense;
@@ -200,13 +201,21 @@ public class ExpenseService {
         return new ExpenseResList(expenses.stream().map(ExpenseResponse::new).collect(Collectors.toList()), totalPages, totalElements, page);
     }
 
-    public List<MonthlyCategoryExpense> getMonthlyCategoryExpense(String userId){
+    public List<MonthlyCategoryExpense> getMonthlyCategoryExpense(String userId,LocalDateTime startDate, LocalDateTime endDate ){
         User user = userService.GetUserById(userId);
         if (user == null) {
             throw new IllegalArgumentException("User not found");
         }
 
-        return expenseRepository.findMonthlyCategoryExpenseByUserId(user.getId());
+        return expenseRepository.findMonthlyCategoryExpenseByUserId(user.getId(), startDate, endDate);
 
+    }
+
+    public List<DailyExpense> getDailyExpense(String userId,LocalDateTime startDate, LocalDateTime endDate ){
+        User user = userService.GetUserById(userId);
+        if (user == null) {
+            throw new IllegalArgumentException("User not found");
+        }
+        return expenseRepository.findDailyExpenseByUserIdAndTimeFrame(user.getId(), startDate, endDate);
     }
 }
