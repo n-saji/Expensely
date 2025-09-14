@@ -224,18 +224,18 @@ public class ExpenseService {
 
     public String exportExpensesToCSV(String userId, LocalDateTime startDate, LocalDateTime endDate) throws IOException {
         UUID userIdUUID = UUID.fromString(userId);
+        User user = userService.GetUserById(userId);
         List<Expense> expenses = expenseRepository.findByUserIdAndTimeFrameAsc(userIdUUID, startDate, endDate);
 
         StringWriter sw = new StringWriter();
         CSVWriter writer = new CSVWriter(sw);
 
         // header
-        writer.writeNext(new String[]{"ID", "Date", "Description", "Amount", "Category"});
+        writer.writeNext(new String[]{"Date", "Description", "Amount (in " +user.getCurrency()+ ")" , "Category"});
 
         // rows
         for (Expense expense : expenses) {
             writer.writeNext(new String[]{
-                    expense.getId().toString(),
                     expense.getExpenseDate().toString(),
                     expense.getDescription(),
                     String.valueOf(expense.getAmount()),
