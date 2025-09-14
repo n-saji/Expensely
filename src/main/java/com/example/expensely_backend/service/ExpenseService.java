@@ -9,8 +9,11 @@ import com.example.expensely_backend.model.Category;
 import com.example.expensely_backend.model.Expense;
 import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.repository.ExpenseRepository;
+import com.opencsv.CSVWriter;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
+import java.io.StringWriter;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -218,4 +221,30 @@ public class ExpenseService {
         }
         return expenseRepository.findDailyExpenseByUserIdAndTimeFrame(user.getId(), startDate, endDate);
     }
+
+    public String exportExpensesToCSV(String userId, LocalDateTime startDate, LocalDateTime endDate) throws IOException {
+        UUID userIdUUID = UUID.fromString(userId);
+        List<Expense> expenses = expenseRepository.findByUserIdAndTimeFrameAsc(userIdUUID, startDate, endDate);
+
+        StringWriter sw = new StringWriter();
+        CSVWriter writer = new CSVWriter(sw);
+
+        // header
+        writer.writeNext(new String[]{"ID", "Date", "Description", "Amount", "Category"});
+
+        // rows
+        for (Expense expense : expenses) {
+            writer.writeNext(new String[]{
+                    expense.getId().toString(),
+                    expense.getExpenseDate().toString(),
+                    expense.getDescription(),
+                    String.valueOf(expense.getAmount()),
+                    expense.getCategory().getName()
+            });
+        }
+        writer.close();
+        return sw.toString();
+    }
+
+
 }

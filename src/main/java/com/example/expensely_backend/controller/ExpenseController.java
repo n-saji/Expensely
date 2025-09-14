@@ -8,9 +8,11 @@ import com.example.expensely_backend.model.Expense;
 import com.example.expensely_backend.service.CategoryService;
 import com.example.expensely_backend.service.ExpenseService;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -176,6 +178,29 @@ public class ExpenseController {
             return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
         }
 
+    }
+
+    @GetMapping("/user/{userId}/export")
+    public ResponseEntity<?> exportExpenses(@PathVariable String userId,
+                                             @RequestParam(value = "start_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startDate,
+                                             @RequestParam(value = "end_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate) {
+        if (startDate == null) {
+            startDate = LocalDateTime.of(1970, 1, 1, 0, 0);
+        }
+        if (endDate == null) {
+            endDate = LocalDateTime.now();
+            endDate = endDate.withHour(23).withMinute(59).withSecond(59);
+        }
+        try {
+            String csvData = expenseService.exportExpensesToCSV(userId, startDate, endDate);
+            return ResponseEntity.ok()
+                    .header("Content-Disposition", "attachment; filename=\"expenses.csv\"")
+                    .contentType(MediaType.parseMediaType("text/csv"))
+                    .body(csvData.getBytes(StandardCharsets.UTF_8));
+
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
+        }
     }
 
 }

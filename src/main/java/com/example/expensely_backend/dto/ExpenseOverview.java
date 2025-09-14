@@ -124,11 +124,11 @@ public class ExpenseOverview {
             }
         }
 
-        Double totalSum = 0.0;
+        double totalSum = 0.0;
         this.overTheDaysThisMonth = new LinkedHashMap<>();
 
         for (DailyExpense dailyExpense : dailyExpenses) {
-            Double amount = dailyExpense.getTotalAmount() != null ? dailyExpense.getTotalAmount() : 0.0;
+            double amount = dailyExpense.getTotalAmount() != null ? dailyExpense.getTotalAmount() : 0.0;
             totalSum += amount;
 
             LocalDate date = LocalDate.parse(dailyExpense.getExpenseDate()); // safer
