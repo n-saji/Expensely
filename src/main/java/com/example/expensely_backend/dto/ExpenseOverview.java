@@ -39,7 +39,7 @@ public class ExpenseOverview {
     private final Double thisMonthTotalExpense;
 
     @Getter
-    private final Double comparedToLastMonthExpense;
+    private final Double lastMonthTotalExpense;
 
     @Getter
     private final Map<String, Long> categoryCount;
@@ -84,7 +84,7 @@ public class ExpenseOverview {
         Calendar calendar = Calendar.getInstance();
         int currentMonth = calendar.get(Calendar.MONTH);
         this.thisMonthTotalExpense = round(monthMap.getOrDefault(Month.of(currentMonth + 1), 0.0) * 100.0) / 100.0;
-        this.comparedToLastMonthExpense = round((thisMonthTotalExpense - monthMap.getOrDefault(Month.of(currentMonth), 0.0)) * 100.0) / 100.0;
+        this.lastMonthTotalExpense = round((monthMap.getOrDefault(Month.of(currentMonth), 0.0)) * 100.0) / 100.0;
         this.totalCategories = amountByCategory.size();
         this.mostFrequentCategory = categoryCount.entrySet().stream()
                 .max(Map.Entry.comparingByValue())
