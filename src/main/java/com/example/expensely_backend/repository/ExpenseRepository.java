@@ -96,7 +96,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
              JOIN categories c on e.category_id  = c.id\s
              WHERE e.user_id = :userId\s
                 AND  e.expense_date >= :startDate and e.expense_date < :endDate
-               AND EXTRACT(YEAR FROM e.expense_date) = EXTRACT(YEAR FROM NOW())\s
+
              GROUP BY month,c."name"\s
              ORDER BY MIN(e.expense_date)
             \s""", nativeQuery = true)

@@ -61,10 +61,38 @@ public class ExpenseOverview {
     private final int earliestStartMonth, earliestStartYear;
 
 
-    public ExpenseOverview(List<ExpenseResponse> expenses, String userId, List<MonthlyCategoryExpense> monthlyCategoryExpenses, Iterable<Category> categories, List<DailyExpense> dailyExpenses, ExpenseResList FirstExpense) {
+    public ExpenseOverview(List<ExpenseResponse> expenses,List<ExpenseResponse> req_expenses_range,
+                           String userId, List<MonthlyCategoryExpense> monthlyCategoryExpenses,
+                           Iterable<Category> categories, List<DailyExpense> dailyExpenses,
+                           ExpenseResList FirstExpense,Integer reqMonth) {
+        //  Overview page
         this.userId = userId;
+        this.totalCount = expenses.size();
+        this.categoryCount = expenses.stream().collect(Collectors.groupingBy(ExpenseResponse::getCategoryName, Collectors.counting()));
+        this.mostFrequentCategoryCount = categoryCount.values().stream().max(Long::compare).orElse(0L).intValue();
+        this.totalCategories = categoryCount.size();
+
+        Calendar calendar = Calendar.getInstance();
+        int currentMonth = calendar.get(Calendar.MONTH);
+
+        Map<Month, Double> monthMap = req_expenses_range.stream().collect(Collectors.groupingBy(expense -> expense.getExpenseDate().getMonth(), TreeMap::new, Collectors.summingDouble(ExpenseResponse::getAmount)));
+        this.thisMonthTotalExpense = round(monthMap.getOrDefault(Month.of(currentMonth + 1), 0.0) * 100.0) / 100.0;
+        this.lastMonthTotalExpense = round((monthMap.getOrDefault(Month.of(currentMonth), 0.0)) * 100.0) / 100.0;
         this.TotalAmount = expenses.stream().mapToDouble(ExpenseResponse::getAmount).sum();
-        Map<String, Double> rawSums = expenses.stream()
+        this.averageMonthlyExpense = TotalAmount / (currentMonth + 1);
+        this.mostFrequentCategory = categoryCount.entrySet().stream()
+                .max(Map.Entry.comparingByValue())
+                .map(Map.Entry::getKey)
+                .orElse(null);
+        this.earliestStartMonth = FirstExpense.getExpenses().get(0).getExpenseDate().getMonthValue();
+        this.earliestStartYear = FirstExpense.getExpenses().get(0).getExpenseDate().getYear();
+
+        // Requested Yearly view
+        Map<Month, Double> monthMapReq = req_expenses_range.stream().collect(Collectors.groupingBy(expense -> expense.getExpenseDate().getMonth(), TreeMap::new, Collectors.summingDouble(ExpenseResponse::getAmount)));
+        this.amountByMonth = monthMapReq.entrySet().stream().
+                collect(Collectors.toMap(entry -> entry.getKey().getDisplayName(TextStyle.FULL, Locale.ENGLISH), entry -> round(entry.getValue() * 100.0) / 100.0, (a, b) -> a, LinkedHashMap::new));
+
+        Map<String, Double> rawSums = req_expenses_range.stream()
                 .collect(Collectors.groupingBy(
                         ExpenseResponse::getCategoryName,
                         Collectors.summingDouble(ExpenseResponse::getAmount)
@@ -74,40 +102,10 @@ public class ExpenseOverview {
                         Map.Entry::getKey,
                         entry -> round(entry.getValue() * 100.0) / 100.0
                 ));
-        this.totalCount = expenses.size();
-
-        Map<Month, Double> monthMap = expenses.stream().collect(Collectors.groupingBy(expense -> expense.getExpenseDate().getMonth(), TreeMap::new, Collectors.summingDouble(ExpenseResponse::getAmount)));
-        this.amountByMonth = monthMap.entrySet().stream().
-                collect(Collectors.toMap(entry -> entry.getKey().getDisplayName(TextStyle.FULL, Locale.ENGLISH), entry -> round(entry.getValue() * 100.0) / 100.0, (a, b) -> a, LinkedHashMap::new));
-
-
-        this.categoryCount = expenses.stream().collect(Collectors.groupingBy(ExpenseResponse::getCategoryName, Collectors.counting()));
-        this.mostFrequentCategoryCount = categoryCount.values().stream().max(Long::compare).orElse(0L).intValue();
-
-        Calendar calendar = Calendar.getInstance();
-        int currentMonth = calendar.get(Calendar.MONTH);
-        this.thisMonthTotalExpense = round(monthMap.getOrDefault(Month.of(currentMonth + 1), 0.0) * 100.0) / 100.0;
-        this.lastMonthTotalExpense = round((monthMap.getOrDefault(Month.of(currentMonth), 0.0)) * 100.0) / 100.0;
-        this.totalCategories = amountByCategory.size();
-        this.mostFrequentCategory = categoryCount.entrySet().stream()
-                .max(Map.Entry.comparingByValue())
-                .map(Map.Entry::getKey)
-                .orElse(null);
-
-        this.averageMonthlyExpense = TotalAmount / (amountByMonth.isEmpty() ? 1 : amountByMonth.size());
-        this.topFiveMostExpensiveItemThisMonth = expenses.stream()
-                .filter(expense -> expense.getExpenseDate().getMonth() == Month.of(currentMonth + 1))
-                .sorted(Comparator.comparingDouble(ExpenseResponse::getAmount).reversed())
-                .limit(5) //only 5 is required
-                .collect(Collectors.toMap(ExpenseResponse::getDescription, ExpenseResponse::getAmount, (a, b) -> a, LinkedHashMap::new));
-
-
         this.monthlyCategoryExpense = new LinkedHashMap<>();
-
         monthlyCategoryExpenses.sort(Comparator.comparingInt(dto ->
                 Month.valueOf(dto.getMonth().toUpperCase()).getValue()
         ));
-
         for (MonthlyCategoryExpense dto : monthlyCategoryExpenses) {
             String month = dto.getMonth().trim();
 
@@ -127,9 +125,16 @@ public class ExpenseOverview {
             }
         }
 
+
+        // Monthly requested data
+        this.topFiveMostExpensiveItemThisMonth = req_expenses_range.stream()
+                .filter(expense -> expense.getExpenseDate().getMonth() == Month.of(reqMonth ))
+                .sorted(Comparator.comparingDouble(ExpenseResponse::getAmount).reversed())
+                .limit(5) //only 5 is required
+                .collect(Collectors.toMap(ExpenseResponse::getDescription, ExpenseResponse::getAmount, (a, b) -> a, LinkedHashMap::new));
+
         double totalSum = 0.0;
         this.overTheDaysThisMonth = new LinkedHashMap<>();
-
         for (DailyExpense dailyExpense : dailyExpenses) {
             double amount = dailyExpense.getTotalAmount() != null ? dailyExpense.getTotalAmount() : 0.0;
             totalSum += amount;
@@ -139,8 +144,7 @@ public class ExpenseOverview {
 
             overTheDaysThisMonth.put(day, round(totalSum * 100.0) / 100.0);
         }
-        this.earliestStartMonth = FirstExpense.getExpenses().get(0).getExpenseDate().getMonthValue();
-        this.earliestStartYear = FirstExpense.getExpenses().get(0).getExpenseDate().getYear();
+
 
     }
 

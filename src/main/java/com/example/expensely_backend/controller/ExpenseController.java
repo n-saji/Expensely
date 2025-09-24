@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.List;
 
 @RestController
@@ -121,18 +122,39 @@ public class ExpenseController {
     public ResponseEntity<?> getExpensesOverviewByUserIdAndTimeFrame(
             @PathVariable String userId,
             @RequestParam(value = "start_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startDate,
-            @RequestParam(value = "end_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate) {
+            @RequestParam(value = "end_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate,
+            @RequestParam(value = "req_year",required = false) Integer req_year,
+            @RequestParam(value = "req_month",required = false) Integer req_month,
+            @RequestParam(value = "req_month_year",required = false) Integer req_month_year){
+
         int year = LocalDateTime.now().getYear();
         int month = LocalDateTime.now().getMonthValue();
+        req_year = req_year == null ? year : req_year;
+        req_month_year = req_month_year == null ? year : req_month_year;
+        req_month = req_month == null ? month : req_month;
+
+        // this is for monthly view
+        YearMonth req_ym = YearMonth.of(req_month_year,req_month);
+        LocalDateTime req_start = LocalDateTime.of(req_year, req_month, 1, 0, 0);
+        LocalDateTime req_end = req_ym.atEndOfMonth().atTime(23, 59, 59);
+
+        // this is for current year view
         startDate = FormatDate.formatStartDate(startDate,true);
         endDate = FormatDate.formatEndDate(endDate);
+
+        // this is for requested yearly view
+        LocalDateTime req_start_year = LocalDateTime.of(req_year, 1, 1, 0, 0);
+        LocalDateTime req_end_year = LocalDateTime.of(req_year, 12, 31, 23, 59, 59);
+
         try {
             return ResponseEntity.ok(
                     new ExpenseOverview(expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, startDate, endDate, "desc"),
-                            userId,expenseService.getMonthlyCategoryExpense(userId,startDate,endDate),
+                            expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, req_start_year, req_end_year, "desc"),
+                            userId,expenseService.getMonthlyCategoryExpense(userId,req_start_year,req_end_year),
                             categoryService.getCategoriesByUserId(userId,"expense"),
-                            expenseService.getDailyExpense(userId,LocalDateTime.of(year,month,1,0,0),endDate),
-                            expenseService.fetchExpensesWithConditions(userId,FormatDate.formatStartDate(null,false),endDate,"asc",null,1,1)));
+                            expenseService.getDailyExpense(userId,req_start,req_end),
+                            expenseService.fetchExpensesWithConditions(userId,FormatDate.formatStartDate(null,false),endDate,"asc",null,1,1),
+                            req_month));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
         }
