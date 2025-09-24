@@ -35,6 +35,7 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git add expensely_backend-0.0.1-SNAPSHOT.jar
           git commit -m "Add built JAR [skip ci]" || echo "No changes to commit"
-          git push
+          git push https://x-access-token:${{ secrets.GH_PAT }}@github.com/n-saji/Expensely.git HEAD:main
+
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
