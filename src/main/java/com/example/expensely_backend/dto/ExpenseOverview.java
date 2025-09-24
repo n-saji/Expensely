@@ -75,7 +75,7 @@ public class ExpenseOverview {
         Calendar calendar = Calendar.getInstance();
         int currentMonth = calendar.get(Calendar.MONTH);
 
-        Map<Month, Double> monthMap = req_expenses_range.stream().collect(Collectors.groupingBy(expense -> expense.getExpenseDate().getMonth(), TreeMap::new, Collectors.summingDouble(ExpenseResponse::getAmount)));
+        Map<Month, Double> monthMap = expenses.stream().collect(Collectors.groupingBy(expense -> expense.getExpenseDate().getMonth(), TreeMap::new, Collectors.summingDouble(ExpenseResponse::getAmount)));
         this.thisMonthTotalExpense = round(monthMap.getOrDefault(Month.of(currentMonth + 1), 0.0) * 100.0) / 100.0;
         this.lastMonthTotalExpense = round((monthMap.getOrDefault(Month.of(currentMonth), 0.0)) * 100.0) / 100.0;
         this.TotalAmount = expenses.stream().mapToDouble(ExpenseResponse::getAmount).sum();
