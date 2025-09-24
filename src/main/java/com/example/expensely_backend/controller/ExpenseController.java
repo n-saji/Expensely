@@ -150,6 +150,7 @@ public class ExpenseController {
             return ResponseEntity.ok(
                     new ExpenseOverview(expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, startDate, endDate, "desc"),
                             expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, req_start_year, req_end_year, "desc"),
+                            expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, req_start, req_end, "desc"),
                             userId,expenseService.getMonthlyCategoryExpense(userId,req_start_year,req_end_year),
                             categoryService.getCategoriesByUserId(userId,"expense"),
                             expenseService.getDailyExpense(userId,req_start,req_end),

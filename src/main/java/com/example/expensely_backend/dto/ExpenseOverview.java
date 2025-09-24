@@ -64,7 +64,7 @@ public class ExpenseOverview {
     private final Map<String,Double> thisMonthMostExpensiveItem;
 
 
-    public ExpenseOverview(List<ExpenseResponse> expenses,List<ExpenseResponse> req_expenses_range,
+    public ExpenseOverview(List<ExpenseResponse> expenses,List<ExpenseResponse> req_expenses_range,List<ExpenseResponse> req_expenses_range_monthly,
                            String userId, List<MonthlyCategoryExpense> monthlyCategoryExpenses,
                            Iterable<Category> categories, List<DailyExpense> dailyExpenses,
                            ExpenseResList FirstExpense,Integer reqMonth) {
@@ -146,7 +146,7 @@ public class ExpenseOverview {
 
 
         // Monthly requested data
-        this.topFiveMostExpensiveItemThisMonth = req_expenses_range.stream()
+        this.topFiveMostExpensiveItemThisMonth = req_expenses_range_monthly.stream()
                 .filter(expense -> expense.getExpenseDate().getMonth() == Month.of(reqMonth ))
                 .sorted(Comparator.comparingDouble(ExpenseResponse::getAmount).reversed())
                 .limit(5) //only 5 is required
