@@ -135,7 +135,7 @@ public class ExpenseController {
 
         // this is for monthly view
         YearMonth req_ym = YearMonth.of(req_month_year,req_month);
-        LocalDateTime req_start = LocalDateTime.of(req_year, req_month, 1, 0, 0);
+        LocalDateTime req_start = LocalDateTime.of(req_month_year, req_month, 1, 0, 0);
         LocalDateTime req_end = req_ym.atEndOfMonth().atTime(23, 59, 59);
 
         // this is for current year view
