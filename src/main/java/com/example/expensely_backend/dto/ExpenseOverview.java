@@ -60,6 +60,9 @@ public class ExpenseOverview {
     @Getter
     private final int earliestStartMonth, earliestStartYear;
 
+    @Getter
+    private final Map<String,Double> thisMonthMostExpensiveItem;
+
 
     public ExpenseOverview(List<ExpenseResponse> expenses,List<ExpenseResponse> req_expenses_range,
                            String userId, List<MonthlyCategoryExpense> monthlyCategoryExpenses,
@@ -86,6 +89,22 @@ public class ExpenseOverview {
                 .orElse(null);
         this.earliestStartMonth = FirstExpense.getExpenses().get(0).getExpenseDate().getMonthValue();
         this.earliestStartYear = FirstExpense.getExpenses().get(0).getExpenseDate().getYear();
+
+        ExpenseResponse mostExpensive = expenses.stream()
+                .filter(expense -> expense.getExpenseDate().getMonthValue() == (currentMonth+1))
+                .max(Comparator.comparingDouble(ExpenseResponse::getAmount))
+                .orElse(null);
+
+        if (mostExpensive != null) {
+            this.thisMonthMostExpensiveItem = Map.of(
+                    mostExpensive.getDescription(),  // or category, description, etc.
+                    mostExpensive.getAmount()
+            );
+        } else {
+            this.thisMonthMostExpensiveItem = Map.of(); // empty map
+        }
+
+
 
         // Requested Yearly view
         Map<Month, Double> monthMapReq = req_expenses_range.stream().collect(Collectors.groupingBy(expense -> expense.getExpenseDate().getMonth(), TreeMap::new, Collectors.summingDouble(ExpenseResponse::getAmount)));
