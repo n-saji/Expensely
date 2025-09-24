@@ -126,13 +126,13 @@ public class ExpenseController {
         int month = LocalDateTime.now().getMonthValue();
         startDate = FormatDate.formatStartDate(startDate,true);
         endDate = FormatDate.formatEndDate(endDate);
-        System.out.println(startDate+" "+endDate+" dates");
         try {
             return ResponseEntity.ok(
                     new ExpenseOverview(expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, startDate, endDate, "desc"),
                             userId,expenseService.getMonthlyCategoryExpense(userId,startDate,endDate),
                             categoryService.getCategoriesByUserId(userId,"expense"),
-                            expenseService.getDailyExpense(userId,LocalDateTime.of(year,month,1,0,0),endDate)));
+                            expenseService.getDailyExpense(userId,LocalDateTime.of(year,month,1,0,0),endDate),
+                            expenseService.fetchExpensesWithConditions(userId,FormatDate.formatStartDate(null,false),endDate,"asc",null,1,1)));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
         }

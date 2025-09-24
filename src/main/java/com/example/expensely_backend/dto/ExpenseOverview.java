@@ -57,8 +57,11 @@ public class ExpenseOverview {
     @Getter
     private final Map<String,Double> overTheDaysThisMonth;
 
+    @Getter
+    private final int earliestStartMonth, earliestStartYear;
 
-    public ExpenseOverview(List<ExpenseResponse> expenses, String userId, List<MonthlyCategoryExpense> monthlyCategoryExpenses, Iterable<Category> categories, List<DailyExpense> dailyExpenses) {
+
+    public ExpenseOverview(List<ExpenseResponse> expenses, String userId, List<MonthlyCategoryExpense> monthlyCategoryExpenses, Iterable<Category> categories, List<DailyExpense> dailyExpenses, ExpenseResList FirstExpense) {
         this.userId = userId;
         this.TotalAmount = expenses.stream().mapToDouble(ExpenseResponse::getAmount).sum();
         Map<String, Double> rawSums = expenses.stream()
@@ -136,6 +139,8 @@ public class ExpenseOverview {
 
             overTheDaysThisMonth.put(day, round(totalSum * 100.0) / 100.0);
         }
+        this.earliestStartMonth = FirstExpense.getExpenses().get(0).getExpenseDate().getMonthValue();
+        this.earliestStartYear = FirstExpense.getExpenses().get(0).getExpenseDate().getYear();
 
     }
 

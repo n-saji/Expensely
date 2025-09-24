@@ -38,10 +38,8 @@ public class JwtUtil {
                     .getSubject();
             return email;
         } catch (ExpiredJwtException e) {
-            System.out.println("Token expired");
             return null;
         } catch (Exception e) {
-            System.out.println("Invalid token");
             return null;
         }
     }
@@ -54,10 +52,8 @@ public class JwtUtil {
                     .parseClaimsJws(token);
             return true;
         } catch (ExpiredJwtException e) {
-            System.out.println("Token expired");
             return false;
         } catch (Exception e) {
-            System.out.println("Invalid token");
             return false;
         }
     }

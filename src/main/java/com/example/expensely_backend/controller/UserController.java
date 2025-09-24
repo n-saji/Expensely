@@ -264,7 +264,6 @@ public class UserController {
     public ResponseEntity<?> verifyOAuthLogin(@RequestHeader("Authorization") String authHeader, @RequestBody User user) {
         String token = authHeader.replace("Bearer ", "");
         try {
-            System.out.println("Verifying OAuth token: " + token + " " + environment.getProperty("GOOGLE_CLIENT_ID"));
             GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
                     new NetHttpTransport(),
                     JacksonFactory.getDefaultInstance()
