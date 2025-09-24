@@ -108,7 +108,7 @@ public class ExpenseController {
             @RequestParam(value = "end_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate,
             @RequestParam(value = "order", required = false, defaultValue = "desc") String order) {
 
-        startDate = FormatDate.formatStartDate(startDate);
+        startDate = FormatDate.formatStartDate(startDate,false);
         endDate = FormatDate.formatEndDate(endDate);
         try {
             return ResponseEntity.ok(expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, startDate, endDate, order));
@@ -124,8 +124,9 @@ public class ExpenseController {
             @RequestParam(value = "end_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate) {
         int year = LocalDateTime.now().getYear();
         int month = LocalDateTime.now().getMonthValue();
-        startDate = FormatDate.formatStartDate(startDate);
+        startDate = FormatDate.formatStartDate(startDate,true);
         endDate = FormatDate.formatEndDate(endDate);
+        System.out.println(startDate+" "+endDate+" dates");
         try {
             return ResponseEntity.ok(
                     new ExpenseOverview(expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, startDate, endDate, "desc"),
@@ -157,7 +158,7 @@ public class ExpenseController {
             @RequestParam(value = "page", required = false, defaultValue = "1") int page,
             @RequestParam(value = "limit", required = false, defaultValue = "10") int limit) {
 
-        startDate = FormatDate.formatStartDate(startDate);
+        startDate = FormatDate.formatStartDate(startDate,false);
         endDate = FormatDate.formatEndDate(endDate);
         if (order != null && !order.equals("asc") && !order.equals("desc")) {
             return ResponseEntity.badRequest().body(new UserRes(null, "Error: Order must be 'asc' or 'desc'"));
@@ -174,7 +175,7 @@ public class ExpenseController {
     public ResponseEntity<?> exportExpenses(@PathVariable String userId,
                                              @RequestParam(value = "start_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startDate,
                                              @RequestParam(value = "end_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate) {
-        startDate = FormatDate.formatStartDate(startDate);
+        startDate = FormatDate.formatStartDate(startDate,false);
         endDate = FormatDate.formatEndDate(endDate);
         try {
             String csvData = expenseService.exportExpensesToCSV(userId, startDate, endDate);
