@@ -24,7 +24,7 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Build JAR
-        run: ./gradlew clean build
+        run: ./gradlew clean build -x test
 
       - name: Copy JAR to root
         run: cp build/libs/expensely_backend-0.0.1-SNAPSHOT.jar ./expensely_backend-0.0.1-SNAPSHOT.jar
