@@ -1,0 +1,40 @@
+name: Build Gradle JAR
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:  # optional, allows manual run
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Grant execute permission for Gradle wrapper
+        run: chmod +x ./gradlew
+
+      - name: Build JAR
+        run: ./gradlew clean build
+
+      - name: Copy JAR to root
+        run: cp build/libs/expensely_backend-0.0.1-SNAPSHOT.jar ./expensely_backend-0.0.1-SNAPSHOT.jar
+
+      - name: Commit JAR to repo
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git add expensely_backend-0.0.1-SNAPSHOT.jar
+          git commit -m "Add built JAR [skip ci]" || echo "No changes to commit"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
