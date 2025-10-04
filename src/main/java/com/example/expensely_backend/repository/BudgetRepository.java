@@ -10,7 +10,12 @@ import java.util.UUID;
 @Repository
 public interface BudgetRepository extends JpaRepository<Budget, UUID> {
     Boolean existsByCategoryId(UUID categoryId);
+
     List<Budget> findByCategoryId(UUID categoryId);
+
     List<Budget> findByUserId(UUID userId);
 
+    List<Budget> findByUserIdAndCategoryId(UUID userId, UUID categoryId);
+
+    Boolean existsByUserIdAndCategoryId(UUID userId, UUID categoryId);
 }
