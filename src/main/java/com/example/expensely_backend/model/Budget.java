@@ -12,7 +12,7 @@ import java.util.UUID;
 @Entity
 @Table(
         name = "budgets",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "category_id","startDate","endDate"})
+        uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "category_id","startDate","endDate","isActive"})
 )
 public class Budget {
     @Id

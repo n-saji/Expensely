@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.io.StringWriter;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -25,11 +26,13 @@ public class ExpenseService {
     private final ExpenseRepository expenseRepository;
     private final CategoryService categoryService;
     private final UserService userService;
+    private final BudgetService budgetService;
 
-    public ExpenseService(ExpenseRepository expenseRepository, CategoryService categoryService, UserService userService) {
+    public ExpenseService(ExpenseRepository expenseRepository, CategoryService categoryService, UserService userService, BudgetService budgetService) {
         this.expenseRepository = expenseRepository;
         this.categoryService = categoryService;
         this.userService = userService;
+        this.budgetService = budgetService;
     }
 
     public void save(Expense expense) {
@@ -51,6 +54,16 @@ public class ExpenseService {
 
         expense.setUser(user);
         expenseRepository.save(expense);
+
+
+        // calculate if budget set
+
+            try {
+                budgetService.updateBudgetAmountByUserIdAndCategoryId(user.getId().toString(),category.getId().toString(),expense.getAmount());
+            }catch (Exception e){
+                throw new IllegalArgumentException("Error updating budget: " + e.getMessage());
+            }
+
     }
 
     public Expense getExpenseById(String id) {
@@ -63,6 +76,13 @@ public class ExpenseService {
                 throw new IllegalArgumentException("Expense not found");
             }
             expenseRepository.deleteById(UUID.fromString(id));
+//            budget update
+            Expense expense = getExpenseById(id);
+            try{
+            budgetService.updateBudgetAmountByUserIdAndCategoryId(expense.getUser().getId().toString(),expense.getCategory().getId().toString(),expense.getAmount().negate());}
+            catch (Exception e){
+                throw new IllegalArgumentException("Error updating budget: " + e.getMessage());
+            }
         } catch (Exception e) {
             throw new IllegalArgumentException("Error deleting expense: " + e.getMessage());
         }
@@ -92,6 +112,7 @@ public class ExpenseService {
     public Expense updateExpense(Expense expense) {
 
         Expense oldExpense = getExpenseById(expense.getId().toString());
+        BigDecimal changed_amount = expense.getAmount().subtract(oldExpense.getAmount());
 
         if (expense.getCategory() != null && expense.getCategory().getId() != null && !expense.getCategory().getId().equals(oldExpense.getCategory().getId())) {
             Category category = categoryService.getCategoryById(expense.getCategory().getId().toString());
@@ -118,7 +139,15 @@ public class ExpenseService {
         }
 
 
-        return expenseRepository.save(oldExpense);
+        Expense exp =  expenseRepository.save(oldExpense);
+
+//        update budget
+        try{
+            budgetService.updateBudgetAmountByUserIdAndCategoryId(exp.getUser().getId().toString(),exp.getCategory().getId().toString(),changed_amount);
+        }catch (Exception e){
+            throw new IllegalArgumentException("Error updating budget: " + e.getMessage());
+        }
+        return exp;
     }
 
     public List<ExpenseResponse> getExpenseByUserIdAndStartDateAndEndDate(String userId, LocalDateTime startDate, LocalDateTime endDate, String order) {
@@ -159,6 +188,13 @@ public class ExpenseService {
             }
         }
         expenseRepository.deleteAll(expenses);
+        for (Expense expense : expenses) {
+            try{
+                budgetService.updateBudgetAmountByUserIdAndCategoryId(expense.getUser().getId().toString(),expense.getCategory().getId().toString(),expense.getAmount().negate());}
+            catch (Exception e){
+                throw new IllegalArgumentException("Error updating budget: " + e.getMessage());
+            }
+        }
     }
 
     public ExpenseResList fetchExpensesWithConditions(String userId, LocalDateTime startDate, LocalDateTime endDate, String order, String categoryId, int page, int limit) {

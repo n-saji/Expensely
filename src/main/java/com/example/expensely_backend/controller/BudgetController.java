@@ -85,7 +85,7 @@ public class BudgetController {
             existingBudget.setAmountLimit(budget.getAmountLimit());
 //            existingBudget.setCategory(budget.getCategory());
             if (budget.getPeriod() != null) existingBudget.setPeriod(budget.getPeriod());
-            budgetService.save(existingBudget);
+            budgetService.updateBudget(existingBudget);
             return ResponseEntity.ok(new BudgetResponse( "", "Budget updated successfully"));
         }catch (Exception e) {
             return ResponseEntity.badRequest().body(new BudgetResponse( e.getMessage(), null));
