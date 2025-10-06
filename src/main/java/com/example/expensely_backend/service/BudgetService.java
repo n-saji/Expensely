@@ -90,12 +90,12 @@ public class BudgetService {
     public Budget findById(String id) {
         return budgetRepository.findById(UUID.fromString(id)).orElseThrow(() -> new IllegalArgumentException("Budget not found"));
     }
-    public void deleteById(String id) {
+    public void deleteByIdHard(String id) {
         try {
             Budget budget = budgetRepository.findById(UUID.fromString(id)).orElseThrow(() -> new IllegalArgumentException("Budget not found"));
-            budget.setActive(false);
-            budget.setUpdatedAt(new java.sql.Timestamp(new Date().getTime()).toLocalDateTime());
-            budgetRepository.save(budget);
+//            budget.setActive(false);
+//            budget.setUpdatedAt(new java.sql.Timestamp(new Date().getTime()).toLocalDateTime());
+            budgetRepository.delete(budget);
         }catch (Exception e) {
             throw new IllegalArgumentException("Error deleting budget: " + e.getMessage());
         }

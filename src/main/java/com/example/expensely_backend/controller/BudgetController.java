@@ -47,7 +47,7 @@ public class BudgetController {
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteBudgetById(@PathVariable String id) {
         try {
-            budgetService.deleteById(id);
+            budgetService.deleteByIdHard(id);
             return ResponseEntity.status(204).body(new BudgetResponse("","Successfully deleted"));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new BudgetResponse(e.getMessage(),null));

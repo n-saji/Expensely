@@ -49,7 +49,7 @@ public class CategoryService {
 //                    throw new IllegalArgumentException("Cannot delete category, it is referenced by existing budgets");
 //                }
 //            }
-//            categoryRepository.deleteById(UUID.fromString(id));
+//            categoryRepository.deleteByIdHard(UUID.fromString(id));
 //        } catch (Exception e) {
 //            throw new IllegalArgumentException("Error deleting category: " + e.getMessage());
 //        }
