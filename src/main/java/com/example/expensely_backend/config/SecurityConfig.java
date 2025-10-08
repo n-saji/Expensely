@@ -47,10 +47,10 @@ public class SecurityConfig {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/**")
-                        .allowedOrigins("http://localhost:3000","http://192.168.*:*","http://76.38.202.178:3000","https://expensely-self.vercel.app") // Your Next.js dev URL
+                        .allowedOrigins("http://localhost:3000","http://192.168.1.54:3000","http://76.38.202.178:3000","https://expensely-self.vercel.app")
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS","PATCH")
                         .allowedHeaders("*")
-                        .allowCredentials(true); // Optional if you're using cookies/auth headers
+                        .allowCredentials(true);
             }
         };
     }

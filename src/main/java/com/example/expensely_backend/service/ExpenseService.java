@@ -59,7 +59,7 @@ public class ExpenseService {
         // calculate if budget set
 
             try {
-                budgetService.updateBudgetAmountByUserIdAndCategoryId(user.getId().toString(),category.getId().toString(),expense.getAmount());
+                budgetService.updateBudgetAmountByUserIdAndCategoryId(user.getId().toString(),category.getId().toString(),expense.getAmount(),expense.getExpenseDate());
             }catch (Exception e){
                 throw new IllegalArgumentException("Error updating budget: " + e.getMessage());
             }
@@ -79,7 +79,7 @@ public class ExpenseService {
 //            budget update
             Expense expense = getExpenseById(id);
             try{
-            budgetService.updateBudgetAmountByUserIdAndCategoryId(expense.getUser().getId().toString(),expense.getCategory().getId().toString(),expense.getAmount().negate());}
+            budgetService.updateBudgetAmountByUserIdAndCategoryId(expense.getUser().getId().toString(),expense.getCategory().getId().toString(),expense.getAmount().negate(),expense.getExpenseDate());}
             catch (Exception e){
                 throw new IllegalArgumentException("Error updating budget: " + e.getMessage());
             }
@@ -143,7 +143,7 @@ public class ExpenseService {
 
 //        update budget
         try{
-            budgetService.updateBudgetAmountByUserIdAndCategoryId(exp.getUser().getId().toString(),exp.getCategory().getId().toString(),changed_amount);
+            budgetService.updateBudgetAmountByUserIdAndCategoryId(exp.getUser().getId().toString(),exp.getCategory().getId().toString(),changed_amount,exp.getExpenseDate());
         }catch (Exception e){
             throw new IllegalArgumentException("Error updating budget: " + e.getMessage());
         }
@@ -190,7 +190,7 @@ public class ExpenseService {
         expenseRepository.deleteAll(expenses);
         for (Expense expense : expenses) {
             try{
-                budgetService.updateBudgetAmountByUserIdAndCategoryId(expense.getUser().getId().toString(),expense.getCategory().getId().toString(),expense.getAmount().negate());}
+                budgetService.updateBudgetAmountByUserIdAndCategoryId(expense.getUser().getId().toString(),expense.getCategory().getId().toString(),expense.getAmount().negate(),expense.getExpenseDate());}
             catch (Exception e){
                 throw new IllegalArgumentException("Error updating budget: " + e.getMessage());
             }

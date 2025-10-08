@@ -11,6 +11,7 @@ import com.example.expensely_backend.utils.FormatDate;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
@@ -124,6 +125,10 @@ public class BudgetService {
     }
 
     public Budget updateBudget(Budget budget) {
+
+        if (budget.getUser() == null) {
+            throw new IllegalArgumentException("User must not be null");
+        }
         if (!budgetRepository.existsById(budget.getId())) {
             throw new IllegalArgumentException("Budget not found");
         }
@@ -144,6 +149,15 @@ public class BudgetService {
         }
         try {
             budget.setUpdatedAt(new java.sql.Timestamp(new Date().getTime()).toLocalDateTime());
+            BigDecimal total_amount = budget.getAmountSpent();
+            List<Expense> expense = expenseRepository.findByUserIdAndTimeFrameAsc(budget.getUser().getId(), FormatDate.formatStartDate(budget.getStartDate().atStartOfDay(),true), FormatDate.formatEndDate(budget.getEndDate().atStartOfDay()));
+            for(Expense exp : expense){
+                if (exp.getCategory().getId()== budget.getCategory().getId()) {
+                    total_amount = total_amount.add(exp.getAmount());
+                }
+            }
+            budget.setAmountSpent(total_amount);
+
             return budgetRepository.save(budget);
         }catch (Exception e) {
             throw new IllegalArgumentException("Error updating budget: " + e.getMessage());
@@ -154,13 +168,21 @@ public class BudgetService {
         return budgetRepository.findByUserIdAndCategoryId(UUID.fromString(user_id), UUID.fromString(category_id));
     }
 
-    public void updateBudgetAmountByUserIdAndCategoryId(String user_id, String category_id, BigDecimal amount){
+    public void updateBudgetAmountByUserIdAndCategoryId(String user_id, String category_id, BigDecimal amount, LocalDateTime date){
+        if (date == null) {
+            throw new IllegalArgumentException("Date must not be null");
+        }
         Budget budget = findByUserIdAndCategoryId(user_id, category_id);
         if(budget == null){
             return;
         }
+
+        if(date.toLocalDate().isBefore( budget.getStartDate())|| date.toLocalDate().isAfter( budget.getEndDate() )){
+               return;
+           }
+
         budget.setAmountSpent(budget.getAmountSpent().add(amount));
-        budget.setUpdatedAt(new java.sql.Timestamp(new Date().getTime()).toLocalDateTime());
+        budget.setUpdatedAt(LocalDateTime.now());
         try{
         budgetRepository.save(budget);
         }
