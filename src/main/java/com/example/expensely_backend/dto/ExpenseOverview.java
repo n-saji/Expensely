@@ -58,7 +58,7 @@ public class ExpenseOverview {
     private final Map<String,Double> overTheDaysThisMonth;
 
     @Getter
-    private final int earliestStartMonth, earliestStartYear;
+    private final Integer earliestStartMonth, earliestStartYear;
 
     @Getter
     private final Map<String,Double> thisMonthMostExpensiveItem;
@@ -87,8 +87,14 @@ public class ExpenseOverview {
                 .max(Map.Entry.comparingByValue())
                 .map(Map.Entry::getKey)
                 .orElse(null);
-        this.earliestStartMonth = FirstExpense.getExpenses().get(0).getExpenseDate().getMonthValue();
-        this.earliestStartYear = FirstExpense.getExpenses().get(0).getExpenseDate().getYear();
+
+        if (FirstExpense != null && FirstExpense.getExpenses() != null && !FirstExpense.getExpenses().isEmpty()) {
+            this.earliestStartMonth = FirstExpense.getExpenses().get(0).getExpenseDate().getMonthValue();
+            this.earliestStartYear = FirstExpense.getExpenses().get(0).getExpenseDate().getYear();
+        } else {
+            this.earliestStartMonth = null;
+            this.earliestStartYear = null;
+        }
 
         ExpenseResponse mostExpensive = expenses.stream()
                 .filter(expense -> expense.getExpenseDate().getMonthValue() == (currentMonth+1))
