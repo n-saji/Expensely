@@ -157,7 +157,7 @@ public class UserController {
     @GetMapping("/{id}")
     public ResponseEntity<?> getUserById(@PathVariable String id) {
         try {
-            User user = userService.GetUserById(id);
+            User user = userService.GetActiveUserById(id);
             if (user == null) {
                 return ResponseEntity.status(404).body(new UserRes(null, "User not found"));
             }
@@ -170,7 +170,7 @@ public class UserController {
     @PatchMapping("/update-profile")
     public ResponseEntity<?> updateProfile(@RequestBody User user) {
         try {
-            User existingUser = userService.GetUserById(user.getId().toString());
+            User existingUser = userService.GetActiveUserById(user.getId().toString());
             if (existingUser == null) {
                 return ResponseEntity.status(404).body(new UserRes(null, "User not found"));
             }
@@ -193,7 +193,7 @@ public class UserController {
     @PatchMapping("/update-settings")
     public ResponseEntity<?> updateSettings(@RequestBody User user) {
         try {
-            User existingUser = userService.GetUserById(user.getId().toString());
+            User existingUser = userService.GetActiveUserById(user.getId().toString());
             if (existingUser == null) {
                 return ResponseEntity.status(404).body(new UserRes(null, "User not found"));
             }
@@ -215,7 +215,7 @@ public class UserController {
     @PatchMapping("/update-password")
     public ResponseEntity<?> updatePassword(@RequestBody User user) {
         try {
-            User existingUser = userService.GetUserById(user.getId().toString());
+            User existingUser = userService.GetActiveUserById(user.getId().toString());
             if (existingUser == null) {
                 return ResponseEntity.status(404).body(new UserRes(null, "User not found"));
             }
@@ -238,7 +238,7 @@ public class UserController {
                 return ResponseEntity.status(404).body(new UserRes(null, "User not found"));
             }
             user.setIsActive(false);
-            userService.UpdateUser(user);
+            userService.deleteUser(user);
             return ResponseEntity.ok(new UserRes(null, null));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new UserRes(null, e.getMessage()));
@@ -248,7 +248,7 @@ public class UserController {
     @PatchMapping("/{id}/update-profile-picture")
     public ResponseEntity<?> updateProfilePicture(@PathVariable String id, @RequestParam("filepath") String filePath) {
         try {
-            User user = userService.GetUserById(id);
+            User user = userService.GetActiveUserById(id);
             if (user == null) {
                 return ResponseEntity.status(404).body(new UserRes(null, "User not found"));
             }

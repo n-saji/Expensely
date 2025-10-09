@@ -1,9 +1,10 @@
 package com.example.expensely_backend.service;
 
 import com.example.expensely_backend.model.User;
-import com.example.expensely_backend.repository.UserRepository;
+import com.example.expensely_backend.repository.*;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -14,11 +15,21 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final ExpiredTokenRepository expiredTokenRepository;
+    private final BudgetRepository budgetRepository;
+    private final CategoryRepository categoryRepository;
+    private final ExpenseRepository expenseRepository;
 
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, ExpiredTokenRepository expiredTokenRepository,
+                       BudgetRepository budgetRepository, CategoryRepository categoryRepository, ExpenseRepository expenseRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.expiredTokenRepository = expiredTokenRepository;
+        this.budgetRepository = budgetRepository;
+        this.categoryRepository = categoryRepository;
+        this.expenseRepository = expenseRepository;
     }
 
 
@@ -59,13 +70,18 @@ public class UserService {
 
     }
 
-    public User GetUserById(String id) {
+    public User GetActiveUserById(String id) {
         UUID uuid = UUID.fromString(id);
         User user = userRepository.findById(uuid).orElseThrow(() -> new IllegalArgumentException("User not found"));
         if (user.getIsActive() == null || !user.getIsActive()) {
             throw new IllegalArgumentException("User is not active");
         }
         return user;
+    }
+
+    public User GetUserById(String id) {
+        UUID uuid = UUID.fromString(id);
+        return userRepository.findById(uuid).orElseThrow(() -> new IllegalArgumentException("User not found"));
     }
 
     public User GetUserByEmailOrPhone(String email, String phone) {
@@ -122,6 +138,19 @@ public class UserService {
             throw new IllegalArgumentException("No users found");
         }
         return users;
+    }
+
+    @Transactional
+    public void deleteUser(User user) {
+        try {
+            expiredTokenRepository.deleteAllByUserId(user.getId());
+            budgetRepository.deleteAllByUserId(user.getId());
+            expenseRepository.deleteAllByUserId(user.getId());
+            categoryRepository.deleteByUserId(user.getId());
+            userRepository.delete(user);
+        }catch (Exception e) {
+            throw new IllegalArgumentException("Error deleting user: " + e.getMessage());
+        }
     }
 
 

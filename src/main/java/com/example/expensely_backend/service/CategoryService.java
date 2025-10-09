@@ -24,7 +24,7 @@ public class CategoryService {
         if (category.getUser() == null || category.getUser().getId() == null) {
             throw new IllegalArgumentException("User must be provided");
         }
-        var user = userService.GetUserById(category.getUser().getId().toString());
+        var user = userService.GetActiveUserById(category.getUser().getId().toString());
         if (user == null) {
             throw new IllegalArgumentException("User not found");
         }
@@ -64,7 +64,7 @@ public class CategoryService {
     }
 
     public Iterable<Category> getCategoriesByUserId(String userId, String type) {
-        var user = userService.GetUserById(userId);
+        var user = userService.GetActiveUserById(userId);
         if (user == null) {
             throw new IllegalArgumentException("User not found");
         }

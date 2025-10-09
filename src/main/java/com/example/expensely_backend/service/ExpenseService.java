@@ -47,7 +47,7 @@ public class ExpenseService {
         if (expense.getUser() == null || expense.getUser().getId() == null) {
             throw new IllegalArgumentException("User must be provided");
         }
-        User user = userService.GetUserById(expense.getUser().getId().toString());
+        User user = userService.GetActiveUserById(expense.getUser().getId().toString());
         if (user == null) {
             throw new IllegalArgumentException("User not found");
         }
@@ -89,7 +89,7 @@ public class ExpenseService {
     }
 
     public Iterable<Expense> getExpensesByUserId(String userId) {
-        User user = userService.GetUserById(userId);
+        User user = userService.GetActiveUserById(userId);
         if (user == null) {
             throw new IllegalArgumentException("User not found");
         }
@@ -101,7 +101,7 @@ public class ExpenseService {
         if (category == null) {
             throw new IllegalArgumentException("Category not found");
         }
-        User user = userService.GetUserById(userId);
+        User user = userService.GetActiveUserById(userId);
         if (user == null) {
             throw new IllegalArgumentException("User not found");
         }
@@ -151,7 +151,7 @@ public class ExpenseService {
     }
 
     public List<ExpenseResponse> getExpenseByUserIdAndStartDateAndEndDate(String userId, LocalDateTime startDate, LocalDateTime endDate, String order) {
-        User user = userService.GetUserById(userId);
+        User user = userService.GetActiveUserById(userId);
         if (user == null) {
             throw new IllegalArgumentException("User not found");
         }
@@ -170,7 +170,7 @@ public class ExpenseService {
     }
 
     public void deleteBuUserIDAndExpenseIds(String userId, List<Expense> expenses) {
-        User user = userService.GetUserById(userId);
+        User user = userService.GetActiveUserById(userId);
         if (user == null) {
             throw new IllegalArgumentException("User not found");
         }
@@ -200,7 +200,7 @@ public class ExpenseService {
     public ExpenseResList fetchExpensesWithConditions(String userId, LocalDateTime startDate, LocalDateTime endDate, String order, String categoryId, int page, int limit) {
         int totalPages, totalElements = 0;
 
-        User user = userService.GetUserById(userId);
+        User user = userService.GetActiveUserById(userId);
         if (user == null) {
             throw new IllegalArgumentException("User not found");
         }
@@ -241,7 +241,7 @@ public class ExpenseService {
     }
 
     public List<MonthlyCategoryExpense> getMonthlyCategoryExpense(String userId,LocalDateTime startDate, LocalDateTime endDate ){
-        User user = userService.GetUserById(userId);
+        User user = userService.GetActiveUserById(userId);
         if (user == null) {
             throw new IllegalArgumentException("User not found");
         }
@@ -251,7 +251,7 @@ public class ExpenseService {
     }
 
     public List<DailyExpense> getDailyExpense(String userId,LocalDateTime startDate, LocalDateTime endDate ){
-        User user = userService.GetUserById(userId);
+        User user = userService.GetActiveUserById(userId);
         if (user == null) {
             throw new IllegalArgumentException("User not found");
         }
@@ -260,7 +260,7 @@ public class ExpenseService {
 
     public String exportExpensesToCSV(String userId, LocalDateTime startDate, LocalDateTime endDate) throws IOException {
         UUID userIdUUID = UUID.fromString(userId);
-        User user = userService.GetUserById(userId);
+        User user = userService.GetActiveUserById(userId);
         List<Expense> expenses = expenseRepository.findByUserIdAndTimeFrameAsc(userIdUUID, startDate, endDate);
 
         StringWriter sw = new StringWriter();

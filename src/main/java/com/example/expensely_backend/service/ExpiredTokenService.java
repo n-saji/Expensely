@@ -5,6 +5,8 @@ import com.example.expensely_backend.model.ExpiredToken;
 import com.example.expensely_backend.repository.ExpiredTokenRepository;
 import org.springframework.stereotype.Service;
 
+import java.util.UUID;
+
 @Service
 public class ExpiredTokenService {
 
@@ -25,5 +27,18 @@ public class ExpiredTokenService {
         // This could involve checking against a database or cache
 
         return expiredTokenRepository.existsById(token);
+    }
+
+    public void deleteExpiredToken(String token) {
+        expiredTokenRepository.deleteById(token);
+    }
+
+    public void deleteExpiredTokenByUserId(String userId) {
+        UUID userIdUUID = UUID.fromString(userId);
+        try {
+            expiredTokenRepository.deleteAllByUserId(userIdUUID);
+        }catch (Exception e) {
+            throw new IllegalArgumentException("Error deleting expired tokens: " + e.getMessage());
+        }
     }
 }

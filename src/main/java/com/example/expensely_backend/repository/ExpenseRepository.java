@@ -117,5 +117,6 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
                                                             @Param("startDate") LocalDateTime startDate,
                                                             @Param("endDate") LocalDateTime endDate);
 
+    long deleteAllByUserId(UUID id);
 }
 

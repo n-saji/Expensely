@@ -49,7 +49,7 @@ public class BudgetService {
 
 
     public Budget save(Budget budget) {
-        User user = userService.GetUserById(budget.getUser().getId().toString());
+        User user = userService.GetActiveUserById(budget.getUser().getId().toString());
         if (user == null) {
             throw new IllegalArgumentException("User not found");
         }
@@ -117,7 +117,7 @@ public class BudgetService {
         }
     }
     public List<Budget> getBudgetsByUserId(String userId) {
-        User user = userService.GetUserById(userId);
+        User user = userService.GetActiveUserById(userId);
         if (user == null) {
             throw new IllegalArgumentException("User not found");
         }

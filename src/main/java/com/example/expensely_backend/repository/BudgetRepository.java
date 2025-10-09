@@ -26,4 +26,5 @@ public interface BudgetRepository extends JpaRepository<Budget, UUID> {
 
     List<Budget> findByEndDateBeforeAndIsActiveTrue(LocalDate today);
 
+    long deleteAllByUserId(UUID userId);
 }
