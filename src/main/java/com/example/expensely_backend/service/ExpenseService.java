@@ -197,7 +197,7 @@ public class ExpenseService {
         }
     }
 
-    public ExpenseResList fetchExpensesWithConditions(String userId, LocalDateTime startDate, LocalDateTime endDate, String order, String categoryId, int page, int limit) {
+    public ExpenseResList fetchExpensesWithConditions(String userId, LocalDateTime startDate, LocalDateTime endDate, String order, String categoryId, int page, int limit, String q) {
         int totalPages, totalElements = 0;
 
         User user = userService.GetActiveUserById(userId);
@@ -211,6 +211,7 @@ public class ExpenseService {
 
         List<Expense> expenses;
         UUID categoryUUID = null;
+        q = "%" + q + "%";
         if (categoryId != null) {
             Category category = categoryService.getCategoryById(categoryId);
             if (category == null) {
@@ -218,22 +219,22 @@ public class ExpenseService {
             }
             categoryUUID = category.getId();
             if (order == null || order.equalsIgnoreCase("desc")) {
-                expenses = expenseRepository.findByUserIdAndTimeFrameAndCategoryDescWithLimit(user.getId(), startDate, endDate, categoryUUID, limit, offset);
+                expenses = expenseRepository.findByUserIdAndTimeFrameAndCategoryDescWithLimit(user.getId(), startDate, endDate, categoryUUID, limit, offset,q);
             } else if (order.equalsIgnoreCase("asc")) {
-                expenses = expenseRepository.findByUserIdAndTimeFrameAndCategoryAscWithLimit(user.getId(), startDate, endDate, categoryUUID, limit, offset);
+                expenses = expenseRepository.findByUserIdAndTimeFrameAndCategoryAscWithLimit(user.getId(), startDate, endDate, categoryUUID, limit, offset,q);
             } else {
                 throw new IllegalArgumentException("Order must be 'asc' or 'desc'");
             }
-            totalElements = expenseRepository.countByUserIdAndTimeFrameAndCategory(user.getId(), startDate, endDate, categoryUUID);
+            totalElements = expenseRepository.countByUserIdAndTimeFrameAndCategory(user.getId(), startDate, endDate, categoryUUID,q);
         } else {
             if (order == null || order.equalsIgnoreCase("desc")) {
-                expenses = expenseRepository.findByUserIdAndTimeFrameDescWithLimit(user.getId(), startDate, endDate, limit, offset);
+                expenses = expenseRepository.findByUserIdAndTimeFrameDescWithLimit(user.getId(), startDate, endDate, limit, offset,q);
             } else if (order.equalsIgnoreCase("asc")) {
-                expenses = expenseRepository.findByUserIdAndTimeFrameAscWithLimit(user.getId(), startDate, endDate, limit, offset);
+                expenses = expenseRepository.findByUserIdAndTimeFrameAscWithLimit(user.getId(), startDate, endDate, limit, offset,q);
             } else {
                 throw new IllegalArgumentException("Order must be 'asc' or 'desc'");
             }
-            totalElements = expenseRepository.countByUserIdAndTimeFrame(user.getId(), startDate, endDate);
+            totalElements = expenseRepository.countByUserIdAndTimeFrame(user.getId(), startDate, endDate,q);
         }
 
         totalPages = (int) Math.ceil((double) totalElements / limit);

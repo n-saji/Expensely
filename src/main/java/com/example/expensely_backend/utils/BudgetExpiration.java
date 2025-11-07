@@ -29,3 +29,4 @@ public class BudgetExpiration {
         System.out.println("Budget expiry job ran at " + today + ", expired " + budgetsToExpire.size() + " budgets.");
     }
 }
+//export $(cat .env | xargs) && ./gradlew bootRun

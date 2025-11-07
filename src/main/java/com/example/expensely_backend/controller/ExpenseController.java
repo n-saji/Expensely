@@ -154,7 +154,7 @@ public class ExpenseController {
                             userId,expenseService.getMonthlyCategoryExpense(userId,req_start_year,req_end_year),
                             categoryService.getCategoriesByUserId(userId,"expense"),
                             expenseService.getDailyExpense(userId,req_start,req_end),
-                            expenseService.fetchExpensesWithConditions(userId,FormatDate.formatStartDate(null,false),endDate,"asc",null,1,1),
+                            expenseService.fetchExpensesWithConditions(userId,FormatDate.formatStartDate(null,false),endDate,"asc",null,1,1,""),
                             req_month));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
@@ -179,7 +179,8 @@ public class ExpenseController {
             @RequestParam(value = "order", required = false, defaultValue = "desc") String order,
             @RequestParam(value = "category_id", required = false) String categoryId,
             @RequestParam(value = "page", required = false, defaultValue = "1") int page,
-            @RequestParam(value = "limit", required = false, defaultValue = "10") int limit) {
+            @RequestParam(value = "limit", required = false, defaultValue = "10") int limit,
+            @RequestParam(value = "q", required = false) String q) {
 
         startDate = FormatDate.formatStartDate(startDate,false);
         endDate = FormatDate.formatEndDate(endDate);
@@ -187,7 +188,7 @@ public class ExpenseController {
             return ResponseEntity.badRequest().body(new UserRes(null, "Error: Order must be 'asc' or 'desc'"));
         }
         try {
-            return ResponseEntity.ok(expenseService.fetchExpensesWithConditions(userId, startDate, endDate, order, categoryId, page, limit));
+            return ResponseEntity.ok(expenseService.fetchExpensesWithConditions(userId, startDate, endDate, order, categoryId, page, limit,q));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
         }
