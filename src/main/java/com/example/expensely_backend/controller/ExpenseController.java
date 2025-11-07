@@ -184,6 +184,7 @@ public class ExpenseController {
 
         startDate = FormatDate.formatStartDate(startDate,false);
         endDate = FormatDate.formatEndDate(endDate);
+        if (q == null) q = "";
         if (order != null && !order.equals("asc") && !order.equals("desc")) {
             return ResponseEntity.badRequest().body(new UserRes(null, "Error: Order must be 'asc' or 'desc'"));
         }
