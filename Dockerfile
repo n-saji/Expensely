@@ -1,5 +1,5 @@
 # Stage 1: Build the JAR
-FROM gradle:8.14-jdk17 AS builder
+FROM gradle:jdk21-corretto AS builder
 
 WORKDIR /app
 
