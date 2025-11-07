@@ -1,5 +1,5 @@
 # Stage 1: Build the JAR
-FROM gradle:jdk21-corretto AS builder
+FROM gradle:8.14-jdk17 AS builder
 
 WORKDIR /app
 
@@ -13,7 +13,7 @@ RUN chmod +x ./gradlew
 RUN ./gradlew clean build -x test
 
 # Stage 2: Create minimal runtime image
-FROM openjdk:17-jdk-slim
+FROM eclipse-temurin:17-jre-jammy
 
 WORKDIR /app
 
