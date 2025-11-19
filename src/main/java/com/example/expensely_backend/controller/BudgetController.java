@@ -92,7 +92,7 @@ public class BudgetController {
             if (budget.getStartDate() != null) existingBudget.setStartDate(budget.getStartDate());
             if (budget.getEndDate() != null) existingBudget.setEndDate(budget.getEndDate());
 //            updating budget but amount has to be 0 as recalculation happens in service
-            budget.setAmountSpent(BigDecimal.ZERO);
+            existingBudget.setAmountSpent(BigDecimal.ZERO);
             budgetService.updateBudget(existingBudget);
             return ResponseEntity.ok(new BudgetResponse("", "Budget updated successfully"));
         } catch (Exception e) {
