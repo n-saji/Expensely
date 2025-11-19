@@ -1,5 +1,6 @@
 package com.example.expensely_backend.dto;
 
+import com.example.expensely_backend.model.Budget;
 import com.example.expensely_backend.model.Category;
 import lombok.Getter;
 
@@ -63,11 +64,15 @@ public class ExpenseOverview {
     @Getter
     private final Map<String,Double> thisMonthMostExpensiveItem;
 
+    @Getter
+    private final Map<String, Budget> budgetServiceMap;
+
 
     public ExpenseOverview(List<ExpenseResponse> expenses,List<ExpenseResponse> req_expenses_range,List<ExpenseResponse> req_expenses_range_monthly,
                            String userId, List<MonthlyCategoryExpense> monthlyCategoryExpenses,
                            Iterable<Category> categories, List<DailyExpense> dailyExpenses,
-                           ExpenseResList FirstExpense,Integer reqMonth) {
+                           ExpenseResList FirstExpense,Integer reqMonth,
+                           List<Budget> budgetServiceMap) {
         //  Overview page
         this.userId = userId;
         this.totalCount = expenses.size();
@@ -168,6 +173,15 @@ public class ExpenseOverview {
             String day = String.valueOf(date.getDayOfMonth());
 
             overTheDaysThisMonth.put(day, round(totalSum * 100.0) / 100.0);
+        }
+
+        this.budgetServiceMap = new LinkedHashMap<>();
+
+        for (Budget budget :budgetServiceMap ) {
+            budget.setUser(null);
+            String name = budget.getCategory().getName();
+            budget.setCategory(null);
+            this.budgetServiceMap.put(name, budget);
         }
 
 

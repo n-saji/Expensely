@@ -5,6 +5,7 @@ import com.example.expensely_backend.dto.AuthResponse;
 import com.example.expensely_backend.dto.ExpenseOverview;
 import com.example.expensely_backend.dto.UserRes;
 import com.example.expensely_backend.model.Expense;
+import com.example.expensely_backend.service.BudgetService;
 import com.example.expensely_backend.service.CategoryService;
 import com.example.expensely_backend.service.ExpenseService;
 import com.example.expensely_backend.utils.FormatDate;
@@ -25,10 +26,12 @@ public class ExpenseController {
     private final ExpenseService expenseService;
     private final CategoryService categoryService;
     private final FormatDate formatDate = new FormatDate();
+    private final BudgetService budgetService;
 
-    public ExpenseController(ExpenseService expenseService , CategoryService categoryService) {
+    public ExpenseController(ExpenseService expenseService , CategoryService categoryService, BudgetService budgetService) {
         this.expenseService = expenseService;
         this.categoryService = categoryService;
+        this.budgetService = budgetService;
     }
 
     @PostMapping("/create")
@@ -155,7 +158,8 @@ public class ExpenseController {
                             categoryService.getCategoriesByUserId(userId,"expense"),
                             expenseService.getDailyExpense(userId,req_start,req_end),
                             expenseService.fetchExpensesWithConditions(userId,FormatDate.formatStartDate(null,false),endDate,"asc",null,1,1,""),
-                            req_month));
+                            req_month,
+                    budgetService.getBudgetsByUserId(userId)));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
         }
