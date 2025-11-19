@@ -26,9 +26,7 @@ public class BudgetService {
     private final UserService userService;
     private final ExpenseRepository expenseRepository;
 
-    public BudgetService(BudgetRepository budgetRepository, UserService userService,
-                         CategoryRepository categoryRepository,
-                         ExpenseRepository expenseRepository)  {
+    public BudgetService(BudgetRepository budgetRepository, UserService userService, CategoryRepository categoryRepository, ExpenseRepository expenseRepository) {
         this.budgetRepository = budgetRepository;
         this.userService = userService;
         this.categoryRepository = categoryRepository;
@@ -61,26 +59,26 @@ public class BudgetService {
         Category category = categoryOP.get();
         budget.setCategory(category);
         //check if any active budget for a user and a category exists
-        if(budgetRepository.existsByUserIdAndCategoryIdAndIsActiveTrue(budget.getUser().getId(),budget.getCategory().getId()) && budget.isActive()){
+        if (budgetRepository.existsByUserIdAndCategoryIdAndIsActiveTrue(budget.getUser().getId(), budget.getCategory().getId()) && budget.isActive()) {
             throw new IllegalArgumentException("A budget already exists for this user and category");
         }
 
 
         try {
             validateBudget(budget);
-        }catch (Exception e){
+        } catch (Exception e) {
             throw new IllegalArgumentException("Error validating budget: " + e.getMessage());
         }
 
-        budget.setAmountSpent(budget.getAmountSpent() == null ?  BigDecimal.ZERO : budget.getAmountSpent());
+        budget.setAmountSpent(budget.getAmountSpent() == null ? BigDecimal.ZERO : budget.getAmountSpent());
         budget.setCreatedAt(new java.sql.Timestamp(new Date().getTime()).toLocalDateTime());
         budget.setUpdatedAt(new java.sql.Timestamp(new Date().getTime()).toLocalDateTime());
 
 //        update budget by fetching all expense for this category and user
         BigDecimal total_amount = budget.getAmountSpent();
-        List<Expense> expense = expenseRepository.findByUserIdAndTimeFrameAsc(user.getId(), FormatDate.formatStartDate(budget.getStartDate().atStartOfDay(),true), FormatDate.formatEndDate(budget.getEndDate().atStartOfDay()));
-        for(Expense exp : expense){
-            if (exp.getCategory().getId()== budget.getCategory().getId()) {
+        List<Expense> expense = expenseRepository.findByUserIdAndTimeFrameAsc(user.getId(), FormatDate.formatStartDate(budget.getStartDate().atStartOfDay(), true), FormatDate.formatEndDate(budget.getEndDate().atStartOfDay()));
+        for (Expense exp : expense) {
+            if (exp.getCategory().getId() == budget.getCategory().getId()) {
                 total_amount = total_amount.add(exp.getAmount());
             }
         }
@@ -91,16 +89,18 @@ public class BudgetService {
     public Budget findById(String id) {
         return budgetRepository.findById(UUID.fromString(id)).orElseThrow(() -> new IllegalArgumentException("Budget not found"));
     }
+
     public void deleteByIdHard(String id) {
         try {
             Budget budget = budgetRepository.findById(UUID.fromString(id)).orElseThrow(() -> new IllegalArgumentException("Budget not found"));
 //            budget.setActive(false);
 //            budget.setUpdatedAt(new java.sql.Timestamp(new Date().getTime()).toLocalDateTime());
             budgetRepository.delete(budget);
-        }catch (Exception e) {
+        } catch (Exception e) {
             throw new IllegalArgumentException("Error deleting budget: " + e.getMessage());
         }
     }
+
     public List<Budget> findAll() {
         List<Budget> budgets = budgetRepository.findAll();
         if (budgets.isEmpty()) {
@@ -108,14 +108,16 @@ public class BudgetService {
         }
         return budgets;
     }
+
     public List<Budget> getBudgetByCategoryId(String categoryId) {
         UUID categoryUUID = UUID.fromString(categoryId);
         try {
             return budgetRepository.findByCategoryId(categoryUUID);
-        }catch (Exception e) {
+        } catch (Exception e) {
             throw new IllegalArgumentException("Error retrieving budget for category ID: " + categoryId + " - " + e.getMessage());
         }
     }
+
     public List<Budget> getBudgetsByUserId(String userId) {
         User user = userService.GetActiveUserById(userId);
         if (user == null) {
@@ -150,43 +152,42 @@ public class BudgetService {
         try {
             budget.setUpdatedAt(new java.sql.Timestamp(new Date().getTime()).toLocalDateTime());
             BigDecimal total_amount = budget.getAmountSpent();
-            List<Expense> expense = expenseRepository.findByUserIdAndTimeFrameAsc(budget.getUser().getId(), FormatDate.formatStartDate(budget.getStartDate().atStartOfDay(),true), FormatDate.formatEndDate(budget.getEndDate().atStartOfDay()));
-            for(Expense exp : expense){
-                if (exp.getCategory().getId()== budget.getCategory().getId()) {
+            List<Expense> expense = expenseRepository.findByUserIdAndTimeFrameAsc(budget.getUser().getId(), FormatDate.formatStartDate(budget.getStartDate().atStartOfDay(), true), FormatDate.formatEndDate(budget.getEndDate().atStartOfDay()));
+            for (Expense exp : expense) {
+                if (exp.getCategory().getId() == budget.getCategory().getId()) {
                     total_amount = total_amount.add(exp.getAmount());
                 }
             }
             budget.setAmountSpent(total_amount);
 
             return budgetRepository.save(budget);
-        }catch (Exception e) {
+        } catch (Exception e) {
             throw new IllegalArgumentException("Error updating budget: " + e.getMessage());
         }
     }
 
-    public Budget findByUserIdAndCategoryId(String user_id, String category_id){
+    public Budget findByUserIdAndCategoryId(String user_id, String category_id) {
         return budgetRepository.findByUserIdAndCategoryId(UUID.fromString(user_id), UUID.fromString(category_id));
     }
 
-    public void updateBudgetAmountByUserIdAndCategoryId(String user_id, String category_id, BigDecimal amount, LocalDateTime date){
+    public void updateBudgetAmountByUserIdAndCategoryId(String user_id, String category_id, BigDecimal amount, LocalDateTime date) {
         if (date == null) {
             throw new IllegalArgumentException("Date must not be null");
         }
         Budget budget = findByUserIdAndCategoryId(user_id, category_id);
-        if(budget == null){
+        if (budget == null) {
             return;
         }
 
-        if(date.toLocalDate().isBefore( budget.getStartDate())|| date.toLocalDate().isAfter( budget.getEndDate() )){
-               return;
-           }
+        if (date.toLocalDate().isBefore(budget.getStartDate()) || date.toLocalDate().isAfter(budget.getEndDate())) {
+            return;
+        }
 
         budget.setAmountSpent(budget.getAmountSpent().add(amount));
         budget.setUpdatedAt(LocalDateTime.now());
-        try{
-        budgetRepository.save(budget);
-        }
-        catch (Exception e){
+        try {
+            budgetRepository.save(budget);
+        } catch (Exception e) {
             throw new IllegalArgumentException("Error updating budget amount: " + e.getMessage());
         }
 
