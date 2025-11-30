@@ -388,7 +388,9 @@ public class UserController {
             response.addCookie(clearAccess);
             response.addCookie(clearRefresh);
 
-            return ResponseEntity.ok("User logged out successfully!");
+            return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, clearAccess.toString())
+                    .header(HttpHeaders.SET_COOKIE, clearRefresh.toString())
+                    .body("User logged out successfully!");
 
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(
