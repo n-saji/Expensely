@@ -380,17 +380,19 @@ public class UserController {
             Cookie clearAccess = new Cookie("accessToken", null);
             clearAccess.setMaxAge(0);
             clearAccess.setPath("/");
+            clearAccess.setHttpOnly(true);
+            clearAccess.setSecure(true);
 
             Cookie clearRefresh = new Cookie("refreshToken", null);
             clearRefresh.setMaxAge(0);
             clearRefresh.setPath("/");
+            clearRefresh.setHttpOnly(true);
+            clearRefresh.setSecure(true);
 
             response.addCookie(clearAccess);
             response.addCookie(clearRefresh);
 
-            return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, clearAccess.toString())
-                    .header(HttpHeaders.SET_COOKIE, clearRefresh.toString())
-                    .body("User logged out successfully!");
+            return ResponseEntity.ok("User logged out successfully!");
 
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(
