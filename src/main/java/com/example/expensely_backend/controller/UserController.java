@@ -77,6 +77,7 @@ public class UserController {
                         .httpOnly(true)
                         .secure(true)
                         .path("/")
+                        .sameSite("None")
                         .maxAge(15 * 60)  // 15 mins
                         .build();
 
@@ -84,6 +85,7 @@ public class UserController {
                         .httpOnly(true)
                         .secure(true)
                         .path("/")
+                        .sameSite("None")
                         .maxAge(7 * 24 * 60 * 60) // 7 days
                         .build();
 
@@ -275,6 +277,7 @@ public class UserController {
                                 .httpOnly(true)
                                 .secure(true)
                                 .path("/")
+                                .sameSite("None")
                                 .maxAge(15 * 60)  // 15 mins
                                 .build();
 
@@ -282,6 +285,7 @@ public class UserController {
                                 .httpOnly(true)
                                 .secure(true)
                                 .path("/")
+                                .sameSite("None")
                                 .maxAge(7 * 24 * 60 * 60) // 7 days
                                 .build();
                         return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, accessCookie.toString()).header(
@@ -298,6 +302,7 @@ public class UserController {
                                 .httpOnly(true)
                                 .secure(true)
                                 .path("/")
+                                .sameSite("None")
                                 .maxAge(15 * 60)  // 15 mins
                                 .build();
 
@@ -305,6 +310,7 @@ public class UserController {
                                 .httpOnly(true)
                                 .secure(true)
                                 .path("/")
+                                .sameSite("None")
                                 .maxAge(7 * 24 * 60 * 60) // 7 days
                                 .build();
                         return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, accessCookie.toString()).header(
@@ -371,20 +377,25 @@ public class UserController {
     public ResponseEntity<?> logout(HttpServletResponse response) {
         try {
 
-            Cookie clearAccess = new Cookie("accessToken", null);
-            clearAccess.setMaxAge(0);
-            clearAccess.setPath("/");
-            clearAccess.setHttpOnly(true);
-            clearAccess.setSecure(true);
+            ResponseCookie clearAccess = ResponseCookie.from("accessToken", "")
+                    .path("/")
+                    .maxAge(0)
+                    .httpOnly(true)
+                    .secure(true)
+                    .sameSite("None") // can be "Strict", "Lax", or "None"
+                    .build();
 
-            Cookie clearRefresh = new Cookie("refreshToken", null);
-            clearRefresh.setMaxAge(0);
-            clearRefresh.setPath("/");
-            clearRefresh.setHttpOnly(true);
-            clearRefresh.setSecure(true);
 
-            response.addCookie(clearAccess);
-            response.addCookie(clearRefresh);
+            ResponseCookie clearRefresh = ResponseCookie.from("refreshToken", "")
+                    .path("/")
+                    .maxAge(0)
+                    .httpOnly(true)
+                    .secure(true)
+                    .sameSite("None")
+                    .build();
+
+            response.addHeader("Set-Cookie", clearAccess.toString());
+            response.addHeader("Set-Cookie", clearRefresh.toString());
 
             return ResponseEntity.ok("User logged out successfully!");
 
