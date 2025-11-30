@@ -77,7 +77,6 @@ public class UserController {
                         .httpOnly(true)
                         .secure(true)
                         .path("/")
-                        .sameSite("None")
                         .maxAge(15 * 60)  // 15 mins
                         .build();
 
@@ -85,7 +84,6 @@ public class UserController {
                         .httpOnly(true)
                         .secure(true)
                         .path("/")
-                        .sameSite("None")
                         .maxAge(7 * 24 * 60 * 60) // 7 days
                         .build();
 
@@ -277,7 +275,6 @@ public class UserController {
                                 .httpOnly(true)
                                 .secure(true)
                                 .path("/")
-                                .sameSite("None")
                                 .maxAge(15 * 60)  // 15 mins
                                 .build();
 
@@ -285,7 +282,6 @@ public class UserController {
                                 .httpOnly(true)
                                 .secure(true)
                                 .path("/")
-                                .sameSite("None")
                                 .maxAge(7 * 24 * 60 * 60) // 7 days
                                 .build();
                         return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, accessCookie.toString()).header(
@@ -302,7 +298,6 @@ public class UserController {
                                 .httpOnly(true)
                                 .secure(true)
                                 .path("/")
-                                .sameSite("None")
                                 .maxAge(15 * 60)  // 15 mins
                                 .build();
 
@@ -310,7 +305,6 @@ public class UserController {
                                 .httpOnly(true)
                                 .secure(true)
                                 .path("/")
-                                .sameSite("None")
                                 .maxAge(7 * 24 * 60 * 60) // 7 days
                                 .build();
                         return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, accessCookie.toString()).header(
