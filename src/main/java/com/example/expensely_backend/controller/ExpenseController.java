@@ -28,7 +28,7 @@ public class ExpenseController {
     private final FormatDate formatDate = new FormatDate();
     private final BudgetService budgetService;
 
-    public ExpenseController(ExpenseService expenseService , CategoryService categoryService, BudgetService budgetService) {
+    public ExpenseController(ExpenseService expenseService, CategoryService categoryService, BudgetService budgetService) {
         this.expenseService = expenseService;
         this.categoryService = categoryService;
         this.budgetService = budgetService;
@@ -42,10 +42,10 @@ public class ExpenseController {
                 expense.setExpenseDate(LocalDateTime.now());
             }
             expenseService.save(expense);
-            return ResponseEntity.ok(new AuthResponse("Expense created successfully!", null, null, ""));
+            return ResponseEntity.ok(new AuthResponse("Expense created successfully!", null, ""));
 
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new AuthResponse("Expense creation failed!", null, null, e.getMessage()));
+            return ResponseEntity.badRequest().body(new AuthResponse("Expense creation failed!", null, e.getMessage()));
         }
     }
 
@@ -84,14 +84,14 @@ public class ExpenseController {
         try {
             Expense existingExpense = expenseService.getExpenseById(id);
             if (existingExpense == null) {
-                return ResponseEntity.badRequest().body(new AuthResponse("Expense not found!", null, null, ""));
+                return ResponseEntity.badRequest().body(new AuthResponse("Expense not found!", null, ""));
             }
 
             // Save updated expense
             expenseService.updateExpense(updatedExpense);
-            return ResponseEntity.ok(new AuthResponse("Expense updated successfully!", null, null, ""));
+            return ResponseEntity.ok(new AuthResponse("Expense updated successfully!", null, ""));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new AuthResponse("Expense update failed!", null, null, e.getMessage()));
+            return ResponseEntity.badRequest().body(new AuthResponse("Expense update failed!", null, e.getMessage()));
         }
     }
 
@@ -112,7 +112,7 @@ public class ExpenseController {
             @RequestParam(value = "end_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate,
             @RequestParam(value = "order", required = false, defaultValue = "desc") String order) {
 
-        startDate = FormatDate.formatStartDate(startDate,false);
+        startDate = FormatDate.formatStartDate(startDate, false);
         endDate = FormatDate.formatEndDate(endDate);
         try {
             return ResponseEntity.ok(expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, startDate, endDate, order));
@@ -126,9 +126,9 @@ public class ExpenseController {
             @PathVariable String userId,
             @RequestParam(value = "start_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startDate,
             @RequestParam(value = "end_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate,
-            @RequestParam(value = "req_year",required = false) Integer req_year,
-            @RequestParam(value = "req_month",required = false) Integer req_month,
-            @RequestParam(value = "req_month_year",required = false) Integer req_month_year){
+            @RequestParam(value = "req_year", required = false) Integer req_year,
+            @RequestParam(value = "req_month", required = false) Integer req_month,
+            @RequestParam(value = "req_month_year", required = false) Integer req_month_year) {
 
         int year = LocalDateTime.now().getYear();
         int month = LocalDateTime.now().getMonthValue();
@@ -137,12 +137,12 @@ public class ExpenseController {
         req_month = req_month == null ? month : req_month;
 
         // this is for monthly view
-        YearMonth req_ym = YearMonth.of(req_month_year,req_month);
+        YearMonth req_ym = YearMonth.of(req_month_year, req_month);
         LocalDateTime req_start = LocalDateTime.of(req_month_year, req_month, 1, 0, 0);
         LocalDateTime req_end = req_ym.atEndOfMonth().atTime(23, 59, 59);
 
         // this is for current year view
-        startDate = FormatDate.formatStartDate(startDate,true);
+        startDate = FormatDate.formatStartDate(startDate, true);
         endDate = FormatDate.formatEndDate(endDate);
 
         // this is for requested yearly view
@@ -154,12 +154,12 @@ public class ExpenseController {
                     new ExpenseOverview(expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, startDate, endDate, "desc"),
                             expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, req_start_year, req_end_year, "desc"),
                             expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, req_start, req_end, "desc"),
-                            userId,expenseService.getMonthlyCategoryExpense(userId,req_start_year,req_end_year),
-                            categoryService.getCategoriesByUserId(userId,"expense"),
-                            expenseService.getDailyExpense(userId,req_start,req_end),
-                            expenseService.fetchExpensesWithConditions(userId,FormatDate.formatStartDate(null,false),endDate,"asc",null,1,1,""),
+                            userId, expenseService.getMonthlyCategoryExpense(userId, req_start_year, req_end_year),
+                            categoryService.getCategoriesByUserId(userId, "expense"),
+                            expenseService.getDailyExpense(userId, req_start, req_end),
+                            expenseService.fetchExpensesWithConditions(userId, FormatDate.formatStartDate(null, false), endDate, "asc", null, 1, 1, ""),
                             req_month,
-                    budgetService.getBudgetsByUserId(userId)));
+                            budgetService.getBudgetsByUserId(userId)));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
         }
@@ -169,9 +169,9 @@ public class ExpenseController {
     public ResponseEntity<?> bulkDeleteExpensesByUserId(@PathVariable String userId, @RequestBody List<Expense> expenses) {
         try {
             expenseService.deleteBuUserIDAndExpenseIds(userId, expenses);
-            return ResponseEntity.ok(new AuthResponse("Bulk delete expenses successfully!", null, null, ""));
+            return ResponseEntity.ok(new AuthResponse("Bulk delete expenses successfully!", null, ""));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new AuthResponse("Bulk delete expenses failed!", null, null, e.getMessage()));
+            return ResponseEntity.badRequest().body(new AuthResponse("Bulk delete expenses failed!", null, e.getMessage()));
         }
     }
 
@@ -186,14 +186,14 @@ public class ExpenseController {
             @RequestParam(value = "limit", required = false, defaultValue = "10") int limit,
             @RequestParam(value = "q", required = false) String q) {
 
-        startDate = FormatDate.formatStartDate(startDate,false);
+        startDate = FormatDate.formatStartDate(startDate, false);
         endDate = FormatDate.formatEndDate(endDate);
         if (q == null) q = "";
         if (order != null && !order.equals("asc") && !order.equals("desc")) {
             return ResponseEntity.badRequest().body(new UserRes(null, "Error: Order must be 'asc' or 'desc'"));
         }
         try {
-            return ResponseEntity.ok(expenseService.fetchExpensesWithConditions(userId, startDate, endDate, order, categoryId, page, limit,q));
+            return ResponseEntity.ok(expenseService.fetchExpensesWithConditions(userId, startDate, endDate, order, categoryId, page, limit, q));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
         }
@@ -202,9 +202,9 @@ public class ExpenseController {
 
     @GetMapping("/user/{userId}/export")
     public ResponseEntity<?> exportExpenses(@PathVariable String userId,
-                                             @RequestParam(value = "start_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startDate,
-                                             @RequestParam(value = "end_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate) {
-        startDate = FormatDate.formatStartDate(startDate,false);
+                                            @RequestParam(value = "start_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startDate,
+                                            @RequestParam(value = "end_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate) {
+        startDate = FormatDate.formatStartDate(startDate, false);
         endDate = FormatDate.formatEndDate(endDate);
         try {
             String csvData = expenseService.exportExpensesToCSV(userId, startDate, endDate);

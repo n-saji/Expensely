@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/categories")
 public class CategoryController {
     private final CategoryService categoryService;
+
     public CategoryController(CategoryService categoryService) {
         this.categoryService = categoryService;
     }
@@ -26,7 +27,7 @@ public class CategoryController {
         try {
             categoryService.save(category);
             return ResponseEntity.ok("Category created successfully!").getBody();
-        }catch (Exception e) {
+        } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Error: " + e.getMessage()).getBody();
         }
 
@@ -57,7 +58,7 @@ public class CategoryController {
     public ResponseEntity<?> getCategoriesByUserId(@PathVariable String userId,
                                                    @RequestParam(required = false) String type) {
         try {
-            return ResponseEntity.ok(categoryService.getCategoriesByUserId(userId,type));
+            return ResponseEntity.ok(categoryService.getCategoriesByUserId(userId, type));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
@@ -66,10 +67,10 @@ public class CategoryController {
     @PatchMapping("/update/{id}")
     public ResponseEntity<?> updateCategory(@PathVariable String id, @RequestBody Category category) {
         try {
-                categoryService.updateCategory(id,category);
-            return ResponseEntity.ok(new AuthResponse("Category updated successfully!",null,null,null));
+            categoryService.updateCategory(id, category);
+            return ResponseEntity.ok(new AuthResponse("Category updated successfully!", null, null));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new AuthResponse("Error updating category", null, null, e.getMessage()));
+            return ResponseEntity.badRequest().body(new AuthResponse("Error updating category", null, e.getMessage()));
         }
     }
 

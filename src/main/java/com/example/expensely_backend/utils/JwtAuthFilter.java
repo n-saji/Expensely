@@ -4,6 +4,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -28,27 +29,50 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                                     FilterChain filterChain)
             throws ServletException, IOException {
 
-        final String authHeader = request.getHeader("Authorization");
-
         String path = request.getServletPath();
-        if (path.equals("/api/users/login") || path.equals("/api/users/register") || path.equals("/ping")) {
+
+        if (path.equals("/api/users/login") || path.equals("/api/users/register") || path.equals(
+                "/ping") || path.equals("/api/users/refresh") || path.equals("/api/users/verify" +
+                "-oauth-login")) {
             filterChain.doFilter(request, response); // Skip JWT check
             return;
         }
+        String token = null;
 
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            final String jwt = authHeader.substring(7);
-            try {
-                String email = jwtUtil.GetStringFromToken(jwt);
-                UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(email, null, Collections.emptyList());
-                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-
-                SecurityContextHolder.getContext().setAuthentication(authentication);
-            } catch (Exception e) {
-                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid JWT token");
-                return;
+        if (request.getCookies() != null) {
+            for (var cookie : request.getCookies()) {
+                if (cookie.getName().equals("accessToken")) {
+                    token = cookie.getValue();
+                    break;
+                }
             }
+        }
+
+        System.out.println("token:" + token);
+        if (token == null) {
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Token not found");
+//            filterChain.doFilter(request, response);
+            return;
+        }
+        System.out.println("hello");
+        try {
+            String email = jwtUtil.GetStringFromToken(token);
+            if (email == null) {
+                throw new BadCredentialsException("Token expired or invalid");
+            }
+            UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(email, null, Collections.emptyList());
+
+            authentication.setDetails(
+                    new WebAuthenticationDetailsSource().buildDetails(request)
+            );
+
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        } catch (Exception e) {
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid JWT token");
+            System.out.println(e.getMessage() + " invalid token");
+            return;
         }
 
         filterChain.doFilter(request, response);
