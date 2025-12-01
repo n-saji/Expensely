@@ -59,7 +59,8 @@ public class SecurityConfig {
                 registry.addMapping("/**")
                         .allowedOrigins("http://localhost:3000", "http://192.168.1.54:3000", "http://76.38.202.178:3000", "https://expensely-self.vercel.app")
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
-                        .allowedHeaders("*")
+                        .allowedHeaders("Content-Type", "Authorization", "X-Requested-With")
+                        .exposedHeaders("Set-Cookie")
                         .allowCredentials(true);
             }
         };
