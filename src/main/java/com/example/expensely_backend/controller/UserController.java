@@ -367,10 +367,35 @@ public class UserController {
         newAccessCookie.setHttpOnly(true);
         newAccessCookie.setPath("/");
         newAccessCookie.setMaxAge(15 * 60);
+        newAccessCookie.setSecure(true);
 
-        response.addCookie(newAccessCookie);
+        Cookie newRefreshCookie = new Cookie("refreshToken", tokens.get("refreshToken"));
+        newRefreshCookie.setHttpOnly(true);
+        newRefreshCookie.setPath("/");
+        newRefreshCookie.setMaxAge(7 * 24 * 60 * 60);
+        newRefreshCookie.setSecure(true);
 
-        return ResponseEntity.ok("Access token refreshed");
+//        response.addCookie(newAccessCookie);
+//        response.addCookie(newRefreshCookie);
+
+        ResponseCookie accessCookie = ResponseCookie.from("accessToken", tokens.get("accessToken"))
+                .httpOnly(true)
+                .secure(true)
+                .path("/")
+                .sameSite("None")
+                .maxAge(15 * 60)  // 15 mins
+                .build();
+
+        ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", tokens.get("refreshToken"))
+                .httpOnly(true)
+                .secure(true)
+                .path("/")
+                .sameSite("None")
+                .maxAge(7 * 24 * 60 * 60) // 7 days
+                .build();
+
+        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, accessCookie.toString()).header(
+                HttpHeaders.SET_COOKIE, refreshCookie.toString()).body(new AuthResponse("Token refreshed successfully!", null, ""));
     }
 
     @GetMapping("/logout")
