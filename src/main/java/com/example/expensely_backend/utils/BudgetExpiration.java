@@ -10,9 +10,11 @@ import java.time.LocalDate;
 @Component
 public class BudgetExpiration {
     private final BudgetRepository budgetRepository;
+
     public BudgetExpiration(BudgetRepository budgetRepository) {
         this.budgetRepository = budgetRepository;
     }
+
     @Scheduled(cron = "0 0 0 * * *")
     @Transactional
     public void checkBudgetExpiry() {
@@ -29,4 +31,3 @@ public class BudgetExpiration {
         System.out.println("Budget expiry job ran at " + today + ", expired " + budgetsToExpire.size() + " budgets.");
     }
 }
-//export $(cat .env | xargs) && ./gradlew bootRun
