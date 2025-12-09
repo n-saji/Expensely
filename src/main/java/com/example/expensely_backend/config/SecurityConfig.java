@@ -57,7 +57,7 @@ public class SecurityConfig {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/**")
-                        .allowedOrigins("http://localhost:3000", "http://192.168.1.54:3000", "http://76.38.202.178:3000", "https://expensely-self.vercel.app")
+                        .allowedOrigins("https://expensely-self.vercel.app")
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
                         .allowedHeaders("Content-Type", "Authorization", "X-Requested-With")
                         .exposedHeaders("Set-Cookie")
