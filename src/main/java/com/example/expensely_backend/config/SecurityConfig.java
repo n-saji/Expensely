@@ -34,7 +34,7 @@ public class SecurityConfig {
                     var config = new org.springframework.web.cors.CorsConfiguration();
                     config.setAllowCredentials(true);  // IMPORTANT
                     config.addAllowedOrigin("https://expensely-self.vercel.app");
-//                    config.addAllowedOrigin("http://localhost:3000");
+                    config.addAllowedOrigin("http://localhost:3000");
                     config.addAllowedHeader("*");
                     config.addAllowedMethod("*");
                     config.addExposedHeader("Set-Cookie");
@@ -66,7 +66,7 @@ public class SecurityConfig {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/**")
-                        .allowedOrigins("https://expensely-self.vercel.app")
+                        .allowedOrigins("https://expensely-self.vercel.app", "http://localhost:3000")
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
                         .allowedHeaders("Content-Type", "Authorization", "X-Requested-With")
                         .exposedHeaders("Set-Cookie")
