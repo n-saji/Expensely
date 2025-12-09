@@ -30,16 +30,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                .cors(cors -> cors.configurationSource(request -> {
-                    var config = new org.springframework.web.cors.CorsConfiguration();
-                    config.setAllowCredentials(true);  // IMPORTANT
-                    config.addAllowedOrigin("https://expensely-self.vercel.app");
-                    config.addAllowedOrigin("http://localhost:3000");
-                    config.addAllowedHeader("*");
-                    config.addAllowedMethod("*");
-                    config.addExposedHeader("Set-Cookie");
-                    return config;
-                }))
+                .cors().and()
                 .csrf().disable()
                 .exceptionHandling()
                 .authenticationEntryPoint(customAuthEntryPoint)
