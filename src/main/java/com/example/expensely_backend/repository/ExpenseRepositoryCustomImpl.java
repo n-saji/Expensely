@@ -29,7 +29,6 @@ public class ExpenseRepositoryCustomImpl {
             String customSortOrder,
             String defaultSortBy
     ) {
-        System.out.println(customSortBy + " " + customSortOrder);
         CriteriaBuilder cb = em.getCriteriaBuilder();
         CriteriaQuery<Expense> query = cb.createQuery(Expense.class);
         Root<Expense> expense = query.from(Expense.class);
@@ -62,12 +61,9 @@ public class ExpenseRepositoryCustomImpl {
 
             if (customSortOrder != null && customSortOrder.equalsIgnoreCase("asc")) {
                 orders.add(cb.asc(expense.get(customSortBy)));
-                System.out.println(customSortBy + " " + customSortOrder + " 11");
             } else {
                 orders.add(cb.desc(expense.get(customSortBy)));
-                System.out.println(customSortBy + " " + customSortOrder + " 12");
             }
-            System.out.println(customSortBy + " " + customSortOrder + " 23");
         }
         if (defaultSortBy != null && !defaultSortBy.isEmpty()) {
             if (defaultSortBy.equals("desc")) {

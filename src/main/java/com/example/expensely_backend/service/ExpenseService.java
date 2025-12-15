@@ -207,7 +207,6 @@ public class ExpenseService {
                                                       String categoryId, int page, int limit,
                                                       String q, String customSortBy, String customSortOrder) {
         long totalPages, totalElements = 0;
-        System.out.println(customSortBy + " " + customSortOrder);
         User user = userService.GetActiveUserById(userId);
         if (user == null) {
             throw new IllegalArgumentException("User not found");

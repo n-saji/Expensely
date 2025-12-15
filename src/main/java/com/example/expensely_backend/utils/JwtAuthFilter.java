@@ -48,13 +48,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             }
         }
 
-        System.out.println("token:" + token);
         if (token == null) {
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Token not found");
 //            filterChain.doFilter(request, response);
             return;
         }
-        System.out.println("hello");
         try {
             String email = jwtUtil.GetStringFromToken(token);
             if (email == null) {
@@ -71,7 +69,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         } catch (Exception e) {
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid JWT token");
-            System.out.println(e.getMessage() + " invalid token");
             return;
         }
 

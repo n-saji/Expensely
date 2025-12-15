@@ -190,7 +190,6 @@ public class ExpenseController {
             @RequestParam(value = "sort_by", required = false) String customSortBy,
             @RequestParam(value = "sort_order", required = false) String customSortOrder) {
 
-        System.out.println(customSortBy + " " + customSortOrder);
 
         startDate = FormatDate.formatStartDate(startDate, false);
         endDate = FormatDate.formatEndDate(endDate);
