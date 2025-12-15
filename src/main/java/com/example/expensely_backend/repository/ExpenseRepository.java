@@ -111,27 +111,29 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
              JOIN categories c on e.category_id  = c.id\s
              WHERE e.user_id = :userId\s
                 AND  e.expense_date >= :startDate and e.expense_date < :endDate
-
+            
              GROUP BY month,c."name"\s
              ORDER BY MIN(e.expense_date)
             \s""", nativeQuery = true)
     List<MonthlyCategoryExpense> findMonthlyCategoryExpenseByUserId(@Param("userId") UUID userId, @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 
     @Query(value = """
-    SELECT
-        TO_CHAR(e.expense_date, 'YYYY-MM-DD') AS expenseDate,
-        SUM(e.amount) AS totalAmount
-    FROM expenses e
-    WHERE e.user_id = :userId
-      AND e.expense_date >= :startDate
-      AND e.expense_date < :endDate
-    GROUP BY expenseDate
-    ORDER BY expenseDate
-""", nativeQuery = true)
+                SELECT
+                    TO_CHAR(e.expense_date, 'YYYY-MM-DD') AS expenseDate,
+                    SUM(e.amount) AS totalAmount
+                FROM expenses e
+                WHERE e.user_id = :userId
+                  AND e.expense_date >= :startDate
+                  AND e.expense_date < :endDate
+                GROUP BY expenseDate
+                ORDER BY expenseDate
+            """, nativeQuery = true)
     List<DailyExpense> findDailyExpenseByUserIdAndTimeFrame(@Param("userId") UUID userId,
                                                             @Param("startDate") LocalDateTime startDate,
                                                             @Param("endDate") LocalDateTime endDate);
 
     long deleteAllByUserId(UUID id);
+
+
 }
 

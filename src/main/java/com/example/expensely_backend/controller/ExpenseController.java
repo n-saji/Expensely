@@ -157,7 +157,9 @@ public class ExpenseController {
                             userId, expenseService.getMonthlyCategoryExpense(userId, req_start_year, req_end_year),
                             categoryService.getCategoriesByUserId(userId, "expense"),
                             expenseService.getDailyExpense(userId, req_start, req_end),
-                            expenseService.fetchExpensesWithConditions(userId, FormatDate.formatStartDate(null, false), endDate, "asc", null, 1, 1, ""),
+                            expenseService.fetchExpensesWithConditions(userId,
+                                    FormatDate.formatStartDate(null, false), endDate, "asc", null
+                                    , 1, 1, "", null, null),
                             req_month,
                             budgetService.getBudgetsByUserId(userId)));
         } catch (Exception e) {
@@ -184,7 +186,11 @@ public class ExpenseController {
             @RequestParam(value = "category_id", required = false) String categoryId,
             @RequestParam(value = "page", required = false, defaultValue = "1") int page,
             @RequestParam(value = "limit", required = false, defaultValue = "10") int limit,
-            @RequestParam(value = "q", required = false) String q) {
+            @RequestParam(value = "q", required = false) String q,
+            @RequestParam(value = "sort_by", required = false) String customSortBy,
+            @RequestParam(value = "sort_order", required = false) String customSortOrder) {
+
+        System.out.println(customSortBy + " " + customSortOrder);
 
         startDate = FormatDate.formatStartDate(startDate, false);
         endDate = FormatDate.formatEndDate(endDate);
@@ -192,8 +198,15 @@ public class ExpenseController {
         if (order != null && !order.equals("asc") && !order.equals("desc")) {
             return ResponseEntity.badRequest().body(new UserRes(null, "Error: Order must be 'asc' or 'desc'"));
         }
+        if (customSortBy != null) {
+            if (!customSortBy.equals("amount") && !customSortBy.equals("expenseDate") &&
+                    !customSortBy.equals("description") && !customSortBy.equals("category")) {
+                return ResponseEntity.badRequest().body(new UserRes(null, "Error: Invalid sort column"));
+            }
+        }
         try {
-            return ResponseEntity.ok(expenseService.fetchExpensesWithConditions(userId, startDate, endDate, order, categoryId, page, limit, q));
+            return ResponseEntity.ok(expenseService.fetchExpensesWithConditions(userId, startDate
+                    , endDate, order, categoryId, page, limit, q, customSortBy, customSortOrder));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
         }

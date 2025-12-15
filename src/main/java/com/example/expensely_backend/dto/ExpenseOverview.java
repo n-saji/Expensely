@@ -56,22 +56,22 @@ public class ExpenseOverview {
     private final Map<String, Double> topFiveMostExpensiveItemThisMonth;
 
     @Getter
-    private final Map<String,Double> overTheDaysThisMonth;
+    private final Map<String, Double> overTheDaysThisMonth;
 
     @Getter
     private final Integer earliestStartMonth, earliestStartYear;
 
     @Getter
-    private final Map<String,Double> thisMonthMostExpensiveItem;
+    private final Map<String, Double> thisMonthMostExpensiveItem;
 
     @Getter
     private final Map<String, Budget> budgetServiceMap;
 
 
-    public ExpenseOverview(List<ExpenseResponse> expenses,List<ExpenseResponse> req_expenses_range,List<ExpenseResponse> req_expenses_range_monthly,
+    public ExpenseOverview(List<ExpenseResponse> expenses, List<ExpenseResponse> req_expenses_range, List<ExpenseResponse> req_expenses_range_monthly,
                            String userId, List<MonthlyCategoryExpense> monthlyCategoryExpenses,
                            Iterable<Category> categories, List<DailyExpense> dailyExpenses,
-                           ExpenseResList FirstExpense,Integer reqMonth,
+                           ExpenseResList FirstExpense, Integer reqMonth,
                            List<Budget> budgetServiceMap) {
         //  Overview page
         this.userId = userId;
@@ -93,16 +93,16 @@ public class ExpenseOverview {
                 .map(Map.Entry::getKey)
                 .orElse(null);
 
-        if (FirstExpense != null && FirstExpense.getExpenses() != null && !FirstExpense.getExpenses().isEmpty()) {
-            this.earliestStartMonth = FirstExpense.getExpenses().get(0).getExpenseDate().getMonthValue();
-            this.earliestStartYear = FirstExpense.getExpenses().get(0).getExpenseDate().getYear();
+        if (FirstExpense != null && FirstExpense.expenses() != null && !FirstExpense.expenses().isEmpty()) {
+            this.earliestStartMonth = FirstExpense.expenses().get(0).getExpenseDate().getMonthValue();
+            this.earliestStartYear = FirstExpense.expenses().get(0).getExpenseDate().getYear();
         } else {
             this.earliestStartMonth = null;
             this.earliestStartYear = null;
         }
 
         ExpenseResponse mostExpensive = expenses.stream()
-                .filter(expense -> expense.getExpenseDate().getMonthValue() == (currentMonth+1))
+                .filter(expense -> expense.getExpenseDate().getMonthValue() == (currentMonth + 1))
                 .max(Comparator.comparingDouble(ExpenseResponse::getAmount))
                 .orElse(null);
 
@@ -114,7 +114,6 @@ public class ExpenseOverview {
         } else {
             this.thisMonthMostExpensiveItem = Map.of(); // empty map
         }
-
 
 
         // Requested Yearly view
@@ -158,7 +157,7 @@ public class ExpenseOverview {
 
         // Monthly requested data
         this.topFiveMostExpensiveItemThisMonth = req_expenses_range_monthly.stream()
-                .filter(expense -> expense.getExpenseDate().getMonth() == Month.of(reqMonth ))
+                .filter(expense -> expense.getExpenseDate().getMonth() == Month.of(reqMonth))
                 .sorted(Comparator.comparingDouble(ExpenseResponse::getAmount).reversed())
                 .limit(5) //only 5 is required
                 .collect(Collectors.toMap(ExpenseResponse::getDescription, ExpenseResponse::getAmount, (a, b) -> a, LinkedHashMap::new));
@@ -177,7 +176,7 @@ public class ExpenseOverview {
 
         this.budgetServiceMap = new LinkedHashMap<>();
 
-        for (Budget budget :budgetServiceMap ) {
+        for (Budget budget : budgetServiceMap) {
             budget.setUser(null);
             this.budgetServiceMap.put(budget.getId().toString(), budget);
         }

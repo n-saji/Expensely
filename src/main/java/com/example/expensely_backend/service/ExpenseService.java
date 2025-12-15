@@ -9,6 +9,7 @@ import com.example.expensely_backend.model.Category;
 import com.example.expensely_backend.model.Expense;
 import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.repository.ExpenseRepository;
+import com.example.expensely_backend.repository.ExpenseRepositoryCustomImpl;
 import com.opencsv.CSVWriter;
 import org.springframework.stereotype.Service;
 
@@ -27,12 +28,16 @@ public class ExpenseService {
     private final CategoryService categoryService;
     private final UserService userService;
     private final BudgetService budgetService;
+    private final ExpenseRepositoryCustomImpl expenseRepositoryCustomImpl;
 
-    public ExpenseService(ExpenseRepository expenseRepository, CategoryService categoryService, UserService userService, BudgetService budgetService) {
+    public ExpenseService(ExpenseRepository expenseRepository, CategoryService categoryService,
+                          UserService userService,
+                          BudgetService budgetService, ExpenseRepositoryCustomImpl expenseRepositoryCustomImpl) {
         this.expenseRepository = expenseRepository;
         this.categoryService = categoryService;
         this.userService = userService;
         this.budgetService = budgetService;
+        this.expenseRepositoryCustomImpl = expenseRepositoryCustomImpl;
     }
 
     public void save(Expense expense) {
@@ -58,11 +63,11 @@ public class ExpenseService {
 
         // calculate if budget set
 
-            try {
-                budgetService.updateBudgetAmountByUserIdAndCategoryId(user.getId().toString(),category.getId().toString(),expense.getAmount(),expense.getExpenseDate());
-            }catch (Exception e){
-                throw new IllegalArgumentException("Error updating budget: " + e.getMessage());
-            }
+        try {
+            budgetService.updateBudgetAmountByUserIdAndCategoryId(user.getId().toString(), category.getId().toString(), expense.getAmount(), expense.getExpenseDate());
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Error updating budget: " + e.getMessage());
+        }
 
     }
 
@@ -78,9 +83,9 @@ public class ExpenseService {
             expenseRepository.deleteById(UUID.fromString(id));
 //            budget update
             Expense expense = getExpenseById(id);
-            try{
-            budgetService.updateBudgetAmountByUserIdAndCategoryId(expense.getUser().getId().toString(),expense.getCategory().getId().toString(),expense.getAmount().negate(),expense.getExpenseDate());}
-            catch (Exception e){
+            try {
+                budgetService.updateBudgetAmountByUserIdAndCategoryId(expense.getUser().getId().toString(), expense.getCategory().getId().toString(), expense.getAmount().negate(), expense.getExpenseDate());
+            } catch (Exception e) {
                 throw new IllegalArgumentException("Error updating budget: " + e.getMessage());
             }
         } catch (Exception e) {
@@ -139,12 +144,12 @@ public class ExpenseService {
         }
 
 
-        Expense exp =  expenseRepository.save(oldExpense);
+        Expense exp = expenseRepository.save(oldExpense);
 
 //        update budget
-        try{
-            budgetService.updateBudgetAmountByUserIdAndCategoryId(exp.getUser().getId().toString(),exp.getCategory().getId().toString(),changed_amount,exp.getExpenseDate());
-        }catch (Exception e){
+        try {
+            budgetService.updateBudgetAmountByUserIdAndCategoryId(exp.getUser().getId().toString(), exp.getCategory().getId().toString(), changed_amount, exp.getExpenseDate());
+        } catch (Exception e) {
             throw new IllegalArgumentException("Error updating budget: " + e.getMessage());
         }
         return exp;
@@ -189,17 +194,20 @@ public class ExpenseService {
         }
         expenseRepository.deleteAll(expenses);
         for (Expense expense : expenses) {
-            try{
-                budgetService.updateBudgetAmountByUserIdAndCategoryId(expense.getUser().getId().toString(),expense.getCategory().getId().toString(),expense.getAmount().negate(),expense.getExpenseDate());}
-            catch (Exception e){
+            try {
+                budgetService.updateBudgetAmountByUserIdAndCategoryId(expense.getUser().getId().toString(), expense.getCategory().getId().toString(), expense.getAmount().negate(), expense.getExpenseDate());
+            } catch (Exception e) {
                 throw new IllegalArgumentException("Error updating budget: " + e.getMessage());
             }
         }
     }
 
-    public ExpenseResList fetchExpensesWithConditions(String userId, LocalDateTime startDate, LocalDateTime endDate, String order, String categoryId, int page, int limit, String q) {
-        int totalPages, totalElements = 0;
-
+    public ExpenseResList fetchExpensesWithConditions(String userId, LocalDateTime startDate,
+                                                      LocalDateTime endDate, String order,
+                                                      String categoryId, int page, int limit,
+                                                      String q, String customSortBy, String customSortOrder) {
+        long totalPages, totalElements = 0;
+        System.out.println(customSortBy + " " + customSortOrder);
         User user = userService.GetActiveUserById(userId);
         if (user == null) {
             throw new IllegalArgumentException("User not found");
@@ -211,37 +219,52 @@ public class ExpenseService {
 
         List<Expense> expenses;
         UUID categoryUUID = null;
-        q = "%" + q + "%";
+        if (q == null) q = "";
+        if (order == null) order = "desc";
+        else order = order.toLowerCase();
+
         if (categoryId != null) {
             Category category = categoryService.getCategoryById(categoryId);
             if (category == null) {
                 throw new IllegalArgumentException("Category not found");
             }
             categoryUUID = category.getId();
-            if (order == null || order.equalsIgnoreCase("desc")) {
-                expenses = expenseRepository.findByUserIdAndTimeFrameAndCategoryDescWithLimit(user.getId(), startDate, endDate, categoryUUID, limit, offset,q);
-            } else if (order.equalsIgnoreCase("asc")) {
-                expenses = expenseRepository.findByUserIdAndTimeFrameAndCategoryAscWithLimit(user.getId(), startDate, endDate, categoryUUID, limit, offset,q);
-            } else {
-                throw new IllegalArgumentException("Order must be 'asc' or 'desc'");
-            }
-            totalElements = expenseRepository.countByUserIdAndTimeFrameAndCategory(user.getId(), startDate, endDate, categoryUUID,q);
-        } else {
-            if (order == null || order.equalsIgnoreCase("desc")) {
-                expenses = expenseRepository.findByUserIdAndTimeFrameDescWithLimit(user.getId(), startDate, endDate, limit, offset,q);
-            } else if (order.equalsIgnoreCase("asc")) {
-                expenses = expenseRepository.findByUserIdAndTimeFrameAscWithLimit(user.getId(), startDate, endDate, limit, offset,q);
-            } else {
-                throw new IllegalArgumentException("Order must be 'asc' or 'desc'");
-            }
-            totalElements = expenseRepository.countByUserIdAndTimeFrame(user.getId(), startDate, endDate,q);
         }
+//        q = "%" + q + "%";
+//        if (categoryId != null) {
+//            Category category = categoryService.getCategoryById(categoryId);
+//            if (category == null) {
+//                throw new IllegalArgumentException("Category not found");
+//            }
+//            categoryUUID = category.getId();
+//            if (order == null || order.equalsIgnoreCase("desc")) {
+//                expenses = expenseRepository.findByUserIdAndTimeFrameAndCategoryDescWithLimit(user.getId(), startDate, endDate, categoryUUID, limit, offset, q);
+//            } else if (order.equalsIgnoreCase("asc")) {
+//                expenses = expenseRepository.findByUserIdAndTimeFrameAndCategoryAscWithLimit(user.getId(), startDate, endDate, categoryUUID, limit, offset, q);
+//            } else {
+//                throw new IllegalArgumentException("Order must be 'asc' or 'desc'");
+//            }
+//            totalElements = expenseRepository.countByUserIdAndTimeFrameAndCategory(user.getId(), startDate, endDate, categoryUUID, q);
+//        } else {
+//            if (order == null || order.equalsIgnoreCase("desc")) {
+//                expenses = expenseRepository.findByUserIdAndTimeFrameDescWithLimit(user.getId(), startDate, endDate, limit, offset, q);
+//            } else if (order.equalsIgnoreCase("asc")) {
+//                expenses = expenseRepository.findByUserIdAndTimeFrameAscWithLimit(user.getId(), startDate, endDate, limit, offset, q);
+//            } else {
+//                throw new IllegalArgumentException("Order must be 'asc' or 'desc'");
+//            }
+//            totalElements = expenseRepository.countByUserIdAndTimeFrame(user.getId(), startDate, endDate, q);
+//        }
+        expenses = expenseRepositoryCustomImpl.findExpenses(user.getId(), startDate, endDate,
+                categoryUUID, q, offset, limit, customSortBy, customSortOrder, order);
+        totalElements = expenseRepositoryCustomImpl.countExpenses(user.getId(), startDate, endDate,
+                categoryUUID, q);
 
         totalPages = (int) Math.ceil((double) totalElements / limit);
         return new ExpenseResList(expenses.stream().map(ExpenseResponse::new).collect(Collectors.toList()), totalPages, totalElements, page);
     }
 
-    public List<MonthlyCategoryExpense> getMonthlyCategoryExpense(String userId,LocalDateTime startDate, LocalDateTime endDate ){
+    public List<MonthlyCategoryExpense> getMonthlyCategoryExpense(String userId, LocalDateTime startDate, LocalDateTime endDate) {
         User user = userService.GetActiveUserById(userId);
         if (user == null) {
             throw new IllegalArgumentException("User not found");
@@ -251,7 +274,7 @@ public class ExpenseService {
 
     }
 
-    public List<DailyExpense> getDailyExpense(String userId,LocalDateTime startDate, LocalDateTime endDate ){
+    public List<DailyExpense> getDailyExpense(String userId, LocalDateTime startDate, LocalDateTime endDate) {
         User user = userService.GetActiveUserById(userId);
         if (user == null) {
             throw new IllegalArgumentException("User not found");
@@ -268,7 +291,7 @@ public class ExpenseService {
         CSVWriter writer = new CSVWriter(sw);
 
         // header
-        writer.writeNext(new String[]{"Date", "Description", "Amount (in " +user.getCurrency()+ ")" , "Category"});
+        writer.writeNext(new String[]{"Date", "Description", "Amount (in " + user.getCurrency() + ")", "Category"});
 
         // rows
         for (Expense expense : expenses) {
