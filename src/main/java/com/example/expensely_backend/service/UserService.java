@@ -182,6 +182,7 @@ public class UserService {
                 AlertDtos alert =
                         new AlertDtos("You have exceeded limit set in " + budget.getCategory().getName()
                                 , "CRITICAL");
+                alerts.add(alert);
             }
         }
 
