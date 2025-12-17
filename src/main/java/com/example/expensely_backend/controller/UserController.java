@@ -271,7 +271,7 @@ public class UserController {
                     if (userService.isUserPresent(user.getEmail(), user.getPhone())) {
                         User existingUser = userService.GetUserByEmailOrPhone(user.getEmail(), user.getPhone());
                         user.setOauth2User(true);
-                        Map<String, String> result = jwtUtil.GenerateToken(existingUser.getEmail());
+                        Map<String, String> result = jwtUtil.GenerateToken(existingUser.getId().toString());
                         String accessToken = result.get("accessToken");
                         String refreshToken = result.get("refreshToken");
                         ResponseCookie accessCookie = ResponseCookie.from("accessToken", accessToken)
