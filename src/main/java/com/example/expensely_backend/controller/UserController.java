@@ -65,8 +65,9 @@ public class UserController {
 
         try {
             if (userService.authenticate(user.getEmail(), user.getPhone(), user.getPassword())) {
-                String email = user.getEmail() != null ? user.getEmail() : user.getPhone();
-                Map<String, String> result = jwtUtil.GenerateToken(email);
+                User client = userService.GetUserByEmailOrPhone(user.getEmail(), user.getPhone());
+
+                Map<String, String> result = jwtUtil.GenerateToken(client.getId().toString());
                 if (result == null) {
                     return ResponseEntity.status(500).body(new AuthResponse("Token generation failed", user.getId().toString(), "token generation failed"));
                 }
@@ -407,6 +408,30 @@ public class UserController {
                     new AuthResponse("Error logging out: " + e.getMessage(), null, "internal server error")
             );
         }
+    }
+
+    @GetMapping("/alerts")
+    public ResponseEntity<?> FetchUserAlerts(HttpServletRequest request, HttpServletResponse response) {
+
+        Cookie[] cookies = request.getCookies();
+        String refreshToken = null;
+        for (Cookie cookie : cookies) {
+            if (cookie.getName().equals("refreshToken")) {
+                refreshToken = cookie.getValue();
+            }
+        }
+
+        if (refreshToken == null) {
+            return ResponseEntity.status(401).body("Refresh token missing");
+        }
+        String userId = jwtUtil.GetStringFromToken(refreshToken);
+        try {
+            return ResponseEntity.ok(userService.fetchAllAlertsForUser(userId));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new AuthResponse("Error fetching alerts: " + e.getMessage(), null, "internal server error"));
+        }
+
+
     }
 
 }

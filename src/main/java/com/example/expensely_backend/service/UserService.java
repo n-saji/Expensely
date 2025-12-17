@@ -1,11 +1,15 @@
 package com.example.expensely_backend.service;
 
+import com.example.expensely_backend.dto.AlertDtos;
+import com.example.expensely_backend.model.Budget;
 import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.repository.*;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -21,7 +25,6 @@ public class UserService {
     private final ExpenseRepository expenseRepository;
 
 
-
     public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, ExpiredTokenRepository expiredTokenRepository,
                        BudgetRepository budgetRepository, CategoryRepository categoryRepository, ExpenseRepository expenseRepository) {
         this.userRepository = userRepository;
@@ -35,7 +38,7 @@ public class UserService {
 
     public void save(User user) {
 
-        if (user.getEmail() == null ) {
+        if (user.getEmail() == null) {
             throw new IllegalArgumentException("Email must be provided");
         }
         if ((user.getPhone() == null || user.getPhone().isEmpty()) && !user.isOauth2User()) {
@@ -148,9 +151,42 @@ public class UserService {
             expenseRepository.deleteAllByUserId(user.getId());
             categoryRepository.deleteByUserId(user.getId());
             userRepository.delete(user);
-        }catch (Exception e) {
+        } catch (Exception e) {
             throw new IllegalArgumentException("Error deleting user: " + e.getMessage());
         }
+    }
+
+    public List<AlertDtos> fetchAllAlertsForUser(String userId) {
+        Optional<User> user = userRepository.findById(UUID.fromString(userId));
+        if (user.isEmpty()) {
+            throw new IllegalArgumentException("User not found");
+        }
+
+        List<AlertDtos> alerts = new ArrayList<>();
+
+        List<Budget> budgets = budgetRepository.findByUserId(user.get().getId());
+        if (budgets.isEmpty()) {
+            return alerts;
+        }
+
+
+        for (Budget budget : budgets) {
+            float ratio =
+                    ((budget.getAmountSpent())).divide(budget.getAmountLimit(), RoundingMode.CEILING).floatValue();
+            if (ratio >= 0.70 && ratio <= 1) {
+                AlertDtos alert =
+                        new AlertDtos("You are about to exceed limit set in " + budget.getCategory().getName()
+                                , "WARNING");
+                alerts.add(alert);
+            } else if (ratio > 1) {
+                AlertDtos alert =
+                        new AlertDtos("You have exceeded limit set in " + budget.getCategory().getName()
+                                , "CRITICAL");
+            }
+        }
+
+        return alerts;
+
     }
 
 
