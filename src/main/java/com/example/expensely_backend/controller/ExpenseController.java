@@ -261,6 +261,9 @@ public class ExpenseController {
 
         BulkValidationResponse response =
                 expenseFilesService.validateFile(file, userId);
+        if (!response.isValid()) {
+            return ResponseEntity.badRequest().body(response);
+        }
 
         return ResponseEntity.ok(response);
 
@@ -285,11 +288,11 @@ public class ExpenseController {
         }
 
         try {
-            expenseService.BulkInsertExpensesFromFile(userId, fileId);
+            return ResponseEntity.ok().body(expenseService.BulkInsertExpensesFromFile(userId,
+                    fileId));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
         }
-        return ResponseEntity.ok(new UserRes(null, "Successfully uploaded expenses"));
 
 
     }

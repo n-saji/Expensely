@@ -339,7 +339,7 @@ public class ExpenseService {
         try {
             rows = objectMapper.readValue(
                     ef.getExpenses(),
-                    new TypeReference<List<ExpenseUploadDto>>() {
+                    new TypeReference<>() {
                     }
             );
         } catch (Exception e) {
