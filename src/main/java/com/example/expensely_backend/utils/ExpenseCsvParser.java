@@ -43,7 +43,7 @@ public class ExpenseCsvParser {
             }
 
         } catch (Exception e) {
-            throw new RuntimeException("Failed to parse CSV", e);
+            throw new RuntimeException("Failed to parse CSV: " + e);
         }
 
         return rows;
