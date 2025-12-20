@@ -258,14 +258,16 @@ public class ExpenseController {
         if (file == null || file.isEmpty()) {
             return ResponseEntity.badRequest().body("Please select a file to upload");
         }
+        try {
 
-        BulkValidationResponse response =
-                expenseFilesService.validateFile(file, userId);
-        if (!response.isValid()) {
-            return ResponseEntity.badRequest().body(response);
+            BulkValidationResponse response =
+                    expenseFilesService.validateFile(file, userId);
+
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
         }
-
-        return ResponseEntity.ok(response);
 
 
     }
