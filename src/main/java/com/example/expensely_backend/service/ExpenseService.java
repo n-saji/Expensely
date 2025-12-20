@@ -6,10 +6,7 @@ import com.example.expensely_backend.model.Category;
 import com.example.expensely_backend.model.Expense;
 import com.example.expensely_backend.model.ExpenseFiles;
 import com.example.expensely_backend.model.User;
-import com.example.expensely_backend.repository.ExpenseFilesRepository;
-import com.example.expensely_backend.repository.ExpenseRepository;
-import com.example.expensely_backend.repository.ExpenseRepositoryCustomImpl;
-import com.example.expensely_backend.repository.UserRepository;
+import com.example.expensely_backend.repository.*;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencsv.CSVWriter;
@@ -35,11 +32,14 @@ public class ExpenseService {
     private final ExpenseFilesRepository expenseFilesRepository;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
+    private final CategoryRepository categoryRepository;
 
     public ExpenseService(ExpenseRepository expenseRepository, CategoryService categoryService,
                           UserService userService,
                           BudgetService budgetService, ExpenseRepositoryCustomImpl expenseRepositoryCustomImpl
-            , ExpenseFilesRepository expenseFilesService, UserRepository userRepository, ObjectMapper objectMapper) {
+            , ExpenseFilesRepository expenseFilesService, UserRepository userRepository,
+                          ObjectMapper objectMapper,
+                          CategoryRepository categoryRepository) {
         this.expenseRepository = expenseRepository;
         this.categoryService = categoryService;
         this.userService = userService;
@@ -48,6 +48,8 @@ public class ExpenseService {
         this.expenseFilesRepository = expenseFilesService;
         this.userRepository = userRepository;
         this.objectMapper = objectMapper;
+        this.categoryRepository = categoryRepository;
+
     }
 
     public void save(Expense expense) {
@@ -241,31 +243,7 @@ public class ExpenseService {
             }
             categoryUUID = category.getId();
         }
-//        q = "%" + q + "%";
-//        if (categoryId != null) {
-//            Category category = categoryService.getCategoryById(categoryId);
-//            if (category == null) {
-//                throw new IllegalArgumentException("Category not found");
-//            }
-//            categoryUUID = category.getId();
-//            if (order == null || order.equalsIgnoreCase("desc")) {
-//                expenses = expenseRepository.findByUserIdAndTimeFrameAndCategoryDescWithLimit(user.getId(), startDate, endDate, categoryUUID, limit, offset, q);
-//            } else if (order.equalsIgnoreCase("asc")) {
-//                expenses = expenseRepository.findByUserIdAndTimeFrameAndCategoryAscWithLimit(user.getId(), startDate, endDate, categoryUUID, limit, offset, q);
-//            } else {
-//                throw new IllegalArgumentException("Order must be 'asc' or 'desc'");
-//            }
-//            totalElements = expenseRepository.countByUserIdAndTimeFrameAndCategory(user.getId(), startDate, endDate, categoryUUID, q);
-//        } else {
-//            if (order == null || order.equalsIgnoreCase("desc")) {
-//                expenses = expenseRepository.findByUserIdAndTimeFrameDescWithLimit(user.getId(), startDate, endDate, limit, offset, q);
-//            } else if (order.equalsIgnoreCase("asc")) {
-//                expenses = expenseRepository.findByUserIdAndTimeFrameAscWithLimit(user.getId(), startDate, endDate, limit, offset, q);
-//            } else {
-//                throw new IllegalArgumentException("Order must be 'asc' or 'desc'");
-//            }
-//            totalElements = expenseRepository.countByUserIdAndTimeFrame(user.getId(), startDate, endDate, q);
-//        }
+
         expenses = expenseRepositoryCustomImpl.findExpenses(user.getId(), startDate, endDate,
                 categoryUUID, q, offset, limit, customSortBy, customSortOrder, order);
         totalElements = expenseRepositoryCustomImpl.countExpenses(user.getId(), startDate, endDate,
@@ -347,7 +325,7 @@ public class ExpenseService {
             throw new RuntimeException("Failed to parse expense data", e);
         }
 
-        Iterable<Category> cats = categoryService.getCategoriesByUserId(userId, "expense");
+        List<Category> cats = categoryRepository.findByUserId(userUUID);
         LinkedHashMap<String, Category> catsList = new LinkedHashMap<>();
         cats.forEach(cat -> catsList.put(cat.getName(), cat));
         List<Expense> expenses = rows.stream().map(dto -> {
