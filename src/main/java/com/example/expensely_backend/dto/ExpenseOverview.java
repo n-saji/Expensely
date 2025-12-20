@@ -162,7 +162,6 @@ public class ExpenseOverview {
                 .limit(5) //only 5 is required
                 .collect(Collectors.toMap(ExpenseResponse::getDescription, ExpenseResponse::getAmount, (a, b) -> a, LinkedHashMap::new));
 
-        double totalSum = 0.0;
         this.overTheDaysThisMonth = new LinkedHashMap<>();
         for (DailyExpense dailyExpense : dailyExpenses) {
             double amount = dailyExpense.getTotalAmount() != null ? dailyExpense.getTotalAmount() : 0.0;

@@ -80,9 +80,11 @@ public class ExpenseService {
             if (!expenseRepository.existsById(UUID.fromString(id))) {
                 throw new IllegalArgumentException("Expense not found");
             }
-            expenseRepository.deleteById(UUID.fromString(id));
-//            budget update
+            //budget update
             Expense expense = getExpenseById(id);
+            
+            expenseRepository.deleteById(UUID.fromString(id));
+
             try {
                 budgetService.updateBudgetAmountByUserIdAndCategoryId(expense.getUser().getId().toString(), expense.getCategory().getId().toString(), expense.getAmount().negate(), expense.getExpenseDate());
             } catch (Exception e) {
