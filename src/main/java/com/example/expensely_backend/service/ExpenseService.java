@@ -1,15 +1,17 @@
 package com.example.expensely_backend.service;
 
 
-import com.example.expensely_backend.dto.DailyExpense;
-import com.example.expensely_backend.dto.ExpenseResList;
-import com.example.expensely_backend.dto.ExpenseResponse;
-import com.example.expensely_backend.dto.MonthlyCategoryExpense;
+import com.example.expensely_backend.dto.*;
 import com.example.expensely_backend.model.Category;
 import com.example.expensely_backend.model.Expense;
+import com.example.expensely_backend.model.ExpenseFiles;
 import com.example.expensely_backend.model.User;
+import com.example.expensely_backend.repository.ExpenseFilesRepository;
 import com.example.expensely_backend.repository.ExpenseRepository;
 import com.example.expensely_backend.repository.ExpenseRepositoryCustomImpl;
+import com.example.expensely_backend.repository.UserRepository;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencsv.CSVWriter;
 import org.springframework.stereotype.Service;
 
@@ -17,6 +19,7 @@ import java.io.IOException;
 import java.io.StringWriter;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -29,15 +32,22 @@ public class ExpenseService {
     private final UserService userService;
     private final BudgetService budgetService;
     private final ExpenseRepositoryCustomImpl expenseRepositoryCustomImpl;
+    private final ExpenseFilesRepository expenseFilesRepository;
+    private final UserRepository userRepository;
+    private final ObjectMapper objectMapper;
 
     public ExpenseService(ExpenseRepository expenseRepository, CategoryService categoryService,
                           UserService userService,
-                          BudgetService budgetService, ExpenseRepositoryCustomImpl expenseRepositoryCustomImpl) {
+                          BudgetService budgetService, ExpenseRepositoryCustomImpl expenseRepositoryCustomImpl
+            , ExpenseFilesRepository expenseFilesService, UserRepository userRepository, ObjectMapper objectMapper) {
         this.expenseRepository = expenseRepository;
         this.categoryService = categoryService;
         this.userService = userService;
         this.budgetService = budgetService;
         this.expenseRepositoryCustomImpl = expenseRepositoryCustomImpl;
+        this.expenseFilesRepository = expenseFilesService;
+        this.userRepository = userRepository;
+        this.objectMapper = objectMapper;
     }
 
     public void save(Expense expense) {
@@ -82,7 +92,7 @@ public class ExpenseService {
             }
             //budget update
             Expense expense = getExpenseById(id);
-            
+
             expenseRepository.deleteById(UUID.fromString(id));
 
             try {
@@ -305,6 +315,53 @@ public class ExpenseService {
         }
         writer.close();
         return sw.toString();
+    }
+
+    public String BulkInsertExpensesFromFile(String userId, String fileId) {
+        UUID fileUUID = UUID.fromString(fileId);
+        UUID userUUID = UUID.fromString(userId);
+        ExpenseFiles ef =
+                expenseFilesRepository.findById(fileUUID).orElseThrow(() -> new IllegalArgumentException("File not found"));
+
+        User user =
+                userRepository.findById(userUUID).orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        if (!ef.getUserId().equals(userId)) {
+            throw new SecurityException("Unauthorized access to file");
+        }
+
+        if (ef.getExpiresAt() < System.currentTimeMillis()) {
+            throw new IllegalStateException("File validation expired");
+        }
+
+
+        List<ExpenseUploadDto> rows;
+        try {
+            rows = objectMapper.readValue(
+                    ef.getExpenses(),
+                    new TypeReference<List<ExpenseUploadDto>>() {
+                    }
+            );
+        } catch (Exception e) {
+            System.out.println(ef.getExpenses() + ": " + e.getMessage());
+            throw new RuntimeException("Failed to parse expense data", e);
+        }
+
+        Iterable<Category> cats = categoryService.getCategoriesByUserId(userId, "expense");
+        LinkedHashMap<String, Category> catsList = new LinkedHashMap<>();
+        cats.forEach(cat -> catsList.put(cat.getName(), cat));
+        List<Expense> expenses = rows.stream().map(dto -> {
+            Expense expense = new Expense();
+            expense.setAmount(BigDecimal.valueOf(dto.getAmount()));
+            expense.setCategory(catsList.get(dto.getCategory()));
+            expense.setExpenseDate(dto.getExpense_date().atStartOfDay());
+            expense.setDescription(dto.getDescription());
+            expense.setUser(user);
+            return expense;
+        }).toList();
+        expenseRepository.saveAll(expenses);
+        expenseFilesRepository.deleteById(fileUUID);
+        return "Expenses inserted successfully";
     }
 
 }

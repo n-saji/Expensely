@@ -2,17 +2,23 @@ package com.example.expensely_backend.controller;
 
 
 import com.example.expensely_backend.dto.AuthResponse;
+import com.example.expensely_backend.dto.BulkValidationResponse;
 import com.example.expensely_backend.dto.ExpenseOverview;
 import com.example.expensely_backend.dto.UserRes;
 import com.example.expensely_backend.model.Expense;
 import com.example.expensely_backend.service.BudgetService;
 import com.example.expensely_backend.service.CategoryService;
+import com.example.expensely_backend.service.ExpenseFilesService;
 import com.example.expensely_backend.service.ExpenseService;
 import com.example.expensely_backend.utils.FormatDate;
+import com.example.expensely_backend.utils.JwtUtil;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
@@ -25,13 +31,17 @@ public class ExpenseController {
 
     private final ExpenseService expenseService;
     private final CategoryService categoryService;
-    private final FormatDate formatDate = new FormatDate();
     private final BudgetService budgetService;
+    private final JwtUtil jwtUtil;
+    private final ExpenseFilesService expenseFilesService;
 
-    public ExpenseController(ExpenseService expenseService, CategoryService categoryService, BudgetService budgetService) {
+    public ExpenseController(ExpenseService expenseService, CategoryService categoryService,
+                             BudgetService budgetService, JwtUtil jwtUtil, ExpenseFilesService expenseFilesService) {
         this.expenseService = expenseService;
         this.categoryService = categoryService;
         this.budgetService = budgetService;
+        this.jwtUtil = jwtUtil;
+        this.expenseFilesService = expenseFilesService;
     }
 
     @PostMapping("/create")
@@ -228,6 +238,60 @@ public class ExpenseController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
         }
+    }
+
+    @PostMapping(value = "/bulk_upload/validate", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> validateExcelFile(HttpServletRequest httpReq,
+                                               @RequestParam("file") MultipartFile file) {
+        Cookie[] cookies = httpReq.getCookies();
+        String refreshToken = null;
+        for (Cookie cookie : cookies) {
+            if (cookie.getName().equals("refreshToken")) {
+                refreshToken = cookie.getValue();
+            }
+        }
+
+        if (refreshToken == null) {
+            return ResponseEntity.status(401).body("Refresh token missing");
+        }
+        String userId = jwtUtil.GetStringFromToken(refreshToken);
+        if (file == null || file.isEmpty()) {
+            return ResponseEntity.badRequest().body("Please select a file to upload");
+        }
+
+        BulkValidationResponse response =
+                expenseFilesService.validateFile(file, userId);
+
+        return ResponseEntity.ok(response);
+
+
+    }
+
+    @GetMapping("/bulk_upload/upload")
+    public ResponseEntity<?> uploadExpenseWithFileId(HttpServletRequest httpReq, @RequestParam("file_id") String fileId) {
+        Cookie[] cookies = httpReq.getCookies();
+        String refreshToken = null;
+        for (Cookie cookie : cookies) {
+            if (cookie.getName().equals("refreshToken")) {
+                refreshToken = cookie.getValue();
+            }
+        }
+        if (refreshToken == null) {
+            return ResponseEntity.status(401).body("Refresh token missing");
+        }
+        String userId = jwtUtil.GetStringFromToken(refreshToken);
+        if (fileId.isEmpty()) {
+            return ResponseEntity.badRequest().body("Please select a file to upload");
+        }
+
+        try {
+            expenseService.BulkInsertExpensesFromFile(userId, fileId);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
+        }
+        return ResponseEntity.ok(new UserRes(null, "Successfully uploaded expenses"));
+
+
     }
 
 }
