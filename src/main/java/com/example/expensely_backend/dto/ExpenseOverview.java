@@ -165,7 +165,6 @@ public class ExpenseOverview {
         this.overTheDaysThisMonth = new LinkedHashMap<>();
         for (DailyExpense dailyExpense : dailyExpenses) {
             double amount = dailyExpense.getTotalAmount() != null ? dailyExpense.getTotalAmount() : 0.0;
-            totalSum += amount;
 
             LocalDate date = LocalDate.parse(dailyExpense.getExpenseDate()); // safer
             String day = String.valueOf(date.getDayOfMonth());
