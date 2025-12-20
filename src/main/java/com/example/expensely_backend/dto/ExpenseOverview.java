@@ -171,7 +171,7 @@ public class ExpenseOverview {
             LocalDate date = LocalDate.parse(dailyExpense.getExpenseDate()); // safer
             String day = String.valueOf(date.getDayOfMonth());
 
-            overTheDaysThisMonth.put(day, round(totalSum * 100.0) / 100.0);
+            overTheDaysThisMonth.put(day, round(amount * 100.0) / 100.0);
         }
 
         this.budgetServiceMap = new LinkedHashMap<>();
