@@ -21,6 +21,8 @@ public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
     private final CustomAuthEntryPoint customAuthEntryPoint;
+    String allowedOrigins = System.getenv("ALLOWED_ORIGINS");
+    String[] origins = allowedOrigins != null ? allowedOrigins.split(",") : new String[]{};
 
     public SecurityConfig(JwtAuthFilter jwtAuthFilter, CustomAuthEntryPoint customAuthEntryPoint) {
         this.jwtAuthFilter = jwtAuthFilter;
@@ -53,11 +55,12 @@ public class SecurityConfig {
 
     @Bean
     public WebMvcConfigurer corsConfigurer() {
+
         return new WebMvcConfigurer() {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/**")
-                        .allowedOrigins("https://expensely-self.vercel.app", "http://localhost:3000")
+                        .allowedOrigins(origins)
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
                         .allowedHeaders("Content-Type", "Authorization", "X-Requested-With")
                         .exposedHeaders("Set-Cookie")
