@@ -31,6 +31,8 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+
+
         http
                 .cors().and()
                 .csrf().disable()
@@ -41,7 +43,9 @@ public class SecurityConfig {
                         auth -> auth
                                 .requestMatchers("/api/users/register", "/api/users/login",
                                         "/ping", "/api/users/verify-oauth-login", "/api/users" +
-                                                "/refresh").permitAll() // Allow public access to registration and login
+                                                "/refresh", "/ws/**").permitAll() // Allow public
+                                // access
+                                // to registration and login
                                 .anyRequest().authenticated() // All other requests require authentication
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
@@ -65,9 +69,14 @@ public class SecurityConfig {
                         .allowedHeaders("Content-Type", "Authorization", "X-Requested-With")
                         .exposedHeaders("Set-Cookie")
                         .allowCredentials(true);
+
+                registry.addMapping("/ws/**")
+                        .allowedOrigins(origins)
+                        .allowCredentials(true);
+
             }
         };
     }
 }
 
-//export $(cat .env | xargs) && ./gradlew bootRun
+// export $(cat .env | xargs) && ./gradlew bootRun

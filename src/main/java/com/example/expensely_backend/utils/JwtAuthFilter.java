@@ -31,6 +31,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         String path = request.getServletPath();
 
+        if (path.startsWith("/ws/")) {
+            filterChain.doFilter(request, response); // skip JWT for WebSocket handshake
+            return;
+        }
         if (path.equals("/api/users/login") || path.equals("/api/users/register") || path.equals(
                 "/ping") || path.equals("/api/users/refresh") || path.equals("/api/users/verify" +
                 "-oauth-login")) {
