@@ -18,7 +18,7 @@ FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app
 
 # Copy the built JAR from builder stage
-COPY --from=builder /app/build/libs/expensely_backend-1.0.0-SNAPSHOT.jar app.jar
+COPY --from=builder /app/build/libs/expensely_backend-1.0.0.jar app.jar
 
 # Expose port
 EXPOSE 8080
