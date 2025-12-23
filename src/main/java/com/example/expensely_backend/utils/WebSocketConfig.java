@@ -10,9 +10,16 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 @EnableWebSocket
 public class WebSocketConfig implements WebSocketConfigurer {
 
+    private final AlertHandler alertHandler;
+
+
+    public WebSocketConfig(AlertHandler alertHandler) {
+        this.alertHandler = alertHandler;
+    }
+
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        registry.addHandler(new AlertHandler(), "/ws/alerts")
+        registry.addHandler(alertHandler, "/ws/alerts")
                 .setAllowedOriginPatterns("*"); // allow all origins for testing
     }
 }

@@ -25,4 +25,11 @@ public class GlobalExceptionHandler {
                 .badRequest()
                 .body(new AuthResponse("Validation failed", null, ex.getMessage()));
     }
+
+    @ExceptionHandler(NullPointerException.class)
+    public ResponseEntity<?> handleNullPointerExceptions(NullPointerException ex) {
+        return ResponseEntity
+                .badRequest()
+                .body(new AuthResponse("Null pointer exception", null, ex.getMessage()));
+    }
 }
