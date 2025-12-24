@@ -11,4 +11,8 @@ import java.util.UUID;
 public interface MessagesRepository extends JpaRepository<Messages, UUID> {
 
     List<Messages> findByUserIdAndIsDeliveredFalseAndIsSeenFalse(UUID userId);
+
+    List<Messages> findByUserIdAndIsDelivered(UUID userId, boolean isDelivered);
+
+    List<Messages> findByUserId(UUID userId);
 }

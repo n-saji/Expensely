@@ -25,6 +25,7 @@ public class WebSocketController {
         this.userService = userService;
     }
 
+    //    sends alert to current user
     @PostMapping("/send_alert")
     public ResponseEntity<?> sendAlert(HttpServletRequest httpReq, @RequestBody MessageDTO message) {
         String userId = cookieUtils.getCookie(httpReq);
@@ -34,7 +35,6 @@ public class WebSocketController {
         if (user == null) {
             return ResponseEntity.status(404).body("User not found");
         }
-        System.out.println(message.getMessage());
         webSocketService.sendAlerts(user, message);
         return ResponseEntity.ok().build();
     }

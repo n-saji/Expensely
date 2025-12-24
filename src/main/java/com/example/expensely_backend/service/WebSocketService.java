@@ -2,7 +2,6 @@ package com.example.expensely_backend.service;
 
 import com.example.expensely_backend.dto.MessageDTO;
 import com.example.expensely_backend.handler.AlertHandler;
-import com.example.expensely_backend.model.Messages;
 import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.repository.MessagesRepository;
 import org.springframework.stereotype.Service;
@@ -24,20 +23,14 @@ public class WebSocketService {
         if (messageDTO.getSender() == null || messageDTO.getSender().isEmpty()) return;
         if (messageDTO.getType() == null) return;
 
-        boolean isOnline = alertHandler.isUserOnline(user.getId());
-
-        if (isOnline) {
-            // send via WebSocket
-
+//db storing handled in AlertHandler
+        // send via WebSocket
+        try {
             alertHandler.sendAlert(user.getId(), messageDTO);
-        } else {
-            // save to DB to send later
-            System.out.println("User offline, saving message to DB" + messageDTO.getMessage());
-            Messages message = new Messages();
-            message.setUserId(user.getId());
-            message.setType(messageDTO.getType());
-            message.setMessage(messageDTO.getMessage());
-            messageRepository.save(message);
+        } catch (Exception e) {
+            System.out.println("Error sending websocket msg: " + e.getMessage());
         }
+
+
     }
 }

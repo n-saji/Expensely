@@ -11,10 +11,12 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @NoArgsConstructor
 public class MessageDTO {
+    private String id;
     private String message;
     private String sender;
     private LocalDateTime time = LocalDateTime.now();
     private globals.MessageType type;
+    private Boolean isRead = false;
 
 
 }

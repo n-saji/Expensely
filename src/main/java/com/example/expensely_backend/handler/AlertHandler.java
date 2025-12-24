@@ -41,14 +41,24 @@ public class AlertHandler extends TextWebSocketHandler {
         return sessions != null && !sessions.isEmpty();
     }
 
-    public void sendAlert(UUID userId, MessageDTO alertMessage) {
+    public void sendAlert(UUID userId, MessageDTO messageDTO) {
 
         List<WebSocketSession> sessions = userSessions.get(userId);
+        Messages message = new Messages();
+        message.setUserId(userId);
+        message.setMessage(messageDTO.getMessage());
+        message.setType(messageDTO.getType());
+        Messages savedMsg = messageRepository.save(message);
+        messageDTO.setId(savedMsg.getId().toString());
+        messageDTO.setIsRead(savedMsg.isSeen());
+
         if (sessions != null) {
             for (WebSocketSession session : sessions) {
                 try {
                     if (session.isOpen()) {
-                        session.sendMessage(new TextMessage(objectMapper.writeValueAsString(alertMessage)));
+                        session.sendMessage(new TextMessage(objectMapper.writeValueAsString(messageDTO)));
+                        savedMsg.setDelivered(true);
+                        messageRepository.save(savedMsg);
                     }
                 } catch (Exception e) {
                     System.out.println("Error sending alert to user: " + userId);
@@ -56,12 +66,9 @@ public class AlertHandler extends TextWebSocketHandler {
             }
         } else {
             // user offline, save message to DB
-            Messages message = new Messages();
-            message.setUserId(userId);
-            message.setMessage(alertMessage.getMessage());
-            message.setType(alertMessage.getType());
-            message.setDelivered(false);
-            messageRepository.save(message);
+            System.out.println("User offline, saving message to DB: " + userId);
+            savedMsg.setDelivered(false);
+            messageRepository.save(savedMsg);
         }
     }
 
@@ -76,7 +83,7 @@ public class AlertHandler extends TextWebSocketHandler {
         try {
             User user = userService.GetUserById(uuidParam);
             List<Messages> pendingMessages =
-                    messageRepository.findByUserIdAndIsDeliveredFalseAndIsSeenFalse(user.getId());
+                    messageRepository.findByUserId(user.getId());
 
             System.out.println("User connected: " + user.getId() + ", user email:  " + user.getEmail());
             for (Messages m : pendingMessages) {
@@ -85,6 +92,8 @@ public class AlertHandler extends TextWebSocketHandler {
                 dto.setSender(globals.SERVER_SENDER);
                 dto.setType(m.getType());
                 dto.setTime(m.getCreatedAt());
+                dto.setId(m.getId().toString());
+                dto.setIsRead(m.isSeen());
                 sendAlert(userId, dto);
                 m.setDelivered(true);
             }
