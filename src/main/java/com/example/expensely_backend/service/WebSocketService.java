@@ -7,7 +7,6 @@ import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.repository.MessagesRepository;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -54,11 +53,7 @@ public class WebSocketService {
         }
         UUID userUUID = UUID.fromString(userID);
         try {
-            List<Messages> msgs = messageRepository.findByUserIdAndIsSeen(userUUID, false);
-            for (Messages msg : msgs) {
-                msg.setSeen(true);
-            }
-            messageRepository.saveAll(msgs);
+            messageRepository.markAllAsSeen(userUUID);
         } catch (Exception e) {
             System.out.println("Error marking messages as read: " + e.getMessage());
         }

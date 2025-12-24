@@ -13,6 +13,7 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -52,17 +53,23 @@ public class AlertHandler extends TextWebSocketHandler {
         messageDTO.setId(savedMsg.getId().toString());
         messageDTO.setIsRead(savedMsg.isSeen());
 
+        boolean delivered = false;
+
         if (sessions != null) {
             for (WebSocketSession session : sessions) {
+                if (!session.isOpen()) continue;
+
                 try {
-                    if (session.isOpen()) {
-                        session.sendMessage(new TextMessage(objectMapper.writeValueAsString(messageDTO)));
-                        savedMsg.setDelivered(true);
-                        messageRepository.save(savedMsg);
-                    }
-                } catch (Exception e) {
-                    System.out.println("Error sending alert to user: " + userId);
+                    session.sendMessage(
+                            new TextMessage(objectMapper.writeValueAsString(messageDTO))
+                    );
+                    delivered = true;
+                } catch (IOException e) {
+                    System.out.printf("Failed to send WS message to user %s, error: %s", userId, e);
                 }
+            }
+            if (delivered) {
+                messageRepository.markDelivered(savedMsg.getId());
             }
         } else {
             // user offline, save message to DB
@@ -76,12 +83,13 @@ public class AlertHandler extends TextWebSocketHandler {
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         if (!session.getUri().getQuery().contains("uuid=")) {
             session.close();
+            return;
         }
         String uuidParam = session.getUri().getQuery().split("=")[1]; // /ws/alerts?uuid=xxxx
         UUID userId = UUID.fromString(uuidParam);
         userSessions.computeIfAbsent(userId, k -> new ArrayList<>()).add(session);
         try {
-            User user = userService.GetUserById(uuidParam);
+            User user = userService.GetUserById(userId.toString());
             List<Messages> pendingMessages =
                     messageRepository.findByUserId(user.getId());
 
@@ -94,7 +102,10 @@ public class AlertHandler extends TextWebSocketHandler {
                 dto.setTime(m.getCreatedAt());
                 dto.setId(m.getId().toString());
                 dto.setIsRead(m.isSeen());
-                sendAlert(userId, dto);
+                session.sendMessage(
+                        new TextMessage(objectMapper.writeValueAsString(dto))
+                );
+
                 m.setDelivered(true);
             }
             messageRepository.saveAll(pendingMessages);

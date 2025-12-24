@@ -27,7 +27,7 @@ public class WebSocketController {
     //    sends alert to current user
     @PostMapping("/send_alert")
     public ResponseEntity<?> sendAlert(HttpServletRequest httpReq, @RequestBody MessageDTO message) {
-        String userId = cookieUtils.getCookie(httpReq);
+        String userId = cookieUtils.getStringFromCookie(httpReq);
         if (userId == null)
             return ResponseEntity.status(401).body("Refresh token missing");
         User user = userService.GetUserById(userId);
@@ -40,7 +40,7 @@ public class WebSocketController {
 
     @DeleteMapping("/alerts/delete_by_id/{id}")
     public ResponseEntity<?> deleteById(HttpServletRequest httpReq, @PathVariable String id) {
-        String userId = cookieUtils.getCookie(httpReq);
+        String userId = cookieUtils.getStringFromCookie(httpReq);
         if (userId == null)
             return ResponseEntity.status(401).body("Refresh token missing");
         User user = userService.GetUserById(userId);
@@ -58,7 +58,7 @@ public class WebSocketController {
 
     @PutMapping("/alerts/mark_all_read/by_user_id/{id}")
     public ResponseEntity<?> markAllAsRead(HttpServletRequest httpReq, @PathVariable String id) {
-        String userId = cookieUtils.getCookie(httpReq);
+        String userId = cookieUtils.getStringFromCookie(httpReq);
         if (userId == null)
             return ResponseEntity.status(401).body("Refresh token missing");
         User user = userService.GetUserById(userId);
@@ -76,7 +76,7 @@ public class WebSocketController {
 
     @PutMapping("alerts/mark_as_read/by_message_id/{id}")
     public ResponseEntity<?> markAsRead(HttpServletRequest httpReq, @PathVariable String id) {
-        String userId = cookieUtils.getCookie(httpReq);
+        String userId = cookieUtils.getStringFromCookie(httpReq);
         if (userId == null)
             return ResponseEntity.status(401).body("Refresh token missing");
         User user = userService.GetUserById(userId);

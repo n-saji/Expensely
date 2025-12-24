@@ -14,7 +14,7 @@ public class CookieUtils {
     }
 
 
-    public String getCookie(HttpServletRequest request) {
+    public String getStringFromCookie(HttpServletRequest request) {
         Cookie[] cookies = request.getCookies();
         String refreshToken = null;
         for (Cookie cookie : cookies) {
