@@ -15,4 +15,6 @@ public interface MessagesRepository extends JpaRepository<Messages, UUID> {
     List<Messages> findByUserIdAndIsDelivered(UUID userId, boolean isDelivered);
 
     List<Messages> findByUserId(UUID userId);
+
+    List<Messages> findByUserIdAndIsSeen(UUID userId, boolean isSeen);
 }
