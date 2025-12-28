@@ -27,7 +27,7 @@ public interface MessagesRepository extends JpaRepository<Messages, UUID> {
                 SET m.isSeen = true
                 WHERE m.userId = :userId AND m.isSeen = false
             """)
-    int markAllAsSeen(@Param("userId") UUID userId);
+    void markAllAsSeen(@Param("userId") UUID userId);
 
     @Modifying
     @Query("UPDATE Messages m SET m.isDelivered = true WHERE m.id = :id")

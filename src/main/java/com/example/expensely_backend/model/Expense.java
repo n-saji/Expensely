@@ -9,29 +9,41 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "expenses")
+@Table(
+        name = "expenses",
+        indexes = {
+                @Index(name = "idx_expense_date_user_id", columnList = "user_id,expense_date")
+        }
+)
 public class Expense {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Getter @Setter
+    @Getter
+    @Setter
     private UUID id;
 
     @ManyToOne
-    @Getter @Setter
+    @Getter
+    @Setter
     private User user;
 
     @ManyToOne
-    @Getter @Setter
+    @Getter
+    @Setter
     private Category category;
 
     @Column(nullable = false)
-    @Getter @Setter
+    @Getter
+    @Setter
     private BigDecimal amount;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private String description;
 
     @Column(name = "expense_date")
-    @Getter @Setter
+    @Getter
+    @Setter
     private LocalDateTime expenseDate;
+
 }
