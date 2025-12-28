@@ -1,5 +1,8 @@
 package com.example.expensely_backend.service;
 
+import com.example.expensely_backend.dto.MessageDTO;
+import com.example.expensely_backend.globals.globals;
+import com.example.expensely_backend.handler.AlertHandler;
 import com.example.expensely_backend.model.Budget;
 import com.example.expensely_backend.model.Category;
 import com.example.expensely_backend.model.Expense;
@@ -25,12 +28,16 @@ public class BudgetService {
     private final CategoryRepository categoryRepository;
     private final UserService userService;
     private final ExpenseRepository expenseRepository;
+    private final AlertHandler alertHandler;
 
-    public BudgetService(BudgetRepository budgetRepository, UserService userService, CategoryRepository categoryRepository, ExpenseRepository expenseRepository) {
+    public BudgetService(BudgetRepository budgetRepository, UserService userService,
+                         CategoryRepository categoryRepository,
+                         ExpenseRepository expenseRepository, AlertHandler alertHandler) {
         this.budgetRepository = budgetRepository;
         this.userService = userService;
         this.categoryRepository = categoryRepository;
         this.expenseRepository = expenseRepository;
+        this.alertHandler = alertHandler;
     }
 
     private void validateBudget(Budget budget) {
@@ -188,7 +195,39 @@ public class BudgetService {
         try {
             budgetRepository.save(budget);
         } catch (Exception e) {
+            System.out.println(e.getMessage() + " " + e);
             throw new IllegalArgumentException("Error updating budget amount: " + e.getMessage());
+        }
+
+//        calculate percentage used and send msg
+        float percentage = (budget.getAmountSpent().floatValue() / budget.getAmountLimit().floatValue()) * 100;
+        // Calculate once, format as an integer for the message
+        int displayPercent = (int) percentage;
+        String category = budget.getCategory().getName();
+        String text = "";
+        globals.MessageType type = globals.MessageType.ALERT;
+
+        if (percentage >= 70 && percentage < 100) {
+            text = String.format("Heads up! You've used %d%% of your %s budget.", displayPercent, category);
+            type = globals.MessageType.ALERT;
+        } else if (percentage >= 100) {
+            text = String.format("You've exceeded your %s budget limit.", category);
+            type = globals.MessageType.ERROR;
+        }
+
+// Only send if a message was actually set
+        if (!text.isEmpty()) {
+            MessageDTO msg = new MessageDTO();
+            msg.setMessage(text);
+            msg.setSender(globals.SERVER_SENDER);
+            msg.setType(type);
+
+            try {
+                alertHandler.sendAlert(budget.getUser().getId(), msg);
+            } catch (Exception e) {
+                // Use a logger in production instead of System.out
+                System.out.println("Failed to send budget alert: " + e.getMessage());
+            }
         }
 
     }

@@ -69,7 +69,12 @@ public class AlertHandler extends TextWebSocketHandler {
                 }
             }
             if (delivered) {
-                messageRepository.markDelivered(savedMsg.getId());
+                System.out.println("running markDelivered for message: " + savedMsg.getId());
+                try {
+                    messageRepository.markDelivered(savedMsg.getId());
+                } catch (Exception e) {
+                    System.out.println("Error marking message as delivered: " + e.getMessage());
+                }
             }
         } else {
             // user offline, save message to DB

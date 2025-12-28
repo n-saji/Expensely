@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
@@ -21,6 +22,7 @@ public interface MessagesRepository extends JpaRepository<Messages, UUID> {
 
     List<Messages> findByUserIdAndIsSeen(UUID userId, boolean isSeen);
 
+    @Transactional
     @Modifying
     @Query("""
                 UPDATE Messages m
@@ -29,6 +31,7 @@ public interface MessagesRepository extends JpaRepository<Messages, UUID> {
             """)
     void markAllAsSeen(@Param("userId") UUID userId);
 
+    @Transactional
     @Modifying
     @Query("UPDATE Messages m SET m.isDelivered = true WHERE m.id = :id")
     void markDelivered(@Param("id") UUID id);

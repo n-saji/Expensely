@@ -12,53 +12,64 @@ import java.util.UUID;
 @Entity
 @Table(
         name = "budgets",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "category_id","startDate","endDate","isActive"} )
+        uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "category_id", "startDate", "endDate", "isActive"})
 )
 public class Budget {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Getter @Setter
+    @Getter
+    @Setter
     @Column(columnDefinition = "UUID", updatable = false, nullable = false)
     private UUID id;
 
     @ManyToOne
-    @Setter @Getter
+    @Setter
+    @Getter
     private User user;
 
     @ManyToOne
-    @Setter @Getter
+    @Setter
+    @Getter
     private Category category;
 
-    @Getter @Setter
-    @Column(nullable = false,precision = 10, scale = 2)
+    @Getter
+    @Setter
+    @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal amountLimit;
 
-    @Getter @Setter
-    @Column(precision = 10, scale = 2)
+    @Getter
+    @Setter
+    @Column(precision = 15, scale = 2)
     private BigDecimal amountSpent;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Period period;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     @Column(name = "start_date", nullable = false)
     private LocalDate startDate;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     @Column(name = "end_date")
     private LocalDate endDate;
 
-    @Getter @Setter
-    @Column(name = "is_active",columnDefinition = "boolean default true")
+    @Getter
+    @Setter
+    @Column(name = "is_active", columnDefinition = "boolean default true")
     private boolean isActive = true;
 
-    @Getter @Setter
+    @Getter
+    @Setter
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    @Getter @Setter
+    @Getter
+    @Setter
     @Column(name = "updated_at")
     private LocalDateTime updatedAt = LocalDateTime.now();
 
