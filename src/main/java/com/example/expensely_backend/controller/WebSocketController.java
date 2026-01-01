@@ -74,7 +74,7 @@ public class WebSocketController {
         return ResponseEntity.status(HttpStatus.OK).build();
     }
 
-    @PutMapping("alerts/mark_as_read/by_message_id/{id}")
+    @PutMapping("/alerts/mark_as_read/by_message_id/{id}")
     public ResponseEntity<?> markAsRead(HttpServletRequest httpReq, @PathVariable String id) {
         String userId = cookieUtils.getStringFromCookie(httpReq);
         if (userId == null)
@@ -87,6 +87,16 @@ public class WebSocketController {
             webSocketService.markMessageAsRead(id);
         } catch (Exception e) {
             return ResponseEntity.status(400).body("Invalid alert id");
+        }
+        return ResponseEntity.status(HttpStatus.OK).build();
+    }
+
+    @PostMapping("/alerts/broadcast")
+    public ResponseEntity<?> BroadCastMsgToAlUsers(@RequestParam(value = "msg", required = true) String msg) {
+        try {
+            webSocketService.sendBroadCastMessage(msg);
+        } catch (Exception e) {
+            return ResponseEntity.status(400).body("Error sending broadcast message: " + e.getMessage());
         }
         return ResponseEntity.status(HttpStatus.OK).build();
     }

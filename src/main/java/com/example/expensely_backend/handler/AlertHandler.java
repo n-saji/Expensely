@@ -129,17 +129,7 @@ public class AlertHandler extends TextWebSocketHandler {
     }
 
     public void broadcast(MessageDTO messageDTO) {
-        for (List<WebSocketSession> sessions : userSessions.values()) {
-            for (WebSocketSession session : sessions) {
-                try {
-                    if (session.isOpen()) {
-                        session.sendMessage(new TextMessage(objectMapper.writeValueAsString(messageDTO)));
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        }
+        userSessions.forEach((userId, sessions) -> sendAlert(userId, messageDTO));
     }
 
 }

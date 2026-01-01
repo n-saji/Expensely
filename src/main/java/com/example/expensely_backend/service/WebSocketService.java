@@ -1,22 +1,27 @@
 package com.example.expensely_backend.service;
 
 import com.example.expensely_backend.dto.MessageDTO;
+import com.example.expensely_backend.globals.globals;
 import com.example.expensely_backend.handler.AlertHandler;
 import com.example.expensely_backend.model.Messages;
 import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.repository.MessagesRepository;
+import com.example.expensely_backend.repository.UserRepository;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
 public class WebSocketService {
     private final MessagesRepository messageRepository;
     private final AlertHandler alertHandler;
+    private final UserRepository userRepository;
 
-    public WebSocketService(MessagesRepository messageRepository, AlertHandler alertHandler) {
+    public WebSocketService(MessagesRepository messageRepository, AlertHandler alertHandler, UserRepository userRepository) {
         this.messageRepository = messageRepository;
         this.alertHandler = alertHandler;
+        this.userRepository = userRepository;
     }
 
     public void sendAlerts(User user, MessageDTO messageDTO) {
@@ -70,6 +75,23 @@ public class WebSocketService {
             messageRepository.save(msg);
         } catch (Exception e) {
             System.out.println("Error marking message as read: " + e.getMessage());
+        }
+    }
+
+    public void sendBroadCastMessage(String message) {
+        if (message == null || message.isEmpty()) return;
+        List<User> users = userRepository.findAll();
+        if (users.isEmpty()) return;
+        try {
+            MessageDTO msg = new MessageDTO();
+            msg.setMessage(message);
+            msg.setSender(globals.SERVER_SENDER);
+            msg.setType(globals.MessageType.INFO);
+            for (User user : users) {
+                alertHandler.sendAlert(user.getId(), msg);
+            }
+        } catch (Exception e) {
+            System.out.println("Error sending broadcast msg: " + e.getMessage());
         }
     }
 }
