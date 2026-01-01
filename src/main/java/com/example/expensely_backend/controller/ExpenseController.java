@@ -173,7 +173,9 @@ public class ExpenseController {
                                     FormatDate.formatStartDate(null, false), endDate, "asc", null
                                     , 1, 1, "", null, null),
                             req_month,
-                            budgetService.getBudgetsByUserId(userId)));
+                            budgetService.getBudgetsByUserId(userId),
+                            expenseService.getTotalExpenseForMonth(month == 1 ? year - 1 : year, month == 1 ? 12 : month
+                                    , userId)));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
         }

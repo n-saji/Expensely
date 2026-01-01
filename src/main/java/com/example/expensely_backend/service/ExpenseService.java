@@ -7,6 +7,7 @@ import com.example.expensely_backend.model.Expense;
 import com.example.expensely_backend.model.ExpenseFiles;
 import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.repository.*;
+import com.example.expensely_backend.utils.FormatDate;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencsv.CSVWriter;
@@ -16,6 +17,7 @@ import java.io.IOException;
 import java.io.StringWriter;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.UUID;
@@ -340,6 +342,16 @@ public class ExpenseService {
         expenseRepository.saveAll(expenses);
         expenseFilesRepository.deleteById(fileUUID);
         return "Expenses inserted successfully";
+    }
+
+    public Double getTotalExpenseForMonth(int year, int month, String userId) {
+        UUID userIdUUID = UUID.fromString(userId);
+        LocalDateTime startDate = FormatDate.formatStartDate(LocalDateTime.of(year, month, 1, 0, 0), false);
+        YearMonth req_ym = YearMonth.of(year, month);
+        LocalDateTime endDate = req_ym.atEndOfMonth().atTime(23, 59, 59);
+
+        return expenseRepository.getTotalExpenseByUserId(userIdUUID, startDate, endDate);
+
     }
 
 }

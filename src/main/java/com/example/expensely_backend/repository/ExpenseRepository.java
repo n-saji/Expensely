@@ -134,6 +134,14 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
 
     long deleteAllByUserId(UUID id);
 
+    @Query(value = """
+            SELECT sum(e.amount)
+                        from expenses e
+                        where e.user_id = :userId
+                        AND e.expense_date >= :startDate
+                        AND e.expense_date <= :endDate
+            """, nativeQuery = true)
+    Double getTotalExpenseByUserId(UUID userId, LocalDateTime startDate, LocalDateTime endDate);
 
 }
 

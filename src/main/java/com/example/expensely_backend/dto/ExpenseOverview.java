@@ -38,41 +38,32 @@ public class ExpenseOverview {
 
     @Getter
     private final Double thisMonthTotalExpense;
-
-    @Getter
-    private final Double lastMonthTotalExpense;
-
     @Getter
     private final Map<String, Long> categoryCount;
-
     @Getter
     private final Double averageMonthlyExpense;
-
     @Getter
     private final Map<String, Map<String, Double>> monthlyCategoryExpense;
-
-
     @Getter
     private final Map<String, Double> topFiveMostExpensiveItemThisMonth;
-
     @Getter
     private final Map<String, Double> overTheDaysThisMonth;
-
     @Getter
     private final Integer earliestStartMonth, earliestStartYear;
-
     @Getter
     private final Map<String, Double> thisMonthMostExpensiveItem;
-
     @Getter
     private final Map<String, Budget> budgetServiceMap;
+    @Getter
+    private Double lastMonthTotalExpense = 0.0;
 
 
     public ExpenseOverview(List<ExpenseResponse> expenses, List<ExpenseResponse> req_expenses_range, List<ExpenseResponse> req_expenses_range_monthly,
                            String userId, List<MonthlyCategoryExpense> monthlyCategoryExpenses,
                            Iterable<Category> categories, List<DailyExpense> dailyExpenses,
                            ExpenseResList FirstExpense, Integer reqMonth,
-                           List<Budget> budgetServiceMap) {
+                           List<Budget> budgetServiceMap,
+                           Double LastMonthTotalExpense) {
         //  Overview page
         this.userId = userId;
         this.totalCount = expenses.size();
@@ -85,7 +76,7 @@ public class ExpenseOverview {
 
         Map<Month, Double> monthMap = expenses.stream().collect(Collectors.groupingBy(expense -> expense.getExpenseDate().getMonth(), TreeMap::new, Collectors.summingDouble(ExpenseResponse::getAmount)));
         this.thisMonthTotalExpense = round(monthMap.getOrDefault(Month.of(currentMonth + 1), 0.0) * 100.0) / 100.0;
-        this.lastMonthTotalExpense = round((monthMap.getOrDefault(Month.of(currentMonth), 0.0)) * 100.0) / 100.0;
+        this.lastMonthTotalExpense = LastMonthTotalExpense;
         this.TotalAmount = expenses.stream().mapToDouble(ExpenseResponse::getAmount).sum();
         this.averageMonthlyExpense = TotalAmount / (currentMonth + 1);
         this.mostFrequentCategory = categoryCount.entrySet().stream()
