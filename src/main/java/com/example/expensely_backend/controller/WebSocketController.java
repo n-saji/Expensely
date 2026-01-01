@@ -92,7 +92,19 @@ public class WebSocketController {
     }
 
     @PostMapping("/alerts/broadcast")
-    public ResponseEntity<?> BroadCastMsgToAlUsers(@RequestParam(value = "msg", required = true) String msg) {
+    public ResponseEntity<?> BroadCastMsgToAlUsers(HttpServletRequest httpReq, @RequestParam(value =
+            "msg",
+            required = true) String msg) {
+        String userId = cookieUtils.getStringFromCookie(httpReq);
+        if (userId == null)
+            return ResponseEntity.status(401).body("Refresh token missing");
+        User user = userService.GetUserById(userId);
+        if (user == null) {
+            return ResponseEntity.status(404).body("User not found");
+        }
+        if (user.getIsAdmin() == false) {
+            return ResponseEntity.status(403).body("Forbidden");
+        }
         try {
             webSocketService.sendBroadCastMessage(msg);
         } catch (Exception e) {
