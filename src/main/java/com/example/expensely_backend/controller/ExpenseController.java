@@ -15,7 +15,6 @@ import com.example.expensely_backend.utils.JwtUtil;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -25,7 +24,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/api/expenses")
@@ -162,7 +160,7 @@ public class ExpenseController {
         LocalDateTime req_end_year = LocalDateTime.of(req_year, 12, 31, 23, 59, 59);
 
         try {
-            return ResponseEntity.ok().cacheControl(CacheControl.maxAge(5, TimeUnit.SECONDS)).body(
+            return ResponseEntity.ok().body(
                     new ExpenseOverview(expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, startDate, endDate, "desc"),
                             expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, req_start_year, req_end_year, "desc"),
                             expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, req_start, req_end, "desc"),
