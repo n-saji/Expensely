@@ -11,7 +11,9 @@ import com.example.expensely_backend.repository.BudgetRepository;
 import com.example.expensely_backend.repository.CategoryRepository;
 import com.example.expensely_backend.repository.ExpenseRepository;
 import com.example.expensely_backend.utils.FormatDate;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -22,23 +24,14 @@ import java.util.UUID;
 
 
 @Service
+@RequiredArgsConstructor
 public class BudgetService {
 
-    private final BudgetRepository budgetRepository;
     private final CategoryRepository categoryRepository;
     private final UserService userService;
     private final ExpenseRepository expenseRepository;
     private final AlertHandler alertHandler;
-
-    public BudgetService(BudgetRepository budgetRepository, UserService userService,
-                         CategoryRepository categoryRepository,
-                         ExpenseRepository expenseRepository, AlertHandler alertHandler) {
-        this.budgetRepository = budgetRepository;
-        this.userService = userService;
-        this.categoryRepository = categoryRepository;
-        this.expenseRepository = expenseRepository;
-        this.alertHandler = alertHandler;
-    }
+    private final BudgetRepository budgetRepository;
 
     private void validateBudget(Budget budget) {
         if (budget.getUser() == null) throw new IllegalArgumentException("User must not be null");
@@ -52,7 +45,7 @@ public class BudgetService {
             throw new IllegalArgumentException("Budget period must not be null");
     }
 
-
+    @Transactional
     public Budget save(Budget budget) {
         User user = userService.GetActiveUserById(budget.getUser().getId().toString());
         if (user == null) {
