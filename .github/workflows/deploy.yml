@@ -57,7 +57,7 @@ jobs:
             docker rm expensely-app || true
             docker run -d \
               --name expensely-app \
-              -p 80:8080 \
+              -p 8080:8080 \
               --restart unless-stopped \
               --env-file ~/app/.env \
               ${{ secrets.DOCKERHUB_USERNAME }}/expensely-app:latest
