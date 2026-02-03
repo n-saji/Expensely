@@ -13,14 +13,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 🔐 Login to Docker Hub
+
       - name: Docker Hub Login
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 🐳 Build & Push Image
+
       - name: Build and Push Docker Image
         run: |
           IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/expensely-app
@@ -29,9 +29,9 @@ jobs:
           docker build -t $IMAGE:$TAG -t $IMAGE:latest .
           docker push $IMAGE:$TAG
           docker push $IMAGE:latest
-        
 
-        # 🚀 Deploy to EC2
+
+
       - name: SSH to EC2 and deploy
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -52,12 +52,12 @@ jobs:
             EOF
 
 
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/go-app:latest
-            docker stop go-app || true
-            docker rm go-app || true
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/expensely-app:latest
+            docker stop expensely-app || true
+            docker rm expensely-app || true
             docker run -d \
-              --name go-app \
+              --name expensely-app \
               -p 8080:8080 \
               --restart unless-stopped \
               -v ~/app/.env:/app/.env \
-              ${{ secrets.DOCKERHUB_USERNAME }}/go-app:latest
+              ${{ secrets.DOCKERHUB_USERNAME }}/expensely-app:latest
