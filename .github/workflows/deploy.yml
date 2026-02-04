@@ -30,6 +30,14 @@ jobs:
           docker push $IMAGE:$TAG
           docker push $IMAGE:latest
 
+      - name: Copy docker-compose.yml to EC2
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "./docker-compose.yml"
+          target: "~/app/docker-compose.yml"
 
 
       - name: SSH to EC2 and deploy
@@ -50,10 +58,8 @@ jobs:
             MAILGUN_API_KEY=${{ secrets.MAILGUN_API_KEY }}
             EOF
 
+            cd ~/app
             docker-compose pull app
-            docker-compose up -d \
-              --no-deps \
-              --scale app=2 \
-              app
+            docker-compose up -d --no-deps --scale app=2 app
             docker image prune -f
             
