@@ -48,6 +48,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           source: "./docker-compose.yml"
           target: "~/app"
+          overwrite: 'true'
 
 
       - name: SSH to EC2 and deploy
