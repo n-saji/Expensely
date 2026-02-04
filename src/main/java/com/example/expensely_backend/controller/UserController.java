@@ -6,6 +6,7 @@ import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.service.ExpiredTokenService;
 import com.example.expensely_backend.service.UserService;
 import com.example.expensely_backend.utils.JwtUtil;
+import com.example.expensely_backend.utils.Mailgun;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.http.javanet.NetHttpTransport;
@@ -30,12 +31,15 @@ public class UserController {
     private final JwtUtil jwtUtil;
     private final ExpiredTokenService expiredTokenService;
     private final Environment environment;
+    private final Mailgun mailgun;
 
-    public UserController(UserService userService, JwtUtil jwtUtil, ExpiredTokenService expiredTokenService, Environment environment) {
+    public UserController(UserService userService, JwtUtil jwtUtil,
+                          ExpiredTokenService expiredTokenService, Environment environment, Mailgun mailgun) {
         this.userService = userService;
         this.jwtUtil = jwtUtil;
         this.expiredTokenService = expiredTokenService;
         this.environment = environment;
+        this.mailgun = mailgun;
     }
 
 
@@ -431,7 +435,17 @@ public class UserController {
             return ResponseEntity.badRequest().body(new AuthResponse("Error fetching alerts: " + e.getMessage(), null, "internal server error"));
         }
 
+    }
 
+    @GetMapping("/send-mail-test")
+    public ResponseEntity<?> sendMailTest(@RequestParam(name = "to") String to,
+                                          @RequestParam(required = false, name = "subject") String subject, @RequestParam(name = "text") String text) {
+        try {
+            mailgun.sendSimpleMessage(to, subject, text);
+            return ResponseEntity.ok("Mail sent successfully!");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new AuthResponse("Error sending mail: " + e.getMessage(), null, "internal server error"));
+        }
     }
 
 }

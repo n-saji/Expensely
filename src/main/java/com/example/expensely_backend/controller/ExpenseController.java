@@ -172,7 +172,8 @@ public class ExpenseController {
                                     , 1, 1, "", null, null),
                             req_month,
                             budgetService.getBudgetsByUserId(userId),
-                            expenseService.getTotalExpenseForMonth(month == 1 ? year - 1 : year, month == 1 ? 12 : month
+                            expenseService.getTotalExpenseForMonth(month == 1 ? year - 1 : year,
+                                    month == 1 ? 12 : month - 1
                                     , userId)));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
