@@ -1,21 +1,26 @@
-version: '3.8'
+version: "3.8"
+
 services:
-  db:
-    image: postgres:15
-    environment:
-      POSTGRES_DB: expensely
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+  nginx:
+    image: nginx:alpine
+    container_name: expensely-nginx
     ports:
-      - "5432:5432"
-  app:
-    build: .
-    ports:
-      - "8080:8080"
-    environment:
-      DB_URL: jdbc:postgresql://db:5432/expensely
-      DB_USERNAME: postgres
-      DB_PASSWORD: postgres
-      JWT_SECRET: your-super-secret-key-which-is-32-characters
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
-      - db
+      - app
+    restart: unless-stopped
+
+  app:
+    image: nikhilsaji/expensely-app:latest
+    env_file:
+      - .env
+    expose:
+      - "8080"
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/health" ]
+      interval: 10s
+      timeout: 3s
+      retries: 3

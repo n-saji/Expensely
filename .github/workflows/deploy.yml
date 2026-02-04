@@ -47,15 +47,13 @@ jobs:
             DB_URL=${{ secrets.DB_URL }}
             FRONTEND_URL=${{ secrets.FRONTEND_URL }}            
             PORT=${{ secrets.PORT }}
+            MAILGUN_API_KEY=${{ secrets.MAILGUN_API_KEY }}
             EOF
 
-
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/expensely-app:latest
-            docker stop expensely-app || true
-            docker rm expensely-app || true
-            docker run -d \
-              --name expensely-app \
-              -p 8080:8080 \
-              --restart unless-stopped \
-              --env-file ~/app/.env \
-              ${{ secrets.DOCKERHUB_USERNAME }}/expensely-app:latest
+            docker-compose pull app
+            docker-compose up -d \
+              --no-deps \
+              --scale app=2 \
+              app
+            docker image prune -f
+            

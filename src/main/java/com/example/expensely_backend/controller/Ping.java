@@ -13,4 +13,9 @@ public class Ping {
         return ResponseEntity.ok("pong");
     }
 
+    @GetMapping("/health")
+    public ResponseEntity<String> health() {
+        return ResponseEntity.ok("ok");
+    }
+
 }

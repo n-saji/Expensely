@@ -5,7 +5,7 @@ HELP.md
 !**/src/test/**/build/
 .env
 .DS_Store
-
+scratch.ignore
 ### STS ###
 .apt_generated
 .classpath
