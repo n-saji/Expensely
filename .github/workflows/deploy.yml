@@ -1,4 +1,4 @@
-name: Build & Deploy Go App to EC2
+name: Expensely-Action-Deploy
 
 on:
   push:
@@ -13,13 +13,30 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Get Runner IP
+        id: ip
+        run: echo "ipv4=$(curl -s https://ifconfig.me)" >> $GITHUB_OUTPUT
+
+      - name: Whitelist Runner IP
+        run: |
+          aws ec2 authorize-security-group-ingress \
+            --group-id ${{ secrets.AWS_SG_ID }} \
+            --protocol tcp \
+            --port 22 \
+            --cidr ${{ steps.ip.outputs.ipv4 }}/32
 
       - name: Docker Hub Login
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
 
       - name: Build and Push Docker Image
         run: |
@@ -29,8 +46,6 @@ jobs:
           docker build -t $IMAGE:$TAG -t $IMAGE:latest .
           docker push $IMAGE:$TAG
           docker push $IMAGE:latest
-
-
 
       - name: SSH to EC2 and deploy
         uses: appleboy/ssh-action@v1.0.3
@@ -59,3 +74,12 @@ jobs:
               --restart unless-stopped \
               --env-file ~/app/.env \
               ${{ secrets.DOCKERHUB_USERNAME }}/expensely-app:latest
+
+      - name: Revoke Runner IP
+        if: always()
+        run: |
+          aws ec2 revoke-security-group-ingress \
+            --group-id ${{ secrets.AWS_SG_ID }} \
+            --protocol tcp \
+            --port 22 \
+            --cidr ${{ steps.ip.outputs.ipv4 }}/32
