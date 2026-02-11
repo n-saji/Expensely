@@ -466,9 +466,16 @@ public class ExpenseService {
 
         Map<String, Map<String, Double>> monthlyCategoryExpense = new LinkedHashMap<>();
 
-
+        List<Category> categories = categoryRepository.findByUserAndType(user, "expense");
         for (MonthlyCategoryExpense dto : dbRes) {
             String month = dto.getMonth().trim();
+            monthlyCategoryExpense.computeIfAbsent(month, k -> {
+                Map<String, Double> categoryMap = new LinkedHashMap<>();
+                for (Category cat : categories) {
+                    categoryMap.put(cat.getName(), 0.0);
+                }
+                return categoryMap;
+            });
 
             String category = dto.getCategoryName();
             Double amount = dto.getTotalAmount();
