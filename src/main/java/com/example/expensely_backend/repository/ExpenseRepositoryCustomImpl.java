@@ -150,7 +150,7 @@ public class ExpenseRepositoryCustomImpl {
         );
 
         query.groupBy(monthExpr);
-        query.orderBy(cb.desc(monthExpr));
+        query.orderBy(cb.asc(monthExpr));
 
         List<Tuple> results = em.createQuery(query).getResultList();
 
@@ -199,7 +199,7 @@ public class ExpenseRepositoryCustomImpl {
         );
 
         query.groupBy(monthExpr, category.get("name"));
-        query.orderBy(cb.desc(monthExpr));
+        query.orderBy(cb.asc(monthExpr));
         List<Tuple> results = em.createQuery(query).getResultList();
 
         List<MonthlyCategoryExpense> monthlyCategoryExpenses = new ArrayList<>();
