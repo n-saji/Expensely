@@ -4,7 +4,6 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -58,12 +57,13 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             return;
         }
         try {
-            String email = jwtUtil.GetStringFromToken(token);
-            if (email == null) {
-                throw new BadCredentialsException("Token expired or invalid");
+            String userId = jwtUtil.GetStringFromToken(token);
+            if (userId == null) {
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "User not found");
+                return;
             }
             UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(email, null, Collections.emptyList());
+                    new UsernamePasswordAuthenticationToken(userId, null, Collections.emptyList());
 
             authentication.setDetails(
                     new WebAuthenticationDetailsSource().buildDetails(request)

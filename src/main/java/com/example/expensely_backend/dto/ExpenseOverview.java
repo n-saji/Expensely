@@ -167,6 +167,7 @@ public class ExpenseOverview {
 
         for (Budget budget : budgetServiceMap) {
             budget.setUser(null);
+            budget.getCategory().setUser(null);
             this.budgetServiceMap.put(budget.getId().toString(), budget);
         }
 

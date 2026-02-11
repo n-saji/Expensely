@@ -1,13 +1,16 @@
 package com.example.expensely_backend.repository;
 
+import com.example.expensely_backend.dto.MonthlyCategoryExpense;
 import com.example.expensely_backend.model.Expense;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.Tuple;
 import jakarta.persistence.criteria.*;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.UUID;
 
@@ -115,6 +118,118 @@ public class ExpenseRepositoryCustomImpl {
 
         return em.createQuery(query).getSingleResult();
     }
+
+    public LinkedHashMap<String, Double> getMonthlyExpenseFromTillTo(
+            UUID userId,
+            LocalDateTime startDate,
+            LocalDateTime endDate) {
+
+        CriteriaBuilder cb = em.getCriteriaBuilder();
+        CriteriaQuery<Tuple> query = cb.createTupleQuery();
+        Root<Expense> expense = query.from(Expense.class);
+
+        Expression<LocalDateTime> monthExpr =
+                cb.function("date_trunc", LocalDateTime.class,
+                        cb.literal("month"),
+                        expense.get("expenseDate"));
+
+        Expression<String> formattedMonth =
+                cb.function("to_char", String.class,
+                        monthExpr,
+                        cb.literal("FMMon/YY"));
+
+        query.multiselect(
+                formattedMonth.alias("month"),
+                cb.sum(expense.get("amount")).alias("total")
+        );
+
+        query.where(
+                cb.equal(expense.get("user").get("id"), userId),
+                cb.greaterThanOrEqualTo(expense.get("expenseDate"), startDate),
+                cb.lessThan(expense.get("expenseDate"), endDate)
+        );
+
+        query.groupBy(monthExpr);
+        query.orderBy(cb.desc(monthExpr));
+
+        List<Tuple> results = em.createQuery(query).getResultList();
+
+        LinkedHashMap<String, Double> monthlyExpenses = new LinkedHashMap<>();
+        for (Tuple tuple : results) {
+            String month = tuple.get("month", String.class);
+            Number totalNumber = tuple.get("total", Number.class);
+            Double total = totalNumber != null ? totalNumber.doubleValue() : 0.0;
+            monthlyExpenses.put(month, total);
+        }
+
+        return monthlyExpenses;
+    }
+
+    public List<MonthlyCategoryExpense> getMonthlyCategoryExpenseFromTillTo(
+            UUID userId,
+            LocalDateTime startDate,
+            LocalDateTime endDate) {
+
+        CriteriaBuilder cb = em.getCriteriaBuilder();
+        CriteriaQuery<Tuple> query = cb.createTupleQuery();
+        Root<Expense> expense = query.from(Expense.class);
+        Join<Object, Object> category = expense.join("category", JoinType.LEFT);
+
+        Expression<LocalDateTime> monthExpr =
+                cb.function("date_trunc", LocalDateTime.class,
+                        cb.literal("month"),
+                        expense.get("expenseDate"));
+
+        Expression<String> formattedMonth =
+                cb.function("to_char", String.class,
+                        monthExpr,
+                        cb.literal("FMMon/YY"));
+
+        query.multiselect(
+                formattedMonth.alias("month"),
+                category.get("name").alias("category"),
+                cb.sum(expense.get("amount")).alias("total")
+        );
+
+
+        query.where(
+                cb.equal(expense.get("user").get("id"), userId),
+                cb.greaterThanOrEqualTo(expense.get("expenseDate"), startDate),
+                cb.lessThan(expense.get("expenseDate"), endDate)
+        );
+
+        query.groupBy(monthExpr, category.get("name"));
+        query.orderBy(cb.desc(monthExpr));
+        List<Tuple> results = em.createQuery(query).getResultList();
+
+        List<MonthlyCategoryExpense> monthlyCategoryExpenses = new ArrayList<>();
+        for (Tuple tuple : results) {
+            String month = tuple.get("month", String.class);
+            String categoryName = tuple.get("category", String.class);
+            Number totalNumber = tuple.get("total", Number.class);
+            Double total = totalNumber != null ? totalNumber.doubleValue() : 0.0;
+            monthlyCategoryExpenses.add(new MonthlyCategoryExpense() {
+                @Override
+                public String getMonth() {
+                    return month;
+                }
+
+                @Override
+                public String getCategoryName() {
+                    return categoryName;
+                }
+
+                @Override
+                public Double getTotalAmount() {
+                    return total;
+                }
+            });
+        }
+
+        return monthlyCategoryExpenses;
+    }
+
 }
+
 
 

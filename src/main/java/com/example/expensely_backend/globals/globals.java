@@ -8,4 +8,8 @@ public class globals {
     public enum MessageType {
         ALERT, INFO, ERROR, SUCCESS
     }
+
+    public enum TimeFrame {
+        MONTH, YEAR, ALL_TIME
+    }
 }

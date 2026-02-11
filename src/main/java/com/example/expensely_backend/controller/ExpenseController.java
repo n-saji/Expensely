@@ -5,6 +5,7 @@ import com.example.expensely_backend.dto.AuthResponse;
 import com.example.expensely_backend.dto.BulkValidationResponse;
 import com.example.expensely_backend.dto.ExpenseOverview;
 import com.example.expensely_backend.dto.UserRes;
+import com.example.expensely_backend.globals.globals;
 import com.example.expensely_backend.model.Expense;
 import com.example.expensely_backend.service.BudgetService;
 import com.example.expensely_backend.service.CategoryService;
@@ -12,11 +13,10 @@ import com.example.expensely_backend.service.ExpenseFilesService;
 import com.example.expensely_backend.service.ExpenseService;
 import com.example.expensely_backend.utils.FormatDate;
 import com.example.expensely_backend.utils.JwtUtil;
-import jakarta.servlet.http.Cookie;
-import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -244,20 +244,9 @@ public class ExpenseController {
     }
 
     @PostMapping(value = "/bulk_upload/validate", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<?> validateExcelFile(HttpServletRequest httpReq,
+    public ResponseEntity<?> validateExcelFile(Authentication authentication,
                                                @RequestParam("file") MultipartFile file) {
-        Cookie[] cookies = httpReq.getCookies();
-        String refreshToken = null;
-        for (Cookie cookie : cookies) {
-            if (cookie.getName().equals("refreshToken")) {
-                refreshToken = cookie.getValue();
-            }
-        }
-
-        if (refreshToken == null) {
-            return ResponseEntity.status(401).body("Refresh token missing");
-        }
-        String userId = jwtUtil.GetStringFromToken(refreshToken);
+        String userId = (String) authentication.getPrincipal();
         if (file == null || file.isEmpty()) {
             return ResponseEntity.badRequest().body("Please select a file to upload");
         }
@@ -276,18 +265,8 @@ public class ExpenseController {
     }
 
     @GetMapping("/bulk_upload/upload")
-    public ResponseEntity<?> uploadExpenseWithFileId(HttpServletRequest httpReq, @RequestParam("file_id") String fileId) {
-        Cookie[] cookies = httpReq.getCookies();
-        String refreshToken = null;
-        for (Cookie cookie : cookies) {
-            if (cookie.getName().equals("refreshToken")) {
-                refreshToken = cookie.getValue();
-            }
-        }
-        if (refreshToken == null) {
-            return ResponseEntity.status(401).body("Refresh token missing");
-        }
-        String userId = jwtUtil.GetStringFromToken(refreshToken);
+    public ResponseEntity<?> uploadExpenseWithFileId(Authentication authentication, @RequestParam("file_id") String fileId) {
+        String userId = (String) authentication.getPrincipal();
         if (fileId.isEmpty()) {
             return ResponseEntity.badRequest().body("Please select a file to upload");
         }
@@ -298,8 +277,39 @@ public class ExpenseController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
         }
+    }
 
+    @GetMapping("/monthly")
+    public ResponseEntity<?> getExpenseByMonthRange(Authentication authentication,
+                                                    @RequestParam(name = "count", defaultValue = "6") int count,
+                                                    @RequestParam(name = "type", defaultValue = "MONTH") globals.TimeFrame type
+    ) {
 
+        String userId = (String) authentication.getPrincipal();
+
+        try {
+            return ResponseEntity.ok(expenseService.getMonthlyExpenseFromTillTo(userId, count,
+                    type));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/monthly/category")
+    public ResponseEntity<?> getExpenseByMonthCategoryRange(Authentication authentication,
+                                                            @RequestParam(name = "count", defaultValue = "6") int count,
+                                                            @RequestParam(name = "type", defaultValue = "MONTH") globals.TimeFrame type
+    ) {
+
+        String userId = (String) authentication.getPrincipal();
+
+        try {
+            return ResponseEntity.ok(expenseService.getMonthlyCategoryExpenseFromTillTo(userId,
+                    count,
+                    type));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
+        }
     }
 
 }

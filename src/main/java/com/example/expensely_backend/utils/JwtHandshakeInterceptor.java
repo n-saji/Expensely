@@ -31,10 +31,9 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
 
             String userId = jwtService.getStringFromCookie(servletRequest.getServletRequest());
             if (userId == null) {
-                System.out.println("Invalid token or userid");
                 return false;
             }
-            System.out.println(userId);
+
             UUID userUUID = UUID.fromString(userId);
             attributes.put("userId", userUUID);
 

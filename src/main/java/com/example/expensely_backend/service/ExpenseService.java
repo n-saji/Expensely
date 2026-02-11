@@ -2,6 +2,7 @@ package com.example.expensely_backend.service;
 
 
 import com.example.expensely_backend.dto.*;
+import com.example.expensely_backend.globals.globals;
 import com.example.expensely_backend.model.Category;
 import com.example.expensely_backend.model.Expense;
 import com.example.expensely_backend.model.ExpenseFiles;
@@ -18,8 +19,10 @@ import java.io.StringWriter;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -353,5 +356,133 @@ public class ExpenseService {
         return expenseRepository.getTotalExpenseByUserId(userIdUUID, startDate, endDate);
 
     }
+
+    public LinkedHashMap<String, Double> getMonthlyExpenseFromTillTo(String userId, int count,
+                                                                     globals.TimeFrame type) {
+        User user = userService.GetActiveUserById(userId);
+        if (user == null) {
+            throw new IllegalArgumentException("User not found");
+        }
+        // checks
+        if (type == null) {
+            throw new IllegalArgumentException("Type not allowed to be null");
+        }
+        if (count < 1) {
+            throw new IllegalArgumentException("Count must be greater than 0");
+        }
+        if (type == globals.TimeFrame.MONTH && count > 12) {
+            throw new IllegalArgumentException("Count must be less than or equal to 12 for MONTH type");
+        }
+
+        LocalDateTime date = LocalDateTime.now(ZoneOffset.UTC);
+        LocalDateTime startDate, endDate;
+        switch (type) {
+            case YEAR -> startDate = LocalDateTime.of(date.getYear() - count, date.getMonth(),
+                    1, 0
+                    , 0,
+                    0);
+            case ALL_TIME -> startDate = date.minusYears(count - 1)
+                    .withMonth(1)
+                    .withDayOfMonth(1)
+                    .withHour(0)
+                    .withMinute(0)
+                    .withSecond(0)
+                    .withNano(0);
+
+            case MONTH -> {
+
+                startDate = date.minusMonths(count - 1)
+                        .withDayOfMonth(1)
+                        .withHour(0)
+                        .withMinute(0)
+                        .withSecond(0)
+                        .withNano(0);
+
+            }
+            default -> throw new IllegalArgumentException("Invalid time frame type");
+        }
+        YearMonth date_ym = YearMonth.of(date.getYear(), date.getMonth());
+        endDate = LocalDateTime.of(date.getYear(), date.getMonth(), date_ym.lengthOfMonth(), 23, 59
+                , 59);
+
+        return
+                expenseRepositoryCustomImpl.getMonthlyExpenseFromTillTo(user.getId(),
+                        startDate,
+                        endDate);
+    }
+
+    public Map<String, Map<String, Double>> getMonthlyCategoryExpenseFromTillTo(String userId, int count,
+                                                                                globals.TimeFrame type) {
+        User user = userService.GetActiveUserById(userId);
+        if (user == null) {
+            throw new IllegalArgumentException("User not found");
+        }
+        // checks
+        if (type == null) {
+            throw new IllegalArgumentException("Type not allowed to be null");
+        }
+        if (count < 1) {
+            throw new IllegalArgumentException("Count must be greater than 0");
+        }
+        if (type == globals.TimeFrame.MONTH && count > 12) {
+            throw new IllegalArgumentException("Count must be less than or equal to 12 for MONTH type");
+        }
+
+        LocalDateTime date = LocalDateTime.now(ZoneOffset.UTC);
+        LocalDateTime startDate, endDate;
+        switch (type) {
+            case YEAR -> startDate = LocalDateTime.of(date.getYear() - count, date.getMonth(),
+                    1, 0
+                    , 0,
+                    0);
+            case ALL_TIME -> startDate = date.minusYears(count - 1)
+                    .withMonth(1)
+                    .withDayOfMonth(1)
+                    .withHour(0)
+                    .withMinute(0)
+                    .withSecond(0)
+                    .withNano(0);
+
+            case MONTH -> {
+
+                startDate = date.minusMonths(count - 1)
+                        .withDayOfMonth(1)
+                        .withHour(0)
+                        .withMinute(0)
+                        .withSecond(0)
+                        .withNano(0);
+
+            }
+            default -> throw new IllegalArgumentException("Invalid time frame type");
+        }
+        YearMonth date_ym = YearMonth.of(date.getYear(), date.getMonth());
+        endDate = LocalDateTime.of(date.getYear(), date.getMonth(), date_ym.lengthOfMonth(), 23, 59
+                , 59);
+
+        List<MonthlyCategoryExpense> dbRes =
+                expenseRepositoryCustomImpl.getMonthlyCategoryExpenseFromTillTo(user.getId(),
+                        startDate,
+                        endDate);
+
+        Map<String, Map<String, Double>> monthlyCategoryExpense = new LinkedHashMap<>();
+
+
+        for (MonthlyCategoryExpense dto : dbRes) {
+            String month = dto.getMonth().trim();
+
+            String category = dto.getCategoryName();
+            Double amount = dto.getTotalAmount();
+
+            if (category != null) {
+                monthlyCategoryExpense
+                        .computeIfAbsent(month, k -> new LinkedHashMap<>())
+                        .merge(category, amount, Double::sum);
+
+            }
+        }
+
+        return monthlyCategoryExpense;
+    }
+
 
 }
