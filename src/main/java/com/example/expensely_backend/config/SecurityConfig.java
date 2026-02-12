@@ -44,8 +44,6 @@ public class SecurityConfig {
                                 .requestMatchers("/api/users/register", "/api/users/login",
                                         "/ping", "/api/users/verify-oauth-login", "/api/users" +
                                                 "/refresh", "/ws/**").permitAll() // Allow public
-                                // access
-                                // to registration and login
                                 .anyRequest().authenticated() // All other requests require authentication
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
