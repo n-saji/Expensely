@@ -56,13 +56,13 @@ jobs:
           script: |
             mkdir -p ~/app
             cat << EOF > ~/app/.env
-            ALLOWED_ORIGINS="${{ secrets.ALLOWED_ORIGINS }}"
-            JWT_SECRET="${{ secrets.JWT_SECRET }}"
-            GOOGLE_CLIENT_ID="${{ secrets.GOOGLE_CLIENT_ID }}"
-            DB_URL="${{ secrets.DB_URL }}"
-            FRONTEND_URL="${{ secrets.FRONTEND_URL }}"
+            ALLOWED_ORIGINS=${{ secrets.ALLOWED_ORIGINS }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+            DB_URL=${{ secrets.DB_URL }}
+            FRONTEND_URL=${{ secrets.FRONTEND_URL }}
             PORT=${{ secrets.PORT }}
-            MAILGUN_API_KEY="${{ secrets.MAILGUN_API_KEY }}"
+            MAILGUN_API_KEY=${{ secrets.MAILGUN_API_KEY }}
             EOF
 
 
