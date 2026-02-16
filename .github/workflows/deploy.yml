@@ -62,6 +62,7 @@ jobs:
             DB_URL="${{ secrets.DB_URL }}"
             FRONTEND_URL="${{ secrets.FRONTEND_URL }}"
             PORT=${{ secrets.PORT }}
+            MAILGUN_API_KEY="${{ secrets.MAILGUN_API_KEY }}"
             EOF
 
 
