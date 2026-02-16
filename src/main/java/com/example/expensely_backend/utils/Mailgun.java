@@ -16,20 +16,16 @@ public class Mailgun {
         String from = "Expensely <notifications@" + domain + ">";
 
         if (apiKey == null || apiKey.isEmpty()) {
-            System.out.println("Mailgun API key is not set.");
-            return;
+            throw new IllegalStateException("Mailgun API key is not set in environment variables.");
         }
         if (to == null || to.isEmpty()) {
-            System.out.println("Recipient email is not set.");
-            return;
+            throw new IllegalArgumentException("Recipient email address is required.");
         }
         if (subject == null) {
-            System.out.println("Email subject is not set.");
-            return;
+            throw new IllegalArgumentException("Email subject is required.");
         }
         if (text == null) {
-            System.out.println("Email text is not set.");
-            return;
+            throw new IllegalArgumentException("Email text is required.");
         }
 
 
@@ -57,16 +53,18 @@ public class Mailgun {
             os.close();
 
             int responseCode = conn.getResponseCode();
-            System.out.println("Response Code: " + responseCode);
+
             if (responseCode == 200) {
                 System.out.println("Email sent successfully!");
             } else {
                 System.out.println("Failed to send email.");
                 System.out.println("Response Message: " + conn.getResponseMessage());
+                throw new RuntimeException("Failed to send email." + " Response Code: " + responseCode);
             }
 
         } catch (Exception e) {
             System.out.println("Error sending email: " + e.getMessage());
+            throw new RuntimeException("Error sending email: " + e.getMessage(), e);
         }
 
     }
