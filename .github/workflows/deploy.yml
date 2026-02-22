@@ -145,7 +145,6 @@ jobs:
                 nginx:alpine
             else
               echo "Reloading Nginx proxy with new target..."
-              docker cp ~/app/nginx.conf expensely-proxy:/etc/nginx/nginx.conf
               docker exec expensely-proxy nginx -s reload
             fi
 
