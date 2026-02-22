@@ -90,14 +90,13 @@ jobs:
               --env-file ~/app/.env \
               $IMAGE
 
-            # 5. Wait for the new app to initialize (adjust this sleep time based on your app's boot time)
+            # 5. Wait for the new app to initialize 
             echo "Waiting for the new container ($NEXT) to become healthy on port $NEXT_PORT..."
             MAX_RETRIES=30
             RETRY_COUNT=0
             HEALTH_URL="http://localhost:$NEXT_PORT/ping"
 
             while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-              # Curl the ping endpoint, grab only the HTTP status code
               STATUS=$(curl -s -o /dev/null -w "%{http_code}" $HEALTH_URL || echo "000")
             
               if [ "$STATUS" = "200" ]; then
@@ -119,8 +118,7 @@ jobs:
               exit 1 # Fail the GitHub Action workflow
             fi
 
-            # 6. Set up the Nginx configuration
-            # Note: \$ is used to prevent the bash script from evaluating Nginx variables early
+            # 6. Set up the Nginx configuration            
             cat << EOF > ~/app/nginx.conf
             events {}
             http {
@@ -135,14 +133,6 @@ jobs:
                 }
             }
             EOF
-
-            # Handle ONE-TIME transition: If your old direct-port container is still running, 
-            # we must kill it so Nginx can bind to port 8080.
-            if docker ps -a --format '{{.Names}}' | grep -Eq "^expensely-app\$"; then
-               echo "Removing legacy container to free up port 8080 for Nginx..."
-               docker stop expensely-app || true
-               docker rm expensely-app || true
-            fi
 
             # 7. Start or Reload Nginx Proxy
             if ! docker ps --format '{{.Names}}' | grep -Eq "^expensely-proxy\$"; then
@@ -166,7 +156,7 @@ jobs:
               docker rm expensely-app-$CURRENT
             fi
             
-            echo "Zero-downtime deployment complete!"
+            echo "Deployement Complete!"
 
       - name: Revoke Runner IP
         if: always()
