@@ -155,6 +155,10 @@ jobs:
               docker rm expensely-app-$CURRENT
             fi
             
+            # 9. Clean up old images to save space
+            echo "Cleaning up unused Docker images..."
+            docker image prune -af
+            
             echo "Deployement Complete!"
 
       - name: Revoke Runner IP
