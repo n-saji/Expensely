@@ -66,15 +66,107 @@ jobs:
             EOF
 
 
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/expensely-app:latest
-            docker stop expensely-app || true
-            docker rm expensely-app || true
+            IMAGE="${{ secrets.DOCKERHUB_USERNAME }}/expensely-app:latest"
+            docker pull $IMAGE
+
+            # 3. Determine active environment (Blue or Green)
+            if docker ps --format '{{.Names}}' | grep -Eq "^expensely-app-blue\$"; then
+              CURRENT="blue"
+              NEXT="green"
+              NEXT_PORT=8082
+            else
+              CURRENT="green"
+              NEXT="blue"
+              NEXT_PORT=8081
+            fi
+
+            echo "Deploying to $NEXT container on port $NEXT_PORT..."
+
+            # 4. Start the new container on the alternate port
             docker run -d \
-              --name expensely-app \
-              -p 8080:8080 \
+              --name expensely-app-$NEXT \
+              -p $NEXT_PORT:8080 \
               --restart unless-stopped \
               --env-file ~/app/.env \
-              ${{ secrets.DOCKERHUB_USERNAME }}/expensely-app:latest
+              $IMAGE
+
+            # 5. Wait for the new app to initialize (adjust this sleep time based on your app's boot time)
+            echo "Waiting for the new container ($NEXT) to become healthy on port $NEXT_PORT..."
+            MAX_RETRIES=30
+            RETRY_COUNT=0
+            HEALTH_URL="http://localhost:$NEXT_PORT/ping"
+
+            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+              # Curl the ping endpoint, grab only the HTTP status code
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" $HEALTH_URL || echo "000")
+            
+              if [ "$STATUS" = "200" ]; then
+                echo "Container is healthy! Proceeding with traffic switch..."
+                break
+              fi
+            
+              echo "Health check returned status $STATUS. Retrying in 2 seconds... ($((RETRY_COUNT+1))/$MAX_RETRIES)"
+              sleep 2
+              RETRY_COUNT=$((RETRY_COUNT+1))
+            done
+
+            # Abort if the container never became healthy
+            if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+              echo "Error: New container failed to become healthy in time."
+              echo "Rolling back: Stopping and removing unhealthy $NEXT container..."
+              docker stop expensely-app-$NEXT || true
+              docker rm expensely-app-$NEXT || true
+              exit 1 # Fail the GitHub Action workflow
+            fi
+
+            # 6. Set up the Nginx configuration
+            # Note: \$ is used to prevent the bash script from evaluating Nginx variables early
+            cat << EOF > ~/app/nginx.conf
+            events {}
+            http {
+                server {
+                    listen 8080;
+                    location / {
+                        proxy_pass http://host.docker.internal:$NEXT_PORT;
+                        proxy_set_header Host \$host;
+                        proxy_set_header X-Real-IP \$remote_addr;
+                        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                    }
+                }
+            }
+            EOF
+
+            # Handle ONE-TIME transition: If your old direct-port container is still running, 
+            # we must kill it so Nginx can bind to port 8080.
+            if docker ps -a --format '{{.Names}}' | grep -Eq "^expensely-app\$"; then
+               echo "Removing legacy container to free up port 8080 for Nginx..."
+               docker stop expensely-app || true
+               docker rm expensely-app || true
+            fi
+
+            # 7. Start or Reload Nginx Proxy
+            if ! docker ps --format '{{.Names}}' | grep -Eq "^expensely-proxy\$"; then
+              echo "Starting Nginx proxy..."
+              docker run -d --name expensely-proxy \
+                -p 8080:8080 \
+                -v ~/app/nginx.conf:/etc/nginx/nginx.conf:ro \
+                --add-host host.docker.internal:host-gateway \
+                --restart unless-stopped \
+                nginx:alpine
+            else
+              echo "Reloading Nginx proxy with new target..."
+              docker cp ~/app/nginx.conf expensely-proxy:/etc/nginx/nginx.conf
+              docker exec expensely-proxy nginx -s reload
+            fi
+
+            # 8. Safely shut down the old container
+            if docker ps -a --format '{{.Names}}' | grep -Eq "^expensely-app-$CURRENT\$"; then
+              echo "Stopping and removing old container ($CURRENT)..."
+              docker stop expensely-app-$CURRENT
+              docker rm expensely-app-$CURRENT
+            fi
+            
+            echo "Zero-downtime deployment complete!"
 
       - name: Revoke Runner IP
         if: always()
