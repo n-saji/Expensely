@@ -54,26 +54,12 @@ public class RecurringExpenseService {
 		recurringExpense.setActive(true);
 		recurringExpense.setDate(recExpenseDTO.getDate());
 		LocalDate localDate = recExpenseDTO.getDate();
-		switch (recExpenseDTO.getRecurrence()) {
-			case DAILY ->
-					recurringExpense.setNextOccurrence(localDate.plusDays(1));
-			case WEEKLY ->
-					recurringExpense.setNextOccurrence(localDate.plusWeeks(1));
-			case MONTHLY ->
-					recurringExpense.setNextOccurrence(localDate.plusMonths(1));
-			case YEARLY ->
-					recurringExpense.setNextOccurrence(localDate.plusYears(1));
-			default ->
-					throw new IllegalArgumentException("Invalid recurrence type");
+
+		if (localDate.isBefore(LocalDate.now())) {
+			throw new IllegalArgumentException("Date cannot be in the past");
 		}
-		try {
-			recurringExpenseRepository.save(recurringExpense);
-		} catch (Exception e) {
-			throw new RuntimeException("Failed to create recurring expense: " + e.getMessage());
-		}
-		System.out.println("Recurring expense created with date: " + recurringExpense.getDate() + " and next occurrence: " + recurringExpense.getNextOccurrence() + "," + LocalDate.now());
+
 		if (recurringExpense.getDate().isEqual(LocalDate.now())) {
-			System.out.println("Creating initial expense for recurring expense with date: " + recurringExpense.getDate());
 			try {
 				Expense expense = new Expense();
 				expense.setUser(usr);
@@ -85,6 +71,27 @@ public class RecurringExpenseService {
 			} catch (Exception e) {
 				throw new RuntimeException("Failed to create initial expense for recurring expense: " + e.getMessage());
 			}
+
+			switch (recExpenseDTO.getRecurrence()) {
+				case DAILY ->
+						recurringExpense.setNextOccurrence(localDate.plusDays(1));
+				case WEEKLY ->
+						recurringExpense.setNextOccurrence(localDate.plusWeeks(1));
+				case MONTHLY ->
+						recurringExpense.setNextOccurrence(localDate.plusMonths(1));
+				case YEARLY ->
+						recurringExpense.setNextOccurrence(localDate.plusYears(1));
+				default ->
+						throw new IllegalArgumentException("Invalid recurrence type");
+			}
+		} else {
+			recurringExpense.setNextOccurrence(localDate);
+		}
+
+		try {
+			recurringExpenseRepository.save(recurringExpense);
+		} catch (Exception e) {
+			throw new RuntimeException("Failed to create recurring expense: " + e.getMessage());
 		}
 	}
 
@@ -128,23 +135,41 @@ public class RecurringExpenseService {
 		if (recExpenseDTO.getDescription() != null) {
 			existingExpense.setDescription(recExpenseDTO.getDescription());
 		}
-		if (recExpenseDTO.getDate() != null) {
-			existingExpense.setDate(recExpenseDTO.getDate());
-		}
-		if (recExpenseDTO.getRecurrence() != null) {
-			existingExpense.setRecurrence(recExpenseDTO.getRecurrence());
 
-			switch (recExpenseDTO.getRecurrence()) {
-				case DAILY ->
-						existingExpense.setNextOccurrence(existingExpense.getDate().plusDays(1));
-				case WEEKLY ->
-						existingExpense.setNextOccurrence(existingExpense.getDate().plusWeeks(1));
-				case MONTHLY ->
-						existingExpense.setNextOccurrence(existingExpense.getDate().plusMonths(1));
-				case YEARLY ->
-						existingExpense.setNextOccurrence(existingExpense.getDate().plusYears(1));
-				default ->
-						throw new IllegalArgumentException("Invalid recurrence type");
+		if (recExpenseDTO.getDate() != null && !recExpenseDTO.getDate().isEqual(existingExpense.getDate())) {
+			if (recExpenseDTO.getDate().isBefore(LocalDate.now())) {
+				throw new IllegalArgumentException("Date cannot be in the past");
+			}
+			existingExpense.setDate(recExpenseDTO.getDate());
+
+			if (existingExpense.getDate().isEqual(LocalDate.now())) {
+				try {
+					Expense expense = new Expense();
+					expense.setUser(existingExpense.getUser());
+					expense.setCategory(existingExpense.getCategory());
+					expense.setAmount(existingExpense.getAmount());
+					expense.setDescription(existingExpense.getDescription());
+					expense.setExpenseDate(LocalDateTime.now());
+					expenseRepository.save(expense);
+				} catch (Exception e) {
+					throw new RuntimeException("Failed to create initial expense for recurring expense: " + e.getMessage());
+				}
+
+
+				switch (recExpenseDTO.getRecurrence()) {
+					case DAILY ->
+							existingExpense.setNextOccurrence(existingExpense.getDate().plusDays(1));
+					case WEEKLY ->
+							existingExpense.setNextOccurrence(existingExpense.getDate().plusWeeks(1));
+					case MONTHLY ->
+							existingExpense.setNextOccurrence(existingExpense.getDate().plusMonths(1));
+					case YEARLY ->
+							existingExpense.setNextOccurrence(existingExpense.getDate().plusYears(1));
+					default ->
+							throw new IllegalArgumentException("Invalid recurrence type");
+				}
+			} else {
+				existingExpense.setNextOccurrence(recExpenseDTO.getDate());
 			}
 		}
 		try {
