@@ -12,4 +12,8 @@ public class globals {
     public enum TimeFrame {
         MONTH, YEAR, ALL_TIME
     }
+
+    public enum Recurrence {
+        DAILY, WEEKLY, MONTHLY, YEARLY
+    }
 }
