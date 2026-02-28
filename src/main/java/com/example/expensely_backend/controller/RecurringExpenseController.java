@@ -16,7 +16,7 @@ public class RecurringExpenseController {
 		this.recurringExpenseService = recurringExpenseService;
 	}
 
-	@GetMapping()
+	@GetMapping("/fetch-all")
 	public ResponseEntity<?> getRecurringExpensesForUser(Authentication authentication) {
 		String userId = (String) authentication.getPrincipal();
 		if (userId == null) {
