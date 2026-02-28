@@ -21,6 +21,8 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.DateTimeException;
+import java.time.ZoneId;
 import java.util.Collections;
 import java.util.Map;
 
@@ -171,6 +173,10 @@ public class UserController {
             if (user.getCountry_code() != null)
                 existingUser.setCountry_code(user.getCountry_code());
             if (user.isProfileComplete()) existingUser.setProfileComplete(true);
+            if (user.getTimeZone() != null && !user.getTimeZone().isBlank()) {
+                ResponseEntity<?> tzError = applyTimeZone(user.getTimeZone(), existingUser);
+                if (tzError != null) return tzError;
+            }
             // Add other fields as necessary
 
             userService.UpdateUser(existingUser);
@@ -194,6 +200,10 @@ public class UserController {
             if (user.getCurrency() != null) existingUser.setCurrency(user.getCurrency());
             if (user.getIsActive() != null) existingUser.setIsActive(user.getIsActive());
             if (user.getIsAdmin() != null) existingUser.setIsAdmin(user.getIsAdmin());
+            if (user.getTimeZone() != null && !user.getTimeZone().isBlank()) {
+                ResponseEntity<?> tzError = applyTimeZone(user.getTimeZone(), existingUser);
+                if (tzError != null) return tzError;
+            }
 
             userService.UpdateUser(existingUser);
             return ResponseEntity.ok(new UserRes(existingUser, null));
@@ -445,6 +455,16 @@ public class UserController {
             return ResponseEntity.ok("Mail sent successfully!");
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new AuthResponse("Error sending mail: " + e.getMessage(), null, "internal server error"));
+        }
+    }
+
+    private ResponseEntity<?> applyTimeZone(String timeZone, User user) {
+        try {
+            ZoneId.of(timeZone);
+            user.setTimeZone(timeZone);
+            return null;
+        } catch (DateTimeException e) {
+            return ResponseEntity.badRequest().body(new UserRes(null, "Invalid timezone: " + timeZone));
         }
     }
 

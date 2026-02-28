@@ -7,10 +7,12 @@ import com.example.expensely_backend.dto.ExpenseOverview;
 import com.example.expensely_backend.dto.UserRes;
 import com.example.expensely_backend.globals.globals;
 import com.example.expensely_backend.model.Expense;
+import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.service.BudgetService;
 import com.example.expensely_backend.service.CategoryService;
 import com.example.expensely_backend.service.ExpenseFilesService;
 import com.example.expensely_backend.service.ExpenseService;
+import com.example.expensely_backend.service.UserService;
 import com.example.expensely_backend.utils.FormatDate;
 import com.example.expensely_backend.utils.JwtUtil;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -21,8 +23,10 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.charset.StandardCharsets;
+import java.time.DateTimeException;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.util.List;
 
 @RestController
@@ -34,14 +38,17 @@ public class ExpenseController {
     private final BudgetService budgetService;
     private final JwtUtil jwtUtil;
     private final ExpenseFilesService expenseFilesService;
+    private final UserService userService;
 
     public ExpenseController(ExpenseService expenseService, CategoryService categoryService,
-                             BudgetService budgetService, JwtUtil jwtUtil, ExpenseFilesService expenseFilesService) {
+                             BudgetService budgetService, JwtUtil jwtUtil, ExpenseFilesService expenseFilesService,
+                             UserService userService) {
         this.expenseService = expenseService;
         this.categoryService = categoryService;
         this.budgetService = budgetService;
         this.jwtUtil = jwtUtil;
         this.expenseFilesService = expenseFilesService;
+        this.userService = userService;
     }
 
     @PostMapping("/create")
@@ -49,7 +56,16 @@ public class ExpenseController {
         // Logic to create an expense
         try {
             if (expense.getExpenseDate() == null) {
-                expense.setExpenseDate(LocalDateTime.now());
+                ZoneId zone = ZoneId.systemDefault();
+                try {
+                    if (expense.getUser() != null && expense.getUser().getId() != null) {
+                        User usr = userService.GetUserById(expense.getUser().getId().toString());
+                        if (usr.getTimeZone() != null && !usr.getTimeZone().isBlank()) {
+                            try { zone = ZoneId.of(usr.getTimeZone()); } catch (DateTimeException ignore) { }
+                        }
+                    }
+                } catch (Exception ignore) { }
+                expense.setExpenseDate(LocalDateTime.now(zone));
             }
             expenseService.save(expense);
             return ResponseEntity.ok(new AuthResponse("Expense created successfully!", null, ""));

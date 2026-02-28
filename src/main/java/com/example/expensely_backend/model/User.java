@@ -85,4 +85,9 @@ public class User {
     @Getter
     @Setter
     private boolean isProfileComplete = false;
+
+    @Column(nullable = false, columnDefinition = "varchar(255) default 'UTC'")
+    @Getter
+    @Setter
+    private String timeZone = "UTC";
 }
