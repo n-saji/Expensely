@@ -7,10 +7,7 @@ import com.example.expensely_backend.dto.ExpenseOverview;
 import com.example.expensely_backend.dto.UserRes;
 import com.example.expensely_backend.globals.globals;
 import com.example.expensely_backend.model.Expense;
-import com.example.expensely_backend.service.BudgetService;
-import com.example.expensely_backend.service.CategoryService;
-import com.example.expensely_backend.service.ExpenseFilesService;
-import com.example.expensely_backend.service.ExpenseService;
+import com.example.expensely_backend.service.*;
 import com.example.expensely_backend.utils.FormatDate;
 import com.example.expensely_backend.utils.JwtUtil;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -34,14 +31,17 @@ public class ExpenseController {
 	private final BudgetService budgetService;
 	private final JwtUtil jwtUtil;
 	private final ExpenseFilesService expenseFilesService;
+	private final RecurringExpenseService recurringExpenseService;
 
 	public ExpenseController(ExpenseService expenseService, CategoryService categoryService,
-	                         BudgetService budgetService, JwtUtil jwtUtil, ExpenseFilesService expenseFilesService) {
+	                         BudgetService budgetService, JwtUtil jwtUtil,
+	                         ExpenseFilesService expenseFilesService, RecurringExpenseService recurringExpenseService) {
 		this.expenseService = expenseService;
 		this.categoryService = categoryService;
 		this.budgetService = budgetService;
 		this.jwtUtil = jwtUtil;
 		this.expenseFilesService = expenseFilesService;
+		this.recurringExpenseService = recurringExpenseService;
 	}
 
 	@PostMapping("/create")
@@ -174,7 +174,8 @@ public class ExpenseController {
 							budgetService.getBudgetsByUserId(userId),
 							expenseService.getTotalExpenseForMonth(month == 1 ? year - 1 : year,
 									month == 1 ? 12 : month - 1
-									, userId)));
+									, userId),
+							recurringExpenseService.findRecurringExpenseByUserId(userId)));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
 		}
