@@ -100,6 +100,28 @@ public class IncomeService {
 		}
 	}
 
+	public void deleteByUserIDAndIncomeIds(String userId, List<Income> incomes) {
+		User user = userService.GetActiveUserById(userId);
+		if (user == null) {
+			throw new IllegalArgumentException("User not found");
+		}
+
+		for (int i = 0; i < incomes.size(); i++) {
+			if (incomes.get(i).getId() == null) {
+				throw new IllegalArgumentException("Income ID must be provided");
+			}
+			incomes.set(i, getIncomeById(incomes.get(i).getId().toString()));
+		}
+
+		for (Income income : incomes) {
+			if (!income.getUser().getId().equals(user.getId())) {
+				throw new IllegalArgumentException("Income does not belong to user");
+			}
+		}
+
+		incomeRepository.deleteAll(incomes);
+	}
+
 	public List<Income> getIncomesByUserId(String userId) {
 		User user = userService.GetActiveUserById(userId);
 		if (user == null) {

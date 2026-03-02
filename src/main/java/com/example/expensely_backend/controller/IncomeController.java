@@ -256,4 +256,18 @@ public class IncomeController {
 			return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
 		}
 	}
+
+	@PostMapping("/bulk-delete")
+	public ResponseEntity<?> bulkDeleteIncomes(Authentication authentication, @RequestBody List<Income> incomes) {
+		String userId = (String) authentication.getPrincipal();
+		if (userId == null) {
+			return ResponseEntity.status(401).body("Unauthorized");
+		}
+		try {
+			incomeService.deleteByUserIDAndIncomeIds(userId, incomes);
+			return ResponseEntity.ok(new AuthResponse("Bulk delete incomes successfully!", null, ""));
+		} catch (Exception e) {
+			return ResponseEntity.badRequest().body(new AuthResponse("Bulk delete incomes failed!", null, e.getMessage()));
+		}
+	}
 }
