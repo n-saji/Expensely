@@ -23,16 +23,19 @@ public class UserService {
 	private final BudgetRepository budgetRepository;
 	private final CategoryRepository categoryRepository;
 	private final ExpenseRepository expenseRepository;
+	private final IncomeRepository incomeRepository;
 
 
 	public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, ExpiredTokenRepository expiredTokenRepository,
-	                   BudgetRepository budgetRepository, CategoryRepository categoryRepository, ExpenseRepository expenseRepository) {
+	                   BudgetRepository budgetRepository, CategoryRepository categoryRepository, ExpenseRepository expenseRepository,
+	                   IncomeRepository incomeRepository) {
 		this.userRepository = userRepository;
 		this.passwordEncoder = passwordEncoder;
 		this.expiredTokenRepository = expiredTokenRepository;
 		this.budgetRepository = budgetRepository;
 		this.categoryRepository = categoryRepository;
 		this.expenseRepository = expenseRepository;
+		this.incomeRepository = incomeRepository;
 	}
 
 
@@ -149,6 +152,7 @@ public class UserService {
 			expiredTokenRepository.deleteAllByUserId(user.getId());
 			budgetRepository.deleteAllByUserId(user.getId());
 			expenseRepository.deleteAllByUserId(user.getId());
+			incomeRepository.deleteAllByUserId(user.getId());
 			categoryRepository.deleteByUserId(user.getId());
 			userRepository.delete(user);
 		} catch (Exception e) {

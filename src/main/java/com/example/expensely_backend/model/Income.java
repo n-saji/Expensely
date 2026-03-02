@@ -1,0 +1,49 @@
+package com.example.expensely_backend.model;
+
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+@Entity
+@Table(
+		name = "incomes",
+		indexes = {
+				@Index(name = "idx_income_date_user_id", columnList = "user_id,income_date")
+		}
+)
+public class Income {
+	@Id
+	@GeneratedValue(strategy = GenerationType.UUID)
+	@Getter
+	@Setter
+	private UUID id;
+
+	@ManyToOne
+	@Getter
+	@Setter
+	private User user;
+
+	@ManyToOne
+	@Getter
+	@Setter
+	private Category category;
+
+	@Column(nullable = false)
+	@Getter
+	@Setter
+	private BigDecimal amount;
+
+	@Getter
+	@Setter
+	private String description;
+
+	@Column(name = "income_date")
+	@Getter
+	@Setter
+	private LocalDateTime incomeDate;
+}
+
