@@ -219,4 +219,41 @@ public class IncomeController {
 			return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
 		}
 	}
+
+	@GetMapping("/fetch-with-conditions")
+	public ResponseEntity<?> fetchWithConditions(Authentication authentication,
+	                                             @RequestParam(value = "start_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startDate,
+	                                             @RequestParam(value = "end_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate,
+	                                             @RequestParam(value = "order", required = false, defaultValue = "desc") String order,
+	                                             @RequestParam(value = "category_id", required = false) String categoryId,
+	                                             @RequestParam(value = "page", required = false, defaultValue = "1") int page,
+	                                             @RequestParam(value = "limit", required = false, defaultValue = "10") int limit,
+	                                             @RequestParam(value = "q", required = false) String q,
+	                                             @RequestParam(value = "sort_by", required = false) String customSortBy,
+	                                             @RequestParam(value = "sort_order", required = false) String customSortOrder) {
+
+		String userId = (String) authentication.getPrincipal();
+		if (userId == null) {
+			return ResponseEntity.status(401).body("Unauthorized");
+		}
+
+		startDate = FormatDate.formatStartDate(startDate, false);
+		endDate = FormatDate.formatEndDate(endDate);
+		if (q == null) q = "";
+		if (order != null && !order.equals("asc") && !order.equals("desc")) {
+			return ResponseEntity.badRequest().body(new UserRes(null, "Error: Order must be 'asc' or 'desc'"));
+		}
+		if (customSortBy != null) {
+			if (!customSortBy.equals("amount") && !customSortBy.equals("incomeDate") &&
+					!customSortBy.equals("description") && !customSortBy.equals("category")) {
+				return ResponseEntity.badRequest().body(new UserRes(null, "Error: Invalid sort column"));
+			}
+		}
+		try {
+			return ResponseEntity.ok(incomeService.fetchIncomesWithConditions(userId, startDate
+					, endDate, order, categoryId, page, limit, q, customSortBy, customSortOrder));
+		} catch (Exception e) {
+			return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
+		}
+	}
 }

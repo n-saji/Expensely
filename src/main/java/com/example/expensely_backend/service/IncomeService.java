@@ -1,6 +1,7 @@
 package com.example.expensely_backend.service;
 
 import com.example.expensely_backend.dto.DailyIncome;
+import com.example.expensely_backend.dto.IncomeResList;
 import com.example.expensely_backend.dto.IncomeResponse;
 import com.example.expensely_backend.dto.MonthlyCategoryIncome;
 import com.example.expensely_backend.globals.globals;
@@ -318,5 +319,42 @@ public class IncomeService {
 		}
 		return incomeRepository.findFirstByUserIdOrderByIncomeDateAsc(user.getId());
 	}
-}
 
+	public IncomeResList fetchIncomesWithConditions(String userId, LocalDateTime startDate,
+	                                                LocalDateTime endDate, String order,
+	                                                String categoryId, int page, int limit,
+	                                                String q, String customSortBy, String customSortOrder) {
+		long totalPages, totalElements = 0;
+		User user = userService.GetActiveUserById(userId);
+		if (user == null) {
+			throw new IllegalArgumentException("User not found");
+		}
+		if (page < 1) {
+			throw new IllegalArgumentException("Page must be greater than 0");
+		}
+		int offset = (page - 1) * limit;
+
+		List<Income> incomes;
+		UUID categoryUUID = null;
+		if (q == null) q = "";
+		if (order == null) order = "desc";
+		else order = order.toLowerCase();
+
+		if (categoryId != null) {
+			Category category = categoryService.getCategoryById(categoryId);
+			if (!globals.TYPE_INCOME.equals(category.getType())) {
+				throw new IllegalArgumentException("Category must be income type");
+			}
+			categoryUUID = category.getId();
+		}
+
+		incomes = incomeRepositoryCustomImpl.findIncomes(user.getId(), startDate, endDate,
+				categoryUUID, q, offset, limit, customSortBy, customSortOrder, order);
+		totalElements = incomeRepositoryCustomImpl.countIncomes(user.getId(), startDate, endDate,
+				categoryUUID, q);
+
+		totalPages = (int) Math.ceil((double) totalElements / limit);
+		return new IncomeResList(incomes.stream().map(IncomeResponse::new).collect(Collectors.toList()),
+				totalPages, totalElements, page);
+	}
+}

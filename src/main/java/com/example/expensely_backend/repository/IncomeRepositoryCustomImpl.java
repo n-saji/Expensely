@@ -66,6 +66,90 @@ public class IncomeRepositoryCustomImpl {
 		return monthlyIncome;
 	}
 
+	public List<Income> findIncomes(
+			UUID userId,
+			LocalDateTime startDate,
+			LocalDateTime endDate,
+			UUID categoryId,
+			String q,
+			int offset,
+			int limit,
+			String customSortBy,
+			String customSortOrder,
+			String defaultSortBy
+	) {
+		CriteriaBuilder cb = em.getCriteriaBuilder();
+		CriteriaQuery<Income> query = cb.createQuery(Income.class);
+		Root<Income> income = query.from(Income.class);
+
+		List<Predicate> predicates = new ArrayList<>();
+		predicates.add(cb.equal(income.get("user").get("id"), userId));
+		predicates.add(cb.greaterThanOrEqualTo(income.get("incomeDate"), startDate));
+		predicates.add(cb.lessThan(income.get("incomeDate"), endDate));
+
+		if (categoryId != null) {
+			predicates.add(cb.equal(income.get("category").get("id"), categoryId));
+		}
+
+		if (q != null && !q.isEmpty()) {
+			predicates.add(cb.like(cb.lower(income.get("description")), "%" + q.toLowerCase() + "%"));
+		}
+
+		query.select(income).where(predicates.toArray(new Predicate[0]));
+
+		List<Order> orders = new ArrayList<>();
+		if (customSortBy != null && !customSortBy.isEmpty()) {
+			if (customSortOrder != null && customSortOrder.equalsIgnoreCase("asc")) {
+				orders.add(cb.asc(income.get(customSortBy)));
+			} else {
+				orders.add(cb.desc(income.get(customSortBy)));
+			}
+		}
+		if (defaultSortBy != null && !defaultSortBy.isEmpty()) {
+			if (defaultSortBy.equals("desc")) {
+				orders.add(cb.desc(income.get("incomeDate")));
+			} else {
+				orders.add(cb.asc(income.get("incomeDate")));
+			}
+		}
+
+		query.orderBy(orders);
+		return em.createQuery(query)
+				.setFirstResult(offset)
+				.setMaxResults(limit)
+				.getResultList();
+	}
+
+	public long countIncomes(
+			UUID userId,
+			LocalDateTime startDate,
+			LocalDateTime endDate,
+			UUID categoryId,
+			String q
+	) {
+		CriteriaBuilder cb = em.getCriteriaBuilder();
+		CriteriaQuery<Long> query = cb.createQuery(Long.class);
+		Root<Income> income = query.from(Income.class);
+
+		List<Predicate> predicates = new ArrayList<>();
+		predicates.add(cb.equal(income.get("user").get("id"), userId));
+		predicates.add(cb.greaterThanOrEqualTo(income.get("incomeDate"), startDate));
+		predicates.add(cb.lessThan(income.get("incomeDate"), endDate));
+
+		if (categoryId != null) {
+			predicates.add(cb.equal(income.get("category").get("id"), categoryId));
+		}
+
+		if (q != null && !q.isEmpty()) {
+			predicates.add(cb.like(cb.lower(income.get("description")), "%" + q.toLowerCase() + "%"));
+		}
+
+		query.select(cb.count(income))
+				.where(predicates.toArray(new Predicate[0]));
+
+		return em.createQuery(query).getSingleResult();
+	}
+
 	public List<MonthlyCategoryIncome> getMonthlyCategoryIncomeFromTillTo(
 			UUID userId,
 			LocalDateTime startDate,
