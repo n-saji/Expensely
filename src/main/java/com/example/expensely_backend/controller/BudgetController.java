@@ -105,5 +105,18 @@ public class BudgetController {
 		}
 	}
 
+	@GetMapping("/available-categories")
+	public ResponseEntity<?> getAvailableCategories(Authentication authentication) {
+		String userId = (String) authentication.getPrincipal();
+		if (userId == null) {
+			return ResponseEntity.status(401).body("Unauthorized");
+		}
+		try {
+			return ResponseEntity.ok(budgetService.getCategoriesWithoutActiveBudget(userId));
+		} catch (Exception e) {
+			return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+		}
+	}
+
 
 }

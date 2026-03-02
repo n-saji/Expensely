@@ -221,4 +221,14 @@ public class BudgetService {
 
 	}
 
+	public List<Category> getCategoriesWithoutActiveBudget(String userId) {
+		User user = userService.GetActiveUserById(userId);
+		if (user == null) {
+			throw new IllegalArgumentException("User not found");
+		}
+		return categoryRepository.findByUserIdAndTypeAndIdNotIn(user.getId(),
+				globals.TYPE_EXPENSE,
+				budgetRepository.findActiveBudgetsByUserId(user.getId()).stream().map(b -> b.getCategory().getId()).toList()).stream().peek(b -> b.setUser(null)).toList();
+	}
+
 }

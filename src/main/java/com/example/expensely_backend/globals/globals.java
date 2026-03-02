@@ -4,6 +4,8 @@ public class globals {
 
 
 	public static final String SERVER_SENDER = "SERVER";
+	public static final String TYPE_EXPENSE = "expense";
+	public static final String TYPE_INCOME = "income";
 
 	public enum MessageType {
 		ALERT, INFO, ERROR, SUCCESS
