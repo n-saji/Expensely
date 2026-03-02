@@ -1,5 +1,6 @@
 package com.example.expensely_backend.model;
 
+import com.example.expensely_backend.globals.globals;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -46,7 +47,7 @@ public class Budget {
 	@Setter
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)
-	private Period period;
+	private globals.Period period;
 
 	@Getter
 	@Setter
@@ -73,12 +74,5 @@ public class Budget {
 	@Column(name = "updated_at")
 	private LocalDateTime updatedAt = LocalDateTime.now();
 
-	public enum Period {
-		DAILY,
-		WEEKLY,
-		MONTHLY,
-		YEARLY,
-		CUSTOM
-	}
 
 }

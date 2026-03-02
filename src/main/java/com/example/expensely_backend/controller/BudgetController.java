@@ -95,9 +95,6 @@ public class BudgetController {
 					"budget id must not be empty", null));
 		}
 		try {
-			if (budget.getAmountLimit() == null || budget.getAmountLimit().intValue() <= 0) {
-				return ResponseEntity.badRequest().body(new BudgetResponse("Budget limit must not be null", null));
-			}
 			Budget budgetRes = budgetService.updateBudget(userId, id, budget);
 			budgetRes.setUser(null);
 			budgetRes.setCategory(null);

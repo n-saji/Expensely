@@ -142,29 +142,20 @@ public class BudgetService {
 			throw new IllegalArgumentException("Budget start date must be before end date");
 		}
 		if (budget.getPeriod() != null && budget.getPeriod().name().isEmpty()) {
+
 			throw new IllegalArgumentException("Budget period must not be " +
 					"empty");
 		}
 		try {
 			if (budget.getAmountLimit() != null)
 				existingBudget.setAmountLimit(budget.getAmountLimit());
-			if (budget.getPeriod() != null)
+			if (budget.getPeriod() != null && (!budget.getPeriod().name().isEmpty()))
 				existingBudget.setPeriod(budget.getPeriod());
 			if (budget.getStartDate() != null)
 				existingBudget.setStartDate(budget.getStartDate());
 			if (budget.getEndDate() != null)
 				existingBudget.setEndDate(budget.getEndDate());
 			budget.setUpdatedAt(new java.sql.Timestamp(new Date().getTime()).toLocalDateTime());
-//			BigDecimal total_amount = budget.getAmountSpent();
-//
-//			List<Expense> expense = expenseRepository.findByUserIdAndTimeFrameAsc(budget.getUser().getId(), FormatDate.formatStartDate(budget.getStartDate().atStartOfDay(), true), FormatDate.formatEndDate(budget.getEndDate().atStartOfDay()));
-//			for (Expense exp : expense) {
-//				if (exp.getCategory().getId().equals(budget.getCategory().getId())) {
-//
-//					total_amount = total_amount.add(exp.getAmount());
-//				}
-//			}
-//			budget.setAmountSpent(total_amount);
 
 			return budgetRepository.save(existingBudget);
 		} catch (Exception e) {
