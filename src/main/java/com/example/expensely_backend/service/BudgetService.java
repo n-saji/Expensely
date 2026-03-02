@@ -47,8 +47,8 @@ public class BudgetService {
 	}
 
 	@Transactional
-	public Budget save(Budget budget) {
-		User user = userService.GetActiveUserById(budget.getUser().getId().toString());
+	public Budget save(String userID, Budget budget) {
+		User user = userService.GetActiveUserById(userID);
 		if (user == null) {
 			throw new IllegalArgumentException("User not found");
 		}
@@ -91,12 +91,13 @@ public class BudgetService {
 		return budgetRepository.findById(UUID.fromString(id)).orElseThrow(() -> new IllegalArgumentException("Budget not found"));
 	}
 
-	public void deleteByIdHard(String id) {
+	public void softDeleteById(String id) {
 		try {
 			Budget budget = budgetRepository.findById(UUID.fromString(id)).orElseThrow(() -> new IllegalArgumentException("Budget not found"));
-//            budget.setActive(false);
-//            budget.setUpdatedAt(new java.sql.Timestamp(new Date().getTime()).toLocalDateTime());
-			budgetRepository.delete(budget);
+			budget.setActive(false);
+			budget.setUpdatedAt(new java.sql.Timestamp(new Date().getTime()).toLocalDateTime());
+			budgetRepository.save(budget);
+//			budgetRepository.delete(budget);
 		} catch (Exception e) {
 			throw new IllegalArgumentException("Error deleting budget: " + e.getMessage());
 		}
@@ -124,54 +125,55 @@ public class BudgetService {
 		if (user == null) {
 			throw new IllegalArgumentException("User not found");
 		}
-		return budgetRepository.findByUserId(user.getId());
+		return budgetRepository.findActiveBudgetsByUserId(user.getId());
 	}
 
-	public Budget updateBudget(Budget budget) {
-
-		if (budget.getUser() == null) {
-			throw new IllegalArgumentException("User must not be null");
+	public Budget updateBudget(String UserId, String budgetId, Budget budget) {
+		UUID budgetUUID = UUID.fromString(budgetId);
+		Budget existingBudget =
+				budgetRepository.findById(budgetUUID).orElseThrow(() -> new IllegalArgumentException("Budget not found"));
+		if (!existingBudget.getUser().getId().toString().equals(UserId)) {
+			throw new IllegalArgumentException("Unauthorized to update this budget");
 		}
-		if (!budgetRepository.existsById(budget.getId())) {
-			throw new IllegalArgumentException("Budget not found");
-		}
-		if (budget.getAmountLimit() == null || budget.getAmountLimit().intValue() <= 0) {
+		if (budget.getAmountLimit() != null && budget.getAmountLimit().compareTo(BigDecimal.ZERO) <= 0) {
 			throw new IllegalArgumentException("Budget limit must not be null");
 		}
-		if (budget.getStartDate() == null) {
-			throw new IllegalArgumentException("Budget start date must not be null");
-		}
-		if (budget.getEndDate() == null) {
-			throw new IllegalArgumentException("Budget end date must not be null");
-		}
-		if (budget.getStartDate().isAfter(budget.getEndDate())) {
+		if (budget.getStartDate() != null && budget.getEndDate() != null && budget.getStartDate().isAfter(budget.getEndDate())) {
 			throw new IllegalArgumentException("Budget start date must be before end date");
 		}
-		if (budget.getPeriod() == null) {
-			throw new IllegalArgumentException("Budget period must not be null");
+		if (budget.getPeriod() != null && budget.getPeriod().name().isEmpty()) {
+			throw new IllegalArgumentException("Budget period must not be " +
+					"empty");
 		}
 		try {
-
+			if (budget.getAmountLimit() != null)
+				existingBudget.setAmountLimit(budget.getAmountLimit());
+			if (budget.getPeriod() != null)
+				existingBudget.setPeriod(budget.getPeriod());
+			if (budget.getStartDate() != null)
+				existingBudget.setStartDate(budget.getStartDate());
+			if (budget.getEndDate() != null)
+				existingBudget.setEndDate(budget.getEndDate());
 			budget.setUpdatedAt(new java.sql.Timestamp(new Date().getTime()).toLocalDateTime());
-			BigDecimal total_amount = budget.getAmountSpent();
+//			BigDecimal total_amount = budget.getAmountSpent();
+//
+//			List<Expense> expense = expenseRepository.findByUserIdAndTimeFrameAsc(budget.getUser().getId(), FormatDate.formatStartDate(budget.getStartDate().atStartOfDay(), true), FormatDate.formatEndDate(budget.getEndDate().atStartOfDay()));
+//			for (Expense exp : expense) {
+//				if (exp.getCategory().getId().equals(budget.getCategory().getId())) {
+//
+//					total_amount = total_amount.add(exp.getAmount());
+//				}
+//			}
+//			budget.setAmountSpent(total_amount);
 
-			List<Expense> expense = expenseRepository.findByUserIdAndTimeFrameAsc(budget.getUser().getId(), FormatDate.formatStartDate(budget.getStartDate().atStartOfDay(), true), FormatDate.formatEndDate(budget.getEndDate().atStartOfDay()));
-			for (Expense exp : expense) {
-				if (exp.getCategory().getId().equals(budget.getCategory().getId())) {
-
-					total_amount = total_amount.add(exp.getAmount());
-				}
-			}
-			budget.setAmountSpent(total_amount);
-
-			return budgetRepository.save(budget);
+			return budgetRepository.save(existingBudget);
 		} catch (Exception e) {
 			throw new IllegalArgumentException("Error updating budget: " + e.getMessage());
 		}
 	}
 
 	public Budget findByUserIdAndCategoryId(String user_id, String category_id) {
-		return budgetRepository.findByUserIdAndCategoryId(UUID.fromString(user_id), UUID.fromString(category_id));
+		return budgetRepository.findActiveBudgetsByUserIdAndCategoryId(UUID.fromString(user_id), UUID.fromString(category_id));
 	}
 
 	public void updateBudgetAmountByUserIdAndCategoryId(String user_id, String category_id, BigDecimal amount, LocalDateTime date) {
@@ -192,7 +194,6 @@ public class BudgetService {
 		try {
 			budgetRepository.save(budget);
 		} catch (Exception e) {
-
 			throw new IllegalArgumentException("Error updating budget amount: " + e.getMessage());
 		}
 
@@ -204,15 +205,15 @@ public class BudgetService {
 		String text = "";
 		globals.MessageType type = globals.MessageType.ALERT;
 
-		if (percentage >= 70 && percentage < 100) {
+		if (percentage >= 70 && percentage <= 100) {
 			text = String.format("Heads up! You've used %d%% of your %s budget.", displayPercent, category);
 			type = globals.MessageType.ALERT;
-		} else if (percentage >= 100) {
+		} else if (percentage > 100) {
 			text = String.format("You've exceeded your %s budget limit.", category);
 			type = globals.MessageType.ERROR;
 		}
 
-// Only send if a message was actually set
+		// Only send if a message was actually set
 		if (!text.isEmpty()) {
 			MessageDTO msg = new MessageDTO();
 			msg.setMessage(text);
