@@ -11,10 +11,12 @@ import com.example.expensely_backend.service.IncomeService;
 import com.example.expensely_backend.service.UserService;
 import com.example.expensely_backend.utils.FormatDate;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.List;
@@ -268,6 +270,23 @@ public class IncomeController {
 			return ResponseEntity.ok(new AuthResponse("Bulk delete incomes successfully!", null, ""));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(new AuthResponse("Bulk delete incomes failed!", null, e.getMessage()));
+		}
+	}
+
+	@GetMapping("/user/{userId}/export")
+	public ResponseEntity<?> exportIncomes(@PathVariable String userId,
+	                                       @RequestParam(value = "start_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startDate,
+	                                       @RequestParam(value = "end_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate) {
+		startDate = FormatDate.formatStartDate(startDate, false);
+		endDate = FormatDate.formatEndDate(endDate);
+		try {
+			String csvData = incomeService.exportIncomesToCSV(userId, startDate, endDate);
+			return ResponseEntity.ok()
+					.header("Content-Disposition", "attachment; filename=\"incomes.csv\"")
+					.contentType(MediaType.parseMediaType("text/csv"))
+					.body(csvData.getBytes(StandardCharsets.UTF_8));
+		} catch (Exception e) {
+			return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
 		}
 	}
 }

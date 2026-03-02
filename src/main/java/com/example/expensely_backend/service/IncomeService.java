@@ -12,8 +12,11 @@ import com.example.expensely_backend.repository.CategoryRepository;
 import com.example.expensely_backend.repository.IncomeRepository;
 import com.example.expensely_backend.repository.IncomeRepositoryCustomImpl;
 import com.example.expensely_backend.utils.FormatDate;
+import com.opencsv.CSVWriter;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
+import java.io.StringWriter;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
@@ -378,5 +381,27 @@ public class IncomeService {
 		totalPages = (int) Math.ceil((double) totalElements / limit);
 		return new IncomeResList(incomes.stream().map(IncomeResponse::new).collect(Collectors.toList()),
 				totalPages, totalElements, page);
+	}
+
+	public String exportIncomesToCSV(String userId, LocalDateTime startDate, LocalDateTime endDate) throws IOException {
+		UUID userIdUUID = UUID.fromString(userId);
+		User user = userService.GetActiveUserById(userId);
+		List<Income> incomes = incomeRepository.findByUserIdAndTimeFrameAsc(userIdUUID, startDate, endDate);
+
+		StringWriter sw = new StringWriter();
+		CSVWriter writer = new CSVWriter(sw);
+
+		writer.writeNext(new String[]{"Date", "Description", "Amount (in " + user.getCurrency() + ")", "Category"});
+
+		for (Income income : incomes) {
+			writer.writeNext(new String[]{
+					income.getIncomeDate().toString(),
+					income.getDescription(),
+					String.valueOf(income.getAmount()),
+					income.getCategory().getName()
+			});
+		}
+		writer.close();
+		return sw.toString();
 	}
 }
