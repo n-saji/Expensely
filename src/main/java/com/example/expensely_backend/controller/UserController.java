@@ -113,25 +113,25 @@ public class UserController {
 	public ResponseEntity<AuthResponse> validateToken(HttpServletRequest request) {
 		try {
 			// Extract token from "Bearer <token>"
-			String refreshToken = null;
+			String accessToken = null;
 
 			if (request.getCookies() != null) {
 				for (Cookie cookie : request.getCookies()) {
-					if (cookie.getName().equals("refreshToken")) {
-						refreshToken = cookie.getValue();
+					if (cookie.getName().equals("accessToken")) {
+						accessToken = cookie.getValue();
 					}
 				}
 			}
 
-			if (refreshToken == null) {
+			if (accessToken == null) {
 				return ResponseEntity.status(401).body(new AuthResponse("Refresh token missing", null, "Refresh token missing"));
 			}
 
-			if (expiredTokenService.isTokenExpired(refreshToken)) {
+			if (expiredTokenService.isTokenExpired(accessToken)) {
 				return ResponseEntity.status(401).body(new AuthResponse(null, null, "Token has expired"));
 			}
 
-			if (jwtUtil.ValidateToken(refreshToken)) {
+			if (jwtUtil.ValidateToken(accessToken)) {
 				return ResponseEntity.ok(new AuthResponse("Token is valid", null, ""));
 			} else {
 				return ResponseEntity.status(401).body(new AuthResponse("invalid token!", null, "Invalid token"));
