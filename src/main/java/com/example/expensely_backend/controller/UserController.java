@@ -144,7 +144,7 @@ public class UserController {
 	}
 
 
-	@GetMapping()
+	@GetMapping("/me")
 	public ResponseEntity<?> getUserById(Authentication authentication) {
 		String userId = (String) authentication.getPrincipal();
 		if (userId == null) {
