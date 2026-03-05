@@ -144,11 +144,14 @@ public class UserController {
 	}
 
 
-	@GetMapping("/{id}")
-	public ResponseEntity<?> getUserById(@PathVariable String id) {
-
+	@GetMapping()
+	public ResponseEntity<?> getUserById(Authentication authentication) {
+		String userId = (String) authentication.getPrincipal();
+		if (userId == null) {
+			return ResponseEntity.status(401).body(new UserRes(null, "Unauthorized"));
+		}
 		try {
-			User user = userService.GetActiveUserById(id);
+			User user = userService.GetActiveUserById(userId);
 			if (user == null) {
 				return ResponseEntity.status(404).body(new UserRes(null, "User not found"));
 			}
