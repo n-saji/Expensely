@@ -55,7 +55,7 @@ public class CategoryController {
 //        }
 //    }
 
-	@GetMapping
+	@GetMapping("/user")
 	public ResponseEntity<?> getCategoriesByUserId(Authentication authentication,
 
 	                                               @RequestParam(required = false) String type) {
