@@ -4,6 +4,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import com.example.expensely_backend.model.User;
+import com.example.expensely_backend.repository.UserRepository;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -19,11 +21,14 @@ import java.util.Collections;
 public class JwtAuthFilter extends OncePerRequestFilter {
 	private final JwtUtil jwtUtil;
 	private final ObjectProvider<RequestMappingHandlerMapping> requestMappingHandlerMappingProvider;
+	private final UserRepository userRepository;
 
 	public JwtAuthFilter(JwtUtil jwtUtil,
-	                     ObjectProvider<RequestMappingHandlerMapping> requestMappingHandlerMappingProvider) {
+	                     ObjectProvider<RequestMappingHandlerMapping> requestMappingHandlerMappingProvider,
+	                     UserRepository userRepository) {
 		this.jwtUtil = jwtUtil;
 		this.requestMappingHandlerMappingProvider = requestMappingHandlerMappingProvider;
+		this.userRepository = userRepository;
 	}
 
 
@@ -41,7 +46,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 		}
 		if (path.equals("/api/users/login") || path.equals("/api/users/register") || path.equals(
 				"/ping") || path.equals("/api/users/refresh") || path.equals("/api/users/verify" +
-				"-oauth-login")) {
+				"-oauth-login") || path.equals("/api/users/verify-otp") || path.equals(
+				"/api/users/resend-otp")) {
 			filterChain.doFilter(request, response); // Skip JWT check
 			return;
 		}
@@ -68,13 +74,24 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 			return;
 		}
 		try {
-			String userId = jwtUtil.GetStringFromToken(token);
-			if (userId == null) {
+			String userSubject = jwtUtil.GetStringFromToken(token);
+			if (userSubject == null) {
 				response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "User not found");
 				return;
 			}
+
+			User user = resolveUser(userSubject);
+			if (user == null) {
+				response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "User not found");
+				return;
+			}
+			if (!user.isEmailVerified()) {
+				response.sendError(HttpServletResponse.SC_FORBIDDEN, "email not verified");
+				return;
+			}
+
 			UsernamePasswordAuthenticationToken authentication =
-					new UsernamePasswordAuthenticationToken(userId, null, Collections.emptyList());
+					new UsernamePasswordAuthenticationToken(user.getId().toString(), null, Collections.emptyList());
 
 			authentication.setDetails(
 					new WebAuthenticationDetailsSource().buildDetails(request)
@@ -96,6 +113,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 			return mapping == null || mapping.getHandler(request) != null;
 		} catch (Exception e) {
 			return true; // fail closed: keep auth checks if handler lookup fails
+		}
+	}
+
+	private User resolveUser(String subject) {
+		try {
+			return userRepository.findById(java.util.UUID.fromString(subject)).orElse(null);
+		} catch (IllegalArgumentException e) {
+			return userRepository.findByEmail(subject).orElse(null);
 		}
 	}
 }

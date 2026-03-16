@@ -1,6 +1,7 @@
 package com.example.expensely_backend.utils;
 
 import com.example.expensely_backend.dto.AuthResponse;
+import com.example.expensely_backend.utils.OtpException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -44,5 +45,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .badRequest()
                 .body(new AuthResponse("Null pointer exception", null, ex.getMessage()));
+    }
+
+    @ExceptionHandler(OtpException.class)
+    public ResponseEntity<?> handleOtpExceptions(OtpException ex) {
+        return ResponseEntity.status(ex.getStatus())
+                .body(new AuthResponse(ex.getMessage(), null, ex.getMessage()));
     }
 }

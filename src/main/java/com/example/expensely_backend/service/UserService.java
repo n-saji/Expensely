@@ -107,6 +107,14 @@ public class UserService {
 		return user;
 	}
 
+	public User GetUserByEmail(String email) {
+		if (email == null || email.isEmpty()) {
+			throw new IllegalArgumentException("Email must be provided");
+		}
+		return userRepository.findByEmail(email)
+				.orElseThrow(() -> new IllegalArgumentException("User not found"));
+	}
+
 	public boolean isUserPresent(String email, String phone) {
 		Optional<User> userOpt = userRepository.findUserByEmailOrPhone(email, phone);
 		return userOpt.isPresent();

@@ -41,9 +41,10 @@ public class SecurityConfig {
 				.and()
 				.authorizeHttpRequests(
 						auth -> auth
-								.requestMatchers("/api/users/register", "/api/users/login",
-										"/ping", "/api/users/verify-oauth-login", "/api/users" +
-												"/refresh", "/ws/**").permitAll() // Allow public
+														.requestMatchers("/api/users/register", "/api/users/login",
+																"/ping", "/api/users/verify-oauth-login", "/api/users" +
+																		"/refresh", "/api/users/verify-otp", "/api/users/resend-otp",
+																"/ws/**").permitAll() // Allow public
 								.anyRequest().permitAll()
 				)
 				.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

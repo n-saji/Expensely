@@ -85,5 +85,9 @@ public class User {
 	@Getter
 	@Setter
 	private boolean isProfileComplete = false;
-	
+
+	@Column(columnDefinition = "boolean default false")
+	@Getter
+	@Setter
+	private boolean isEmailVerified = false; // Default email verified status set to false
 }

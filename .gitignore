@@ -5,6 +5,7 @@ HELP.md
 !**/src/test/**/build/
 .env
 .DS_Store
+/k8
 
 ### STS ###
 .apt_generated

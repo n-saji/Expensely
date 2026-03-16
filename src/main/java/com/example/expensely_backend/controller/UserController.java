@@ -1,8 +1,11 @@
 package com.example.expensely_backend.controller;
 
 import com.example.expensely_backend.dto.AuthResponse;
+import com.example.expensely_backend.dto.OtpResendRequest;
+import com.example.expensely_backend.dto.OtpVerifyRequest;
 import com.example.expensely_backend.dto.UserRes;
 import com.example.expensely_backend.model.User;
+import com.example.expensely_backend.service.EmailOtpService;
 import com.example.expensely_backend.service.ExpiredTokenService;
 import com.example.expensely_backend.service.UserService;
 import com.example.expensely_backend.utils.JwtUtil;
@@ -33,14 +36,17 @@ public class UserController {
 	private final ExpiredTokenService expiredTokenService;
 	private final Environment environment;
 	private final Mailgun mailgun;
+	private final EmailOtpService emailOtpService;
 
 	public UserController(UserService userService, JwtUtil jwtUtil,
-	                      ExpiredTokenService expiredTokenService, Environment environment, Mailgun mailgun) {
+	                      ExpiredTokenService expiredTokenService, Environment environment, Mailgun mailgun,
+	                      EmailOtpService emailOtpService) {
 		this.userService = userService;
 		this.jwtUtil = jwtUtil;
 		this.expiredTokenService = expiredTokenService;
 		this.environment = environment;
 		this.mailgun = mailgun;
+		this.emailOtpService = emailOtpService;
 	}
 
 
@@ -48,8 +54,12 @@ public class UserController {
 	public ResponseEntity<?> register(@RequestBody User user) {
 		try {
 			user.setProfileComplete(true);
+			user.setEmailVerified(false);
 			userService.save(user);
-			return ResponseEntity.ok(new AuthResponse("User registered successfully!", user.getId().toString(), ""));
+			String otp = emailOtpService.createOrUpdateOtp(user);
+			mailgun.sendSimpleMessage(user.getEmail(), "Verify your email",
+					"Your OTP is " + otp + ". It expires in 10 minutes.");
+			return ResponseEntity.ok(new AuthResponse("Verification OTP sent", user.getId().toString(), ""));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(new AuthResponse(e.getMessage(), null, e.getMessage()));
 		}
@@ -71,6 +81,10 @@ public class UserController {
 		try {
 			if (userService.authenticate(user.getEmail(), user.getPhone(), user.getPassword())) {
 				User client = userService.GetUserByEmailOrPhone(user.getEmail(), user.getPhone());
+				if (!client.isEmailVerified()) {
+					return ResponseEntity.status(403).body(new AuthResponse(
+							"email not verified", client.getId().toString(), "email not verified"));
+				}
 
 				Map<String, String> result = jwtUtil.GenerateToken(client.getId().toString());
 				if (result == null) {
@@ -101,12 +115,30 @@ public class UserController {
 				return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, accessCookie.toString()).header(
 						HttpHeaders.SET_COOKIE, refreshCookie.toString()).body(authResponse);
 			} else {
-				return ResponseEntity.status(401).body(new AuthResponse("Invalid credentials", null,
+				return ResponseEntity.status(401).body(new AuthResponse(
+						"Invalid credentials", user.getId() != null ? user.getId().toString() : null,
 						"Invalid credentials"));
 			}
 		} catch (Exception e) {
-			return ResponseEntity.badRequest().body(new AuthResponse("Something went wrong!", null, e.getMessage()));
+			return ResponseEntity.badRequest().body(new AuthResponse(
+					"Something went wrong!", user.getId() != null ? user.getId().toString() : null,
+					e.getMessage()));
 		}
+	}
+
+	@PostMapping("/verify-otp")
+	public ResponseEntity<?> verifyOtp(@RequestBody OtpVerifyRequest request) {
+		emailOtpService.verifyOtp(request.getUserId(), request.getOtp());
+		return ResponseEntity.ok(new AuthResponse("Email verified", request.getUserId(), ""));
+	}
+
+	@PostMapping("/resend-otp")
+	public ResponseEntity<?> resendOtp(@RequestBody OtpResendRequest request) {
+		String otp = emailOtpService.resendOtp(request.getUserId());
+		User user = userService.GetUserById(request.getUserId());
+		mailgun.sendSimpleMessage(user.getEmail(), "Verify your email",
+				"Your OTP is " + otp + ". It expires in 10 minutes.");
+		return ResponseEntity.ok(new AuthResponse("Verification OTP resent", request.getUserId(), ""));
 	}
 
 	@GetMapping("/check-auth")
@@ -289,6 +321,10 @@ public class UserController {
 
 					if (userService.isUserPresent(user.getEmail(), user.getPhone())) {
 						User existingUser = userService.GetUserByEmailOrPhone(user.getEmail(), user.getPhone());
+						if (!existingUser.isEmailVerified()) {
+							existingUser.setEmailVerified(true);
+							userService.UpdateUser(existingUser);
+						}
 						user.setOauth2User(true);
 						Map<String, String> result = jwtUtil.GenerateToken(existingUser.getId().toString());
 						String accessToken = result.get("accessToken");
@@ -314,6 +350,7 @@ public class UserController {
 					} else {
 						// Register new user
 						user.setOauth2User(true);
+						user.setEmailVerified(true);
 						userService.save(user);
 						Map<String, String> result = jwtUtil.GenerateToken(user.getEmail());
 						String accessToken = result.get("accessToken");
@@ -375,13 +412,21 @@ public class UserController {
 			return ResponseEntity.status(401).body("Refresh token missing");
 		}
 
-		String email = jwtUtil.GetStringFromToken(refreshToken);
-		if (email == null) {
+		String subject = jwtUtil.GetStringFromToken(refreshToken);
+		if (subject == null) {
 			return ResponseEntity.status(401).body("Invalid refresh token");
 		}
 
+		User user = resolveUserFromSubject(subject);
+		if (user == null) {
+			return ResponseEntity.status(401).body("Invalid refresh token");
+		}
+		if (!user.isEmailVerified()) {
+			return ResponseEntity.status(403).body("email not verified");
+		}
+
 		// Generate new access token
-		Map<String, String> tokens = jwtUtil.GenerateToken(email);
+		Map<String, String> tokens = jwtUtil.GenerateToken(user.getId().toString());
 
 
 		ResponseCookie accessCookie = ResponseCookie.from("accessToken", tokens.get("accessToken"))
@@ -394,6 +439,18 @@ public class UserController {
 
 
 		return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, accessCookie.toString()).body(new AuthResponse("Token refreshed successfully!", null, ""));
+	}
+
+	private User resolveUserFromSubject(String subject) {
+		try {
+			return userService.GetUserById(subject);
+		} catch (Exception e) {
+			try {
+				return userService.GetUserByEmail(subject);
+			} catch (Exception ignored) {
+				return null;
+			}
+		}
 	}
 
 	@GetMapping("/logout")
