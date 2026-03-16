@@ -9,7 +9,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "email_otps", uniqueConstraints = {
-		@UniqueConstraint(columnNames = "user_id")
+		@UniqueConstraint(columnNames = {"user_id", "purpose"})
 })
 public class EmailOtp {
 	@Id
@@ -18,8 +18,8 @@ public class EmailOtp {
 	@Setter
 	private UUID id;
 
-	@OneToOne(optional = false)
-	@JoinColumn(name = "user_id", nullable = false, unique = true)
+	@ManyToOne(optional = false)
+	@JoinColumn(name = "user_id", nullable = false)
 	@Getter
 	@Setter
 	private User user;
@@ -28,6 +28,11 @@ public class EmailOtp {
 	@Getter
 	@Setter
 	private String otpHash;
+
+	@Column(nullable = false, columnDefinition = "varchar(32) default 'EMAIL_VERIFY'")
+	@Getter
+	@Setter
+	private String purpose = "EMAIL_VERIFY";
 
 	@Column(nullable = false)
 	@Getter

@@ -43,7 +43,8 @@ public class SecurityConfig {
 						auth -> auth
 														.requestMatchers("/api/users/register", "/api/users/login",
 																"/ping", "/api/users/verify-oauth-login", "/api/users" +
-																		"/refresh", "/api/users/verify-otp", "/api/users/resend-otp",
+																												"/refresh", "/api/users/verify-otp", "/api/users/resend-otp",
+																												"/api/users/request-password-reset", "/api/users/confirm-password-reset",
 																"/ws/**").permitAll() // Allow public
 								.anyRequest().permitAll()
 				)

@@ -34,6 +34,7 @@ public class Mailgun {
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setDoOutput(true);
             conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
 
             // Basic Auth
             String auth = "api:" + apiKey;
@@ -41,10 +42,10 @@ public class Mailgun {
             conn.setRequestProperty("Authorization", "Basic " + encodedAuth);
 
             // Form parameters
-            String data = "from=" + from +
-                    "&to=" + to +
-                    "&subject=" + subject +
-                    "&text=" + text;
+            String data = "from=" + urlEncode(from) +
+                    "&to=" + urlEncode(to) +
+                    "&subject=" + urlEncode(subject) +
+                    "&text=" + urlEncode(text);
 
             // Send request
             OutputStream os = conn.getOutputStream();
@@ -67,5 +68,13 @@ public class Mailgun {
             throw new RuntimeException("Error sending email: " + e.getMessage(), e);
         }
 
+    }
+
+    private String urlEncode(String value) {
+        try {
+            return java.net.URLEncoder.encode(value, java.nio.charset.StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Unable to encode email payload", e);
+        }
     }
 }

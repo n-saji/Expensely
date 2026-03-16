@@ -1,9 +1,6 @@
 package com.example.expensely_backend.controller;
 
-import com.example.expensely_backend.dto.AuthResponse;
-import com.example.expensely_backend.dto.OtpResendRequest;
-import com.example.expensely_backend.dto.OtpVerifyRequest;
-import com.example.expensely_backend.dto.UserRes;
+import com.example.expensely_backend.dto.*;
 import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.service.EmailOtpService;
 import com.example.expensely_backend.service.ExpiredTokenService;
@@ -139,6 +136,46 @@ public class UserController {
 		mailgun.sendSimpleMessage(user.getEmail(), "Verify your email",
 				"Your OTP is " + otp + ". It expires in 10 minutes.");
 		return ResponseEntity.ok(new AuthResponse("Verification OTP resent", request.getUserId(), ""));
+	}
+
+	@PostMapping("/request-password-reset")
+	public ResponseEntity<?> requestPasswordReset(@RequestBody PasswordResetRequest request) {
+		if (request.getEmail() == null || request.getEmail().isBlank()) {
+			return ResponseEntity.badRequest().body(new AuthResponse("email is required", null, "email is required"));
+		}
+
+		emailOtpService.createPasswordResetToken(request.getEmail()).ifPresent(details -> {
+			String frontendUrl = environment.getProperty("FRONTEND_URL");
+			if (frontendUrl == null || frontendUrl.isBlank()) {
+				throw new IllegalStateException("FRONTEND_URL is not configured");
+			}
+			String resetLink = frontendUrl + "/reset-password?uid=" + details.getUserId() + "&otp=" + details.getOtpHash();
+			System.out.println("Generated password reset link: " + resetLink +
+					" " + details.getOtpHash()); // Log the reset link for debugging
+			mailgun.sendSimpleMessage(request.getEmail(), "Reset your password",
+					"Click the link to reset your password: " + resetLink + "\nThis link expires in 10 minutes.");
+		});
+
+		return ResponseEntity.ok(new AuthResponse(
+				"If the account exists, a reset link has been sent", null, ""));
+	}
+
+	@PostMapping("/confirm-password-reset")
+	public ResponseEntity<?> confirmPasswordReset(@RequestBody PasswordResetConfirmRequest request) {
+		if (request.getUserId() == null || request.getUserId().isBlank()) {
+			return ResponseEntity.badRequest().body(new AuthResponse("userId is required", null, "userId is required"));
+		}
+		if (request.getOtp() == null || request.getOtp().isBlank()) {
+			return ResponseEntity.badRequest().body(new AuthResponse("otp is required", null, "otp is required"));
+		}
+		if (request.getNewPassword() == null || request.getNewPassword().isBlank()) {
+			return ResponseEntity.badRequest().body(new AuthResponse("password is required", null, "password is required"));
+		}
+
+		User user = emailOtpService.validatePasswordResetToken(request.getUserId(), request.getOtp());
+		user.setPassword(request.getNewPassword());
+		userService.updatePassword(user);
+		return ResponseEntity.ok(new AuthResponse("Password updated", request.getUserId(), ""));
 	}
 
 	@GetMapping("/check-auth")
