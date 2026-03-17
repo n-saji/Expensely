@@ -499,17 +499,15 @@ public class UserController {
 	}
 
 	@GetMapping("/logout")
-	public ResponseEntity<?> logout(HttpServletResponse response) {
+	public ResponseEntity<?> logout() {
 		try {
-
 			ResponseCookie clearAccess = ResponseCookie.from("accessToken", "")
 					.path("/")
 					.maxAge(0)
 					.httpOnly(true)
 					.secure(true)
-					.sameSite("None") // can be "Strict", "Lax", or "None"
+					.sameSite("None")
 					.build();
-
 
 			ResponseCookie clearRefresh = ResponseCookie.from("refreshToken", "")
 					.path("/")
@@ -519,13 +517,11 @@ public class UserController {
 					.sameSite("None")
 					.build();
 
-			response.addHeader("Set-Cookie", clearAccess.toString());
-			response.addHeader("Set-Cookie", clearRefresh.toString());
+			HttpHeaders headers = new HttpHeaders();
+			headers.add(HttpHeaders.SET_COOKIE, clearAccess.toString());
+			headers.add(HttpHeaders.SET_COOKIE, clearRefresh.toString());
 
-			return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(Map.of(
-					"message", "User logged out successfully"
-			));
-
+			return ResponseEntity.noContent().headers(headers).build();
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(
 					new AuthResponse("Error logging out: " + e.getMessage(), null, "internal server error")
