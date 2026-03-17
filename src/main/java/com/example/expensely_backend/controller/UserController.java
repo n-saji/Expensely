@@ -16,10 +16,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.core.env.Environment;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseCookie;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -525,7 +522,7 @@ public class UserController {
 			response.addHeader("Set-Cookie", clearAccess.toString());
 			response.addHeader("Set-Cookie", clearRefresh.toString());
 
-			return ResponseEntity.ok(Map.of(
+			return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(Map.of(
 					"message", "User logged out successfully"
 			));
 
