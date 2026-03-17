@@ -29,7 +29,7 @@ public class EmailOtp {
 	@Setter
 	private String otpHash;
 
-	@Column(nullable = false, columnDefinition = "varchar(32) default 'EMAIL_VERIFY'")
+	@Column(nullable = false, length = 32)
 	@Getter
 	@Setter
 	private String purpose = "EMAIL_VERIFY";
