@@ -525,7 +525,9 @@ public class UserController {
 			response.addHeader("Set-Cookie", clearAccess.toString());
 			response.addHeader("Set-Cookie", clearRefresh.toString());
 
-			return ResponseEntity.ok("User logged out successfully!");
+			return ResponseEntity.ok(Map.of(
+					"message", "User logged out successfully"
+			));
 
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(
