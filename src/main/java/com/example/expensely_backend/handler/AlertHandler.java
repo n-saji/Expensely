@@ -5,6 +5,7 @@ import com.example.expensely_backend.globals.globals;
 import com.example.expensely_backend.model.Messages;
 import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.repository.MessagesRepository;
+import com.example.expensely_backend.service.DbLogService;
 import com.example.expensely_backend.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
@@ -29,12 +30,15 @@ public class AlertHandler extends TextWebSocketHandler {
     private final MessagesRepository messageRepository;
     private final UserService userService;
     private final ObjectMapper objectMapper;
+    private final DbLogService dbLogService;
 
 
-    public AlertHandler(MessagesRepository messageRepository, UserService userService, ObjectMapper objectMapper) {
+    public AlertHandler(MessagesRepository messageRepository, UserService userService, ObjectMapper objectMapper,
+                        DbLogService dbLogService) {
         this.messageRepository = messageRepository;
         this.userService = userService;
         this.objectMapper = objectMapper;
+        this.dbLogService = dbLogService;
     }
 
     public boolean isUserOnline(UUID userId) {
@@ -65,20 +69,24 @@ public class AlertHandler extends TextWebSocketHandler {
                     );
                     delivered = true;
                 } catch (IOException e) {
-                    System.out.printf("Failed to send WS message to user %s, error: %s", userId, e);
+                    dbLogService.logError("handler", getClass().getName(), "sendAlert",
+                            "Failed to send WS message to user " + userId + ", error: " + e.getMessage(), e);
                 }
             }
             if (delivered) {
-                System.out.println("running markDelivered for message: " + savedMsg.getId());
+                dbLogService.logMessage("handler", getClass().getName(), "sendAlert",
+                        "running markDelivered for message: " + savedMsg.getId());
                 try {
                     messageRepository.markDelivered(savedMsg.getId());
                 } catch (Exception e) {
-                    System.out.println("Error marking message as delivered: " + e.getMessage());
+                    dbLogService.logError("handler", getClass().getName(), "sendAlert",
+                            "Error marking message as delivered: " + e.getMessage(), e);
                 }
             }
         } else {
             // user offline, save message to DB
-            System.out.println("User offline, saving message to DB: " + userId);
+            dbLogService.logMessage("handler", getClass().getName(), "sendAlert",
+                    "User offline, saving message to DB: " + userId);
             savedMsg.setDelivered(false);
             messageRepository.save(savedMsg);
         }
@@ -98,7 +106,8 @@ public class AlertHandler extends TextWebSocketHandler {
             List<Messages> pendingMessages =
                     messageRepository.findByUserId(user.getId());
 
-            System.out.println("User connected: " + user.getId() + ", user email:  " + user.getEmail());
+            dbLogService.logMessage("handler", getClass().getName(), "afterConnectionEstablished",
+                    "User connected: " + user.getId() + ", user email: " + user.getEmail());
             for (Messages m : pendingMessages) {
                 MessageDTO dto = new MessageDTO();
                 dto.setMessage(m.getMessage());
@@ -115,7 +124,8 @@ public class AlertHandler extends TextWebSocketHandler {
             }
             messageRepository.saveAll(pendingMessages);
         } catch (Exception e) {
-            System.out.println("Error connecting user: " + e.getMessage());
+            dbLogService.logError("handler", getClass().getName(), "afterConnectionEstablished",
+                    "Error connecting user: " + e.getMessage(), e);
             session.close();
         }
 
@@ -125,7 +135,8 @@ public class AlertHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         userSessions.values().remove(session);
-        System.out.println("User disconnected: " + session.getId());
+        dbLogService.logMessage("handler", getClass().getName(), "afterConnectionClosed",
+                "User disconnected: " + session.getId());
     }
 
     public void broadcast(MessageDTO messageDTO) {

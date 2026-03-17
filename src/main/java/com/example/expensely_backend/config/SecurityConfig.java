@@ -1,5 +1,6 @@
 package com.example.expensely_backend.config;
 
+import com.example.expensely_backend.utils.ApiRequestLoggingFilter;
 import com.example.expensely_backend.utils.CustomAuthEntryPoint;
 import com.example.expensely_backend.utils.JwtAuthFilter;
 import lombok.Data;
@@ -21,12 +22,15 @@ public class SecurityConfig {
 
 	private final JwtAuthFilter jwtAuthFilter;
 	private final CustomAuthEntryPoint customAuthEntryPoint;
+	private final ApiRequestLoggingFilter apiRequestLoggingFilter;
 	String allowedOrigins = System.getenv("ALLOWED_ORIGINS");
 	String[] origins = allowedOrigins != null ? allowedOrigins.split(",") : new String[]{};
 
-	public SecurityConfig(JwtAuthFilter jwtAuthFilter, CustomAuthEntryPoint customAuthEntryPoint) {
+	public SecurityConfig(JwtAuthFilter jwtAuthFilter, CustomAuthEntryPoint customAuthEntryPoint,
+						  ApiRequestLoggingFilter apiRequestLoggingFilter) {
 		this.jwtAuthFilter = jwtAuthFilter;
 		this.customAuthEntryPoint = customAuthEntryPoint;
+		this.apiRequestLoggingFilter = apiRequestLoggingFilter;
 	}
 
 	@Bean
@@ -48,7 +52,8 @@ public class SecurityConfig {
 																"/ws/**").permitAll() // Allow public
 								.anyRequest().permitAll()
 				)
-				.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+				.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+				.addFilterAfter(apiRequestLoggingFilter, JwtAuthFilter.class);
 		return http.build();
 	}
 

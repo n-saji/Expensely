@@ -2,6 +2,7 @@ package com.example.expensely_backend.controller;
 
 import com.example.expensely_backend.dto.*;
 import com.example.expensely_backend.model.User;
+import com.example.expensely_backend.service.DbLogService;
 import com.example.expensely_backend.service.EmailOtpService;
 import com.example.expensely_backend.service.ExpiredTokenService;
 import com.example.expensely_backend.service.UserService;
@@ -34,16 +35,18 @@ public class UserController {
 	private final Environment environment;
 	private final Mailgun mailgun;
 	private final EmailOtpService emailOtpService;
+	private final DbLogService dbLogService;
 
 	public UserController(UserService userService, JwtUtil jwtUtil,
 	                      ExpiredTokenService expiredTokenService, Environment environment, Mailgun mailgun,
-	                      EmailOtpService emailOtpService) {
+	                      EmailOtpService emailOtpService, DbLogService dbLogService) {
 		this.userService = userService;
 		this.jwtUtil = jwtUtil;
 		this.expiredTokenService = expiredTokenService;
 		this.environment = environment;
 		this.mailgun = mailgun;
 		this.emailOtpService = emailOtpService;
+		this.dbLogService = dbLogService;
 	}
 
 
@@ -150,8 +153,8 @@ public class UserController {
 				throw new IllegalStateException("FRONTEND_URL is not configured");
 			}
 			String resetLink = frontendUrl + "/reset-password?uid=" + details.getUserId() + "&otp=" + details.getOtpHash();
-			System.out.println("Generated password reset link: " + resetLink +
-					" " + details.getOtpHash()); // Log the reset link for debugging
+			dbLogService.logMessage("controller", getClass().getName(), "requestPasswordReset",
+					"Generated password reset link: " + resetLink + " " + details.getOtpHash());
 			mailgun.sendSimpleMessage(request.getEmail(), "Reset your password",
 					"Click the link to reset your password: " + resetLink + "\nThis link expires in 10 minutes.");
 		});

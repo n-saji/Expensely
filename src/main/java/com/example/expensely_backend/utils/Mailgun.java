@@ -1,5 +1,6 @@
 package com.example.expensely_backend.utils;
 
+import com.example.expensely_backend.service.DbLogService;
 import org.springframework.stereotype.Component;
 
 import java.io.OutputStream;
@@ -9,6 +10,12 @@ import java.util.Base64;
 
 @Component
 public class Mailgun {
+
+    private final DbLogService dbLogService;
+
+    public Mailgun(DbLogService dbLogService) {
+        this.dbLogService = dbLogService;
+    }
 
     public void sendSimpleMessage(String to, String subject, String text) {
         String apiKey = System.getenv("MAILGUN_API_KEY");
@@ -56,15 +63,17 @@ public class Mailgun {
             int responseCode = conn.getResponseCode();
 
             if (responseCode == 200) {
-                System.out.println("Email sent successfully!");
+                dbLogService.logMessage("utils", getClass().getName(), "sendSimpleMessage",
+                        "Email sent successfully!");
             } else {
-                System.out.println("Failed to send email.");
-                System.out.println("Response Message: " + conn.getResponseMessage());
+                dbLogService.logError("utils", getClass().getName(), "sendSimpleMessage",
+                        "Failed to send email. Response Message: " + conn.getResponseMessage(), null);
                 throw new RuntimeException("Failed to send email." + " Response Code: " + responseCode);
             }
 
         } catch (Exception e) {
-            System.out.println("Error sending email: " + e.getMessage());
+            dbLogService.logError("utils", getClass().getName(), "sendSimpleMessage",
+                    "Error sending email: " + e.getMessage(), e);
             throw new RuntimeException("Error sending email: " + e.getMessage(), e);
         }
 

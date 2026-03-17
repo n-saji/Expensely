@@ -45,6 +45,7 @@ dependencies {
     implementation "com.vladmihalcea:hibernate-types-60:2.21.1"
     implementation 'org.springframework.boot:spring-boot-starter-websocket'
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
 }
 
 tasks.named('test') {

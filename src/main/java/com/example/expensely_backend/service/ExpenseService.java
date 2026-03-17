@@ -38,13 +38,15 @@ public class ExpenseService {
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
     private final CategoryRepository categoryRepository;
+    private final DbLogService dbLogService;
 
     public ExpenseService(ExpenseRepository expenseRepository, CategoryService categoryService,
                           UserService userService,
                           BudgetService budgetService, ExpenseRepositoryCustomImpl expenseRepositoryCustomImpl
             , ExpenseFilesRepository expenseFilesService, UserRepository userRepository,
                           ObjectMapper objectMapper,
-                          CategoryRepository categoryRepository) {
+                          CategoryRepository categoryRepository,
+                          DbLogService dbLogService) {
         this.expenseRepository = expenseRepository;
         this.categoryService = categoryService;
         this.userService = userService;
@@ -54,6 +56,7 @@ public class ExpenseService {
         this.userRepository = userRepository;
         this.objectMapper = objectMapper;
         this.categoryRepository = categoryRepository;
+        this.dbLogService = dbLogService;
 
     }
 
@@ -326,7 +329,8 @@ public class ExpenseService {
                     }
             );
         } catch (Exception e) {
-            System.out.println(ef.getExpenses() + ": " + e.getMessage());
+            dbLogService.logError("service", getClass().getName(), "BulkInsertExpensesFromFile",
+                    ef.getExpenses() + ": " + e.getMessage(), e);
             throw new RuntimeException("Failed to parse expense data", e);
         }
 

@@ -32,6 +32,7 @@ public class BudgetService {
 	private final ExpenseRepository expenseRepository;
 	private final AlertHandler alertHandler;
 	private final BudgetRepository budgetRepository;
+	private final DbLogService dbLogService;
 
 	private void validateBudget(Budget budget) {
 		if (budget.getUser() == null)
@@ -97,7 +98,6 @@ public class BudgetService {
 			budget.setActive(false);
 			budget.setUpdatedAt(new java.sql.Timestamp(new Date().getTime()).toLocalDateTime());
 			budgetRepository.save(budget);
-//			budgetRepository.delete(budget);
 		} catch (Exception e) {
 			throw new IllegalArgumentException("Error deleting budget: " + e.getMessage());
 		}
@@ -214,8 +214,8 @@ public class BudgetService {
 			try {
 				alertHandler.sendAlert(budget.getUser().getId(), msg);
 			} catch (Exception e) {
-				// Use a logger in production instead of System.out
-				System.out.println("Failed to send budget alert: " + e.getMessage());
+				dbLogService.logError("service", getClass().getName(), "updateBudgetAmountByUserIdAndCategoryId",
+						"Failed to send budget alert: " + e.getMessage(), e);
 			}
 		}
 

@@ -17,11 +17,14 @@ public class WebSocketService {
     private final MessagesRepository messageRepository;
     private final AlertHandler alertHandler;
     private final UserRepository userRepository;
+    private final DbLogService dbLogService;
 
-    public WebSocketService(MessagesRepository messageRepository, AlertHandler alertHandler, UserRepository userRepository) {
+    public WebSocketService(MessagesRepository messageRepository, AlertHandler alertHandler, UserRepository userRepository,
+                            DbLogService dbLogService) {
         this.messageRepository = messageRepository;
         this.alertHandler = alertHandler;
         this.userRepository = userRepository;
+        this.dbLogService = dbLogService;
     }
 
     public void sendAlerts(User user, MessageDTO messageDTO) {
@@ -36,7 +39,8 @@ public class WebSocketService {
         try {
             alertHandler.sendAlert(user.getId(), messageDTO);
         } catch (Exception e) {
-            System.out.println("Error sending websocket msg: " + e.getMessage());
+            dbLogService.logError("service", getClass().getName(), "sendAlerts",
+                    "Error sending websocket msg: " + e.getMessage(), e);
         }
 
     }
@@ -47,7 +51,8 @@ public class WebSocketService {
         try {
             messageRepository.deleteById(alertUUID);
         } catch (Exception e) {
-            System.out.println("Error deleting alert: " + e.getMessage());
+            dbLogService.logError("service", getClass().getName(), "deleteAlert",
+                    "Error deleting alert: " + e.getMessage(), e);
         }
 
     }
@@ -60,7 +65,8 @@ public class WebSocketService {
         try {
             messageRepository.markAllAsSeen(userUUID);
         } catch (Exception e) {
-            System.out.println("Error marking messages as read: " + e.getMessage());
+            dbLogService.logError("service", getClass().getName(), "markAllMessagesAsReadForUser",
+                    "Error marking messages as read: " + e.getMessage(), e);
         }
     }
 
@@ -74,7 +80,8 @@ public class WebSocketService {
             msg.setSeen(true);
             messageRepository.save(msg);
         } catch (Exception e) {
-            System.out.println("Error marking message as read: " + e.getMessage());
+            dbLogService.logError("service", getClass().getName(), "markMessageAsRead",
+                    "Error marking message as read: " + e.getMessage(), e);
         }
     }
 
@@ -91,7 +98,8 @@ public class WebSocketService {
                 alertHandler.sendAlert(user.getId(), msg);
             }
         } catch (Exception e) {
-            System.out.println("Error sending broadcast msg: " + e.getMessage());
+            dbLogService.logError("service", getClass().getName(), "sendBroadCastMessage",
+                    "Error sending broadcast msg: " + e.getMessage(), e);
         }
     }
 }

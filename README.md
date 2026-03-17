@@ -2,7 +2,10 @@
 
 # Expensely – Backend
 
-This is the backend service for the Expensely expense tracking application. Built with **Java (Spring Boot)** and **PostgreSQL**, it provides REST APIs to manage user authentication, expense operations, and category analytics. Link to front end repository [[Link](https://github.com/n-saji/Expensely-FE)]
+This is the backend service for the Expensely expense tracking application. Built with **Java (
+Spring Boot)** and **PostgreSQL**, it provides REST APIs to manage user authentication, expense
+operations, and category analytics. Link to front end
+repository [[Link](https://github.com/n-saji/Expensely-FE)]
 
 ## 🔧 Features
 
@@ -29,4 +32,3 @@ This is the backend service for the Expensely expense tracking application. Buil
 - Expense filtering by category/date
 - API versioning and validation
 - Secure error handling
-

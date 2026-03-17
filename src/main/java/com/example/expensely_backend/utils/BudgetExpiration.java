@@ -4,6 +4,7 @@ import com.example.expensely_backend.dto.MessageDTO;
 import com.example.expensely_backend.globals.globals;
 import com.example.expensely_backend.handler.AlertHandler;
 import com.example.expensely_backend.repository.BudgetRepository;
+import com.example.expensely_backend.service.DbLogService;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,11 +18,14 @@ public class BudgetExpiration {
 	private final BudgetRepository budgetRepository;
 	private final Mailgun mailgun;
 	private final AlertHandler alertHandler;
+	private final DbLogService dbLogService;
 
-	public BudgetExpiration(BudgetRepository budgetRepository, Mailgun mailgun, AlertHandler alertHandler) {
+	public BudgetExpiration(BudgetRepository budgetRepository, Mailgun mailgun, AlertHandler alertHandler,
+	                        DbLogService dbLogService) {
 		this.budgetRepository = budgetRepository;
 		this.mailgun = mailgun;
 		this.alertHandler = alertHandler;
+		this.dbLogService = dbLogService;
 	}
 
 	@Scheduled(cron = "0 0 0 * * *")
@@ -53,6 +57,7 @@ public class BudgetExpiration {
 		}
 
 		budgetRepository.saveAll(budgetsToExpire);
-		System.out.println("Budget expiry job ran at " + today + ", expired " + budgetsToExpire.size() + " budgets.");
+		dbLogService.logMessage("utils", getClass().getName(), "checkBudgetExpiry",
+				"Budget expiry job ran at " + today + ", expired " + budgetsToExpire.size() + " budgets.");
 	}
 }
