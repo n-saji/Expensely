@@ -19,6 +19,7 @@ public class CustomAuthEntryPoint implements AuthenticationEntryPoint {
 
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED); // 401
         response.setContentType("application/json");
+        response.setCharacterEncoding(java.nio.charset.StandardCharsets.UTF_8.name());
 
         String json = """
                 {
@@ -27,6 +28,8 @@ public class CustomAuthEntryPoint implements AuthenticationEntryPoint {
                 }
                 """;
 
-        response.getWriter().write(json);
+        byte[] payload = json.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        response.getOutputStream().write(payload);
+        response.flushBuffer();
     }
 }
