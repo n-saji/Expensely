@@ -428,8 +428,16 @@ public class UserController {
 	}
 
 	@GetMapping("/all")
-	public ResponseEntity<?> getAllUsers() {
+	public ResponseEntity<?> getAllUsers(Authentication authentication) {
+		String userId = authentication != null ? (String) authentication.getPrincipal() : null;
+		if (userId == null) {
+			return ResponseEntity.status(401).body(new UserRes(null, "Unauthorized"));
+		}
 		try {
+			User requester = userService.GetUserById(userId);
+			if (requester.getIsAdmin() == null || !requester.getIsAdmin()) {
+				return ResponseEntity.status(403).body(new UserRes(null, "Forbidden"));
+			}
 			return ResponseEntity.ok(userService.getAllUsers());
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(new UserRes(null, e.getMessage()));
