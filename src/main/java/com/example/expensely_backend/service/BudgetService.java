@@ -179,8 +179,13 @@ public class BudgetService {
 		if (date.toLocalDate().isBefore(budget.getStartDate()) || date.toLocalDate().isAfter(budget.getEndDate())) {
 			return;
 		}
+		BigDecimal newAmount = budget.getAmountLimit().add(amount);
+		if (newAmount.compareTo(BigDecimal.ZERO) >= 0) {
+			budget.setAmountSpent(budget.getAmountSpent().add(amount));
+		} else {
+			budget.setAmountSpent(BigDecimal.ZERO);
+		}
 
-		budget.setAmountSpent(budget.getAmountSpent().add(amount));
 		budget.setUpdatedAt(LocalDateTime.now());
 		try {
 			budgetRepository.save(budget);
