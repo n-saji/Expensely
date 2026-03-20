@@ -4,6 +4,8 @@ import com.example.expensely_backend.model.Expense;
 import com.example.expensely_backend.model.RecurringExpense;
 import com.example.expensely_backend.repository.ExpenseRepository;
 import com.example.expensely_backend.repository.RecurringExpenseRepository;
+import com.example.expensely_backend.service.BudgetService;
+import com.example.expensely_backend.service.DbLogService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -20,10 +22,14 @@ public class ExpenseRecurrenceJob {
 
 	private final RecurringExpenseRepository recurringExpenseRepository;
 	private final ExpenseRepository expenseRepository;
+	private final BudgetService budgetService;
+	private final DbLogService dbLogService;
 
-	public ExpenseRecurrenceJob(RecurringExpenseRepository recurringExpenseRepository, ExpenseRepository expenseRepository) {
+	public ExpenseRecurrenceJob(RecurringExpenseRepository recurringExpenseRepository, ExpenseRepository expenseRepository, BudgetService budgetService, DbLogService dbLogService) {
 		this.recurringExpenseRepository = recurringExpenseRepository;
 		this.expenseRepository = expenseRepository;
+		this.budgetService = budgetService;
+		this.dbLogService = dbLogService;
 	}
 
 	/**
@@ -65,14 +71,22 @@ public class ExpenseRecurrenceJob {
 				}
 
 				recurringExpenseRepository.save(rec);
+				budgetService.updateBudgetAmountByUserIdAndCategoryId(rec.getUser().getId().toString(), rec.getCategory().getId().toString(), rec.getAmount(), expense.getExpenseDate());
 				createdCount++;
-				logger.info("Created expense from recurring id={} expenseId={}", rec.getId(), expense.getId());
+				dbLogService.logMessage("job",
+						getClass().getName(), "ExpenseRecurrenceJob",
+						"Created " +
+								"expense from recurring id=" + rec.getId() + " expenseId=" + expense.getId());
 			} catch (Exception e) {
-				logger.error("Failed to process recurring expense id={}: {}", rec.getId(), e.getMessage(), e);
+				dbLogService.logError("job",
+						getClass().getName(), "ExpenseRecurrenceJob",
+						"Failed to process recurring expense id=" + rec.getId() + ": " + e.getMessage(), e);
 			}
 		}
 
-		logger.info("ExpenseRecurrenceJob complete. created={}, skipped={}", createdCount, skippedCount);
+		dbLogService.logMessage("job",
+				getClass().getName(), "ExpenseRecurrenceJob",
+				"Completed run for date=" + today + ". Created " + createdCount + " expenses.");
 	}
 
 }

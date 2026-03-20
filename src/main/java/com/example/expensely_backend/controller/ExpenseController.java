@@ -9,7 +9,6 @@ import com.example.expensely_backend.globals.globals;
 import com.example.expensely_backend.model.Expense;
 import com.example.expensely_backend.service.*;
 import com.example.expensely_backend.utils.FormatDate;
-import com.example.expensely_backend.utils.JwtUtil;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -29,17 +28,15 @@ public class ExpenseController {
 	private final ExpenseService expenseService;
 	private final CategoryService categoryService;
 	private final BudgetService budgetService;
-	private final JwtUtil jwtUtil;
 	private final ExpenseFilesService expenseFilesService;
 	private final RecurringExpenseService recurringExpenseService;
 
 	public ExpenseController(ExpenseService expenseService, CategoryService categoryService,
-	                         BudgetService budgetService, JwtUtil jwtUtil,
+	                         BudgetService budgetService,
 	                         ExpenseFilesService expenseFilesService, RecurringExpenseService recurringExpenseService) {
 		this.expenseService = expenseService;
 		this.categoryService = categoryService;
 		this.budgetService = budgetService;
-		this.jwtUtil = jwtUtil;
 		this.expenseFilesService = expenseFilesService;
 		this.recurringExpenseService = recurringExpenseService;
 	}
