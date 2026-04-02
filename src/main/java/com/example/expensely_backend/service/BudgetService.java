@@ -17,10 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.Date;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 
 @Service
@@ -231,9 +228,16 @@ public class BudgetService {
 		if (user == null) {
 			throw new IllegalArgumentException("User not found");
 		}
+		List<UUID> activeCategoryBudgets =
+				new ArrayList<>(budgetRepository.findActiveBudgetsByUserId(user.getId()).stream().map(b -> b.getCategory().getId()).toList());
+		if (activeCategoryBudgets.isEmpty()) {
+			activeCategoryBudgets.add(UUID.randomUUID()); // Add a dummy UUID to
+			// prevent SQL error when list is empty
+		}
 		return categoryRepository.findByUserIdAndTypeAndIdNotIn(user.getId(),
 				globals.TYPE_EXPENSE,
-				budgetRepository.findActiveBudgetsByUserId(user.getId()).stream().map(b -> b.getCategory().getId()).toList()).stream().peek(b -> b.setUser(null)).toList();
+				activeCategoryBudgets
+		).stream().peek(b -> b.setUser(null)).toList();
 	}
 
 }
