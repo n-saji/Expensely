@@ -3,16 +3,13 @@ package com.example.expensely_backend.service;
 
 import com.example.expensely_backend.dto.*;
 import com.example.expensely_backend.globals.globals;
-import com.example.expensely_backend.model.Category;
-import com.example.expensely_backend.model.Expense;
-import com.example.expensely_backend.model.ExpenseFiles;
-import com.example.expensely_backend.model.User;
+import com.example.expensely_backend.model.*;
 import com.example.expensely_backend.repository.*;
 import com.example.expensely_backend.utils.FormatDate;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencsv.CSVWriter;
-import org.springframework.context.annotation.Bean;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -25,8 +22,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 @Service
@@ -43,6 +40,7 @@ public class ExpenseService {
 	private final CategoryRepository categoryRepository;
 	private final DbLogService dbLogService;
 	private final RecurringExpenseService recurringExpenseService;
+	private final Executor expenseExecutor;
 
 	public ExpenseService(ExpenseRepository expenseRepository, CategoryService categoryService,
 	                      UserService userService,
@@ -50,7 +48,9 @@ public class ExpenseService {
 			, ExpenseFilesRepository expenseFilesService, UserRepository userRepository,
 			              ObjectMapper objectMapper,
 			              CategoryRepository categoryRepository,
-			              DbLogService dbLogService, RecurringExpenseService recurringExpenseService) {
+			              DbLogService dbLogService,
+			              RecurringExpenseService recurringExpenseService,
+			              @Qualifier("expenseExecutor") Executor expenseExecutor) {
 		this.expenseRepository = expenseRepository;
 		this.categoryService = categoryService;
 		this.userService = userService;
@@ -62,6 +62,7 @@ public class ExpenseService {
 		this.categoryRepository = categoryRepository;
 		this.dbLogService = dbLogService;
 		this.recurringExpenseService = recurringExpenseService;
+		this.expenseExecutor = expenseExecutor;
 
 	}
 
@@ -504,27 +505,86 @@ public class ExpenseService {
 		return monthlyCategoryExpense;
 	}
 
-	@Bean
-	public Executor expenseExecutor() {
-		return Executors.newFixedThreadPool(10);
-	}
+	public ExpenseOverview getExpensesOverviewByUserIdAndTimeFrame(
+			String userId,
+			LocalDateTime startDate,
+			LocalDateTime endDate,
+			int year,
+			int month,
+			LocalDateTime req_start_year,
+			LocalDateTime req_end_year,
+			LocalDateTime req_start,
+			LocalDateTime req_end,
+			Integer req_month) {
 
-	public ExpenseOverview getExpensesOverviewByUserIdAndTimeFrame(String userId, LocalDateTime startDate, LocalDateTime endDate, int year, int month, LocalDateTime req_start_year, LocalDateTime req_end_year, LocalDateTime req_start, LocalDateTime req_end, Integer req_month) {
-		return new ExpenseOverview(getExpenseByUserIdAndStartDateAndEndDate(userId, startDate, endDate, "desc"),
-				getExpenseByUserIdAndStartDateAndEndDate(userId, req_start_year, req_end_year, "desc"),
-				getExpenseByUserIdAndStartDateAndEndDate(userId, req_start, req_end, "desc"),
-				userId, getMonthlyCategoryExpense(userId, req_start_year, req_end_year),
-				categoryService.getCategoriesByUserId(userId, globals.TYPE_EXPENSE),
-				getDailyExpense(userId, req_start, req_end),
-				fetchExpensesWithConditions(userId,
-						FormatDate.formatStartDate(null, false), endDate, "asc", null
-						, 1, 1, "", null, null),
+
+		CompletableFuture<List<ExpenseResponse>> f1 =
+				CompletableFuture.supplyAsync(() ->
+						getExpenseByUserIdAndStartDateAndEndDate(userId, startDate, endDate, "desc"), expenseExecutor);
+
+		CompletableFuture<List<ExpenseResponse>> f2 =
+				CompletableFuture.supplyAsync(() ->
+						getExpenseByUserIdAndStartDateAndEndDate(userId, req_start_year, req_end_year, "desc"), expenseExecutor);
+
+		CompletableFuture<List<ExpenseResponse>> f3 =
+				CompletableFuture.supplyAsync(() ->
+						getExpenseByUserIdAndStartDateAndEndDate(userId, req_start, req_end, "desc"), expenseExecutor);
+
+		CompletableFuture<List<MonthlyCategoryExpense>> monthlyCategory =
+				CompletableFuture.supplyAsync(() ->
+						getMonthlyCategoryExpense(userId, req_start_year, req_end_year), expenseExecutor);
+
+		CompletableFuture<Iterable<Category>> categories =
+				CompletableFuture.supplyAsync(() ->
+						categoryService.getCategoriesByUserId(userId, globals.TYPE_EXPENSE), expenseExecutor);
+
+		CompletableFuture<List<DailyExpense>> daily =
+				CompletableFuture.supplyAsync(() ->
+						getDailyExpense(userId, req_start, req_end), expenseExecutor);
+
+		CompletableFuture<ExpenseResList> recentExpenses =
+				CompletableFuture.supplyAsync(() ->
+						fetchExpensesWithConditions(userId,
+								FormatDate.formatStartDate(null, false),
+								endDate,
+								"asc", null, 1, 1, "", null, null), expenseExecutor);
+
+		CompletableFuture<List<Budget>> budgets =
+				CompletableFuture.supplyAsync(() ->
+						budgetService.getBudgetsByUserId(userId), expenseExecutor);
+
+		CompletableFuture<Double> prevMonthTotal =
+				CompletableFuture.supplyAsync(() ->
+						getTotalExpenseForMonth(
+								month == 1 ? year - 1 : year,
+								month == 1 ? 12 : month - 1,
+								userId), expenseExecutor);
+
+		CompletableFuture<List<RecurringExpenseDTO>> recurring =
+				CompletableFuture.supplyAsync(() ->
+						recurringExpenseService.findRecurringExpenseByUserId(userId), expenseExecutor);
+
+		// join all
+		CompletableFuture.allOf(
+				f1, f2, f3, monthlyCategory, categories,
+				daily, recentExpenses, budgets,
+				prevMonthTotal, recurring
+		).join();
+
+		return new ExpenseOverview(
+				f1.join(),
+				f2.join(),
+				f3.join(),
+				userId,
+				monthlyCategory.join(),
+				categories.join(),
+				daily.join(),
+				recentExpenses.join(),
 				req_month,
-				budgetService.getBudgetsByUserId(userId),
-				getTotalExpenseForMonth(month == 1 ? year - 1 : year,
-						month == 1 ? 12 : month - 1
-						, userId),
-				recurringExpenseService.findRecurringExpenseByUserId(userId));
+				budgets.join(),
+				prevMonthTotal.join(),
+				recurring.join()
+		);
 	}
 
 
