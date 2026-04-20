@@ -3,7 +3,6 @@ package com.example.expensely_backend.controller;
 
 import com.example.expensely_backend.dto.AuthResponse;
 import com.example.expensely_backend.dto.BulkValidationResponse;
-import com.example.expensely_backend.dto.ExpenseOverview;
 import com.example.expensely_backend.dto.UserRes;
 import com.example.expensely_backend.globals.globals;
 import com.example.expensely_backend.model.Expense;
@@ -157,22 +156,9 @@ public class ExpenseController {
 		LocalDateTime req_end_year = LocalDateTime.of(req_year, 12, 31, 23, 59, 59);
 
 		try {
+
 			return ResponseEntity.ok().body(
-					new ExpenseOverview(expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, startDate, endDate, "desc"),
-							expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, req_start_year, req_end_year, "desc"),
-							expenseService.getExpenseByUserIdAndStartDateAndEndDate(userId, req_start, req_end, "desc"),
-							userId, expenseService.getMonthlyCategoryExpense(userId, req_start_year, req_end_year),
-							categoryService.getCategoriesByUserId(userId, "expense"),
-							expenseService.getDailyExpense(userId, req_start, req_end),
-							expenseService.fetchExpensesWithConditions(userId,
-									FormatDate.formatStartDate(null, false), endDate, "asc", null
-									, 1, 1, "", null, null),
-							req_month,
-							budgetService.getBudgetsByUserId(userId),
-							expenseService.getTotalExpenseForMonth(month == 1 ? year - 1 : year,
-									month == 1 ? 12 : month - 1
-									, userId),
-							recurringExpenseService.findRecurringExpenseByUserId(userId)));
+					expenseService.getExpensesOverviewByUserIdAndTimeFrame(userId, startDate, endDate, year, month, req_start_year, req_end_year, req_start, req_end, req_month));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
 		}
