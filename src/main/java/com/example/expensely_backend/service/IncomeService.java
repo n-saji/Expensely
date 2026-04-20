@@ -1,6 +1,7 @@
 package com.example.expensely_backend.service;
 
 import com.example.expensely_backend.dto.DailyIncome;
+import com.example.expensely_backend.dto.IncomeOverview;
 import com.example.expensely_backend.dto.IncomeResList;
 import com.example.expensely_backend.dto.IncomeResponse;
 import com.example.expensely_backend.dto.MonthlyCategoryIncome;
@@ -13,6 +14,7 @@ import com.example.expensely_backend.repository.IncomeRepository;
 import com.example.expensely_backend.repository.IncomeRepositoryCustomImpl;
 import com.example.expensely_backend.utils.FormatDate;
 import com.opencsv.CSVWriter;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -23,6 +25,8 @@ import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 
 @Service
@@ -33,17 +37,153 @@ public class IncomeService {
 	private final UserService userService;
 	private final IncomeRepositoryCustomImpl incomeRepositoryCustomImpl;
 	private final CategoryRepository categoryRepository;
+	private final Executor expenseExecutor;
 
 	public IncomeService(IncomeRepository incomeRepository,
 	                     CategoryService categoryService,
 	                     UserService userService,
 	                     IncomeRepositoryCustomImpl incomeRepositoryCustomImpl,
-	                     CategoryRepository categoryRepository) {
+	                     CategoryRepository categoryRepository,
+	                     @Qualifier("expenseExecutor") Executor expenseExecutor) {
 		this.incomeRepository = incomeRepository;
 		this.categoryService = categoryService;
 		this.userService = userService;
 		this.incomeRepositoryCustomImpl = incomeRepositoryCustomImpl;
 		this.categoryRepository = categoryRepository;
+		this.expenseExecutor = expenseExecutor;
+	}
+
+	private UUID getActiveUserIdOrThrow(String userId) {
+		return userService.GetActiveUserById(userId).getId();
+	}
+
+	private List<IncomeResponse> getIncomeByUserIdAndStartDateAndEndDate(UUID userId, LocalDateTime startDate, LocalDateTime endDate, String order) {
+		List<Income> incomes;
+		if (order == null || order.equalsIgnoreCase("desc")) {
+			incomes = incomeRepository.findByUserIdAndTimeFrameDesc(userId, startDate, endDate);
+		} else if (order.equalsIgnoreCase("asc")) {
+			incomes = incomeRepository.findByUserIdAndTimeFrameAsc(userId, startDate, endDate);
+		} else {
+			throw new IllegalArgumentException("Order must be 'asc' or 'desc'");
+		}
+
+		return incomes.stream().map(IncomeResponse::new).collect(Collectors.toList());
+	}
+
+	private List<MonthlyCategoryIncome> getMonthlyCategoryIncome(UUID userId, LocalDateTime startDate, LocalDateTime endDate) {
+		return incomeRepository.findMonthlyCategoryIncomeByUserId(userId, startDate, endDate);
+	}
+
+	private List<DailyIncome> getDailyIncome(UUID userId, LocalDateTime startDate, LocalDateTime endDate) {
+		return incomeRepository.findDailyIncomeByUserIdAndTimeFrame(userId, startDate, endDate);
+	}
+
+	private record DateRange(LocalDateTime startDate, LocalDateTime endDate) {
+	}
+
+	private DateRange resolveDateRange(int count, globals.TimeFrame type) {
+		if (type == null) {
+			throw new IllegalArgumentException("Type not allowed to be null");
+		}
+		if (count < 1) {
+			throw new IllegalArgumentException("Count must be greater than 0");
+		}
+		if (type == globals.TimeFrame.MONTH && count > 12) {
+			throw new IllegalArgumentException("Count must be less than or equal to 12 for MONTH type");
+		}
+
+		LocalDateTime date = LocalDateTime.now(ZoneOffset.UTC);
+		LocalDateTime startDate;
+		switch (type) {
+			case YEAR -> startDate = LocalDateTime.of(date.getYear() - count, date.getMonth(), 1, 0, 0, 0);
+			case ALL_TIME -> startDate = date.minusYears(count - 1)
+					.withMonth(1)
+					.withDayOfMonth(1)
+					.withHour(0)
+					.withMinute(0)
+					.withSecond(0)
+					.withNano(0);
+			case MONTH -> startDate = date.minusMonths(count - 1)
+					.withDayOfMonth(1)
+					.withHour(0)
+					.withMinute(0)
+					.withSecond(0)
+					.withNano(0);
+			default -> throw new IllegalArgumentException("Invalid time frame type");
+		}
+
+		YearMonth dateYm = YearMonth.of(date.getYear(), date.getMonth());
+		LocalDateTime endDate = LocalDateTime.of(date.getYear(), date.getMonth(), dateYm.lengthOfMonth(), 23, 59, 59);
+
+		return new DateRange(startDate, endDate);
+	}
+
+	public IncomeOverview getIncomeOverviewByUserIdAndTimeFrame(
+			String userId,
+			LocalDateTime startDate,
+			LocalDateTime endDate,
+			int year,
+			int month,
+			LocalDateTime reqStartYear,
+			LocalDateTime reqEndYear,
+			LocalDateTime reqStart,
+			LocalDateTime reqEnd,
+			Integer reqMonth) {
+
+		UUID activeUserId = getActiveUserIdOrThrow(userId);
+
+		CompletableFuture<List<IncomeResponse>> f1 =
+				CompletableFuture.supplyAsync(() ->
+						getIncomeByUserIdAndStartDateAndEndDate(activeUserId, startDate, endDate, "desc"), expenseExecutor);
+
+		CompletableFuture<List<IncomeResponse>> f2 =
+				CompletableFuture.supplyAsync(() ->
+						getIncomeByUserIdAndStartDateAndEndDate(activeUserId, reqStartYear, reqEndYear, "desc"), expenseExecutor);
+
+		CompletableFuture<List<IncomeResponse>> f3 =
+				CompletableFuture.supplyAsync(() ->
+						getIncomeByUserIdAndStartDateAndEndDate(activeUserId, reqStart, reqEnd, "desc"), expenseExecutor);
+
+		CompletableFuture<List<MonthlyCategoryIncome>> monthlyCategory =
+				CompletableFuture.supplyAsync(() ->
+						getMonthlyCategoryIncome(activeUserId, reqStartYear, reqEndYear), expenseExecutor);
+
+		CompletableFuture<Iterable<Category>> categories =
+				CompletableFuture.supplyAsync(() ->
+						categoryService.getCategoriesByUserId(userId, globals.TYPE_INCOME), expenseExecutor);
+
+		CompletableFuture<List<DailyIncome>> daily =
+				CompletableFuture.supplyAsync(() ->
+						getDailyIncome(activeUserId, reqStart, reqEnd), expenseExecutor);
+
+		CompletableFuture<Income> firstIncome =
+				CompletableFuture.supplyAsync(() ->
+						incomeRepository.findFirstByUserIdOrderByIncomeDateAsc(activeUserId), expenseExecutor);
+
+		CompletableFuture<Double> prevMonthTotal =
+				CompletableFuture.supplyAsync(() ->
+						getTotalIncomeForMonth(
+								month == 1 ? year - 1 : year,
+								month == 1 ? 12 : month - 1,
+								userId), expenseExecutor);
+
+		CompletableFuture.allOf(
+				f1, f2, f3, monthlyCategory,
+				categories, daily, firstIncome,
+				prevMonthTotal
+		).join();
+
+		return new IncomeOverview(
+				f1.join(),
+				f2.join(),
+				f3.join(),
+				userId,
+				monthlyCategory.join(),
+				categories.join(),
+				daily.join(),
+				reqMonth,
+				firstIncome.join(),
+				prevMonthTotal.join());
 	}
 
 	public Income save(Income income) {
@@ -174,38 +314,15 @@ public class IncomeService {
 	}
 
 	public List<IncomeResponse> getIncomeByUserIdAndStartDateAndEndDate(String userId, LocalDateTime startDate, LocalDateTime endDate, String order) {
-		User user = userService.GetActiveUserById(userId);
-		if (user == null) {
-			throw new IllegalArgumentException("User not found");
-		}
-
-		List<Income> incomes;
-		if (order == null || order.equalsIgnoreCase("desc")) {
-			incomes = incomeRepository.findByUserIdAndTimeFrameDesc(user.getId(), startDate, endDate);
-		} else if (order.equalsIgnoreCase("asc")) {
-			incomes = incomeRepository.findByUserIdAndTimeFrameAsc(user.getId(), startDate, endDate);
-		} else {
-			throw new IllegalArgumentException("Order must be 'asc' or 'desc'");
-		}
-
-		return incomes.stream().map(IncomeResponse::new).collect(Collectors.toList());
+		return getIncomeByUserIdAndStartDateAndEndDate(getActiveUserIdOrThrow(userId), startDate, endDate, order);
 	}
 
 	public List<MonthlyCategoryIncome> getMonthlyCategoryIncome(String userId, LocalDateTime startDate, LocalDateTime endDate) {
-		User user = userService.GetActiveUserById(userId);
-		if (user == null) {
-			throw new IllegalArgumentException("User not found");
-		}
-
-		return incomeRepository.findMonthlyCategoryIncomeByUserId(user.getId(), startDate, endDate);
+		return getMonthlyCategoryIncome(getActiveUserIdOrThrow(userId), startDate, endDate);
 	}
 
 	public List<DailyIncome> getDailyIncome(String userId, LocalDateTime startDate, LocalDateTime endDate) {
-		User user = userService.GetActiveUserById(userId);
-		if (user == null) {
-			throw new IllegalArgumentException("User not found");
-		}
-		return incomeRepository.findDailyIncomeByUserIdAndTimeFrame(user.getId(), startDate, endDate);
+		return getDailyIncome(getActiveUserIdOrThrow(userId), startDate, endDate);
 	}
 
 	public LinkedHashMap<String, Double> getMonthlyIncomeFromTillTo(String userId, int count,
@@ -214,41 +331,9 @@ public class IncomeService {
 		if (user == null) {
 			throw new IllegalArgumentException("User not found");
 		}
-		if (type == null) {
-			throw new IllegalArgumentException("Type not allowed to be null");
-		}
-		if (count < 1) {
-			throw new IllegalArgumentException("Count must be greater than 0");
-		}
-		if (type == globals.TimeFrame.MONTH && count > 12) {
-			throw new IllegalArgumentException("Count must be less than or equal to 12 for MONTH type");
-		}
 
-		LocalDateTime date = LocalDateTime.now(ZoneOffset.UTC);
-		LocalDateTime startDate, endDate;
-		switch (type) {
-			case YEAR ->
-					startDate = LocalDateTime.of(date.getYear() - count, date.getMonth(), 1, 0, 0, 0);
-			case ALL_TIME -> startDate = date.minusYears(count - 1)
-					.withMonth(1)
-					.withDayOfMonth(1)
-					.withHour(0)
-					.withMinute(0)
-					.withSecond(0)
-					.withNano(0);
-			case MONTH -> startDate = date.minusMonths(count - 1)
-					.withDayOfMonth(1)
-					.withHour(0)
-					.withMinute(0)
-					.withSecond(0)
-					.withNano(0);
-			default ->
-					throw new IllegalArgumentException("Invalid time frame type");
-		}
-		YearMonth date_ym = YearMonth.of(date.getYear(), date.getMonth());
-		endDate = LocalDateTime.of(date.getYear(), date.getMonth(), date_ym.lengthOfMonth(), 23, 59, 59);
-
-		return incomeRepositoryCustomImpl.getMonthlyIncomeFromTillTo(user.getId(), startDate, endDate);
+		DateRange range = resolveDateRange(count, type);
+		return incomeRepositoryCustomImpl.getMonthlyIncomeFromTillTo(user.getId(), range.startDate(), range.endDate());
 	}
 
 	public LinkedHashMap<String, java.util.Map<String, Double>> getMonthlyCategoryIncomeFromTillTo(String userId, int count,
@@ -257,42 +342,11 @@ public class IncomeService {
 		if (user == null) {
 			throw new IllegalArgumentException("User not found");
 		}
-		if (type == null) {
-			throw new IllegalArgumentException("Type not allowed to be null");
-		}
-		if (count < 1) {
-			throw new IllegalArgumentException("Count must be greater than 0");
-		}
-		if (type == globals.TimeFrame.MONTH && count > 12) {
-			throw new IllegalArgumentException("Count must be less than or equal to 12 for MONTH type");
-		}
 
-		LocalDateTime date = LocalDateTime.now(ZoneOffset.UTC);
-		LocalDateTime startDate, endDate;
-		switch (type) {
-			case YEAR ->
-					startDate = LocalDateTime.of(date.getYear() - count, date.getMonth(), 1, 0, 0, 0);
-			case ALL_TIME -> startDate = date.minusYears(count - 1)
-					.withMonth(1)
-					.withDayOfMonth(1)
-					.withHour(0)
-					.withMinute(0)
-					.withSecond(0)
-					.withNano(0);
-			case MONTH -> startDate = date.minusMonths(count - 1)
-					.withDayOfMonth(1)
-					.withHour(0)
-					.withMinute(0)
-					.withSecond(0)
-					.withNano(0);
-			default ->
-					throw new IllegalArgumentException("Invalid time frame type");
-		}
-		YearMonth date_ym = YearMonth.of(date.getYear(), date.getMonth());
-		endDate = LocalDateTime.of(date.getYear(), date.getMonth(), date_ym.lengthOfMonth(), 23, 59, 59);
+		DateRange range = resolveDateRange(count, type);
 
 		List<MonthlyCategoryIncome> dbRes =
-				incomeRepositoryCustomImpl.getMonthlyCategoryIncomeFromTillTo(user.getId(), startDate, endDate);
+				incomeRepositoryCustomImpl.getMonthlyCategoryIncomeFromTillTo(user.getId(), range.startDate(), range.endDate());
 
 		java.util.Map<String, java.util.Map<String, Double>> monthlyCategoryIncome = new LinkedHashMap<>();
 

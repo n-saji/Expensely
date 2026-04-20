@@ -1,12 +1,10 @@
 package com.example.expensely_backend.controller;
 
 import com.example.expensely_backend.dto.AuthResponse;
-import com.example.expensely_backend.dto.IncomeOverview;
 import com.example.expensely_backend.dto.UserRes;
 import com.example.expensely_backend.globals.globals;
 import com.example.expensely_backend.model.Income;
 import com.example.expensely_backend.model.User;
-import com.example.expensely_backend.service.CategoryService;
 import com.example.expensely_backend.service.IncomeService;
 import com.example.expensely_backend.service.UserService;
 import com.example.expensely_backend.utils.FormatDate;
@@ -27,12 +25,10 @@ public class IncomeController {
 
 	private final IncomeService incomeService;
 	private final UserService userService;
-	private final CategoryService categoryService;
 
-	public IncomeController(IncomeService incomeService, UserService userService, CategoryService categoryService) {
+	public IncomeController(IncomeService incomeService, UserService userService) {
 		this.incomeService = incomeService;
 		this.userService = userService;
-		this.categoryService = categoryService;
 	}
 
 	@PostMapping("/create")
@@ -175,18 +171,18 @@ public class IncomeController {
 		LocalDateTime reqEndYear = LocalDateTime.of(reqYear, 12, 31, 23, 59, 59);
 
 		try {
-			return ResponseEntity.ok().body(new IncomeOverview(
-					incomeService.getIncomeByUserIdAndStartDateAndEndDate(userId, startDate, endDate, "desc"),
-					incomeService.getIncomeByUserIdAndStartDateAndEndDate(userId, reqStartYear, reqEndYear, "desc"),
-					incomeService.getIncomeByUserIdAndStartDateAndEndDate(userId, reqStart, reqEnd, "desc"),
-					userId,
-					incomeService.getMonthlyCategoryIncome(userId, reqStartYear, reqEndYear),
-					categoryService.getCategoriesByUserId(userId, globals.TYPE_INCOME),
-					incomeService.getDailyIncome(userId, reqStart, reqEnd),
-					reqMonth,
-					incomeService.getFirstIncome(userId),
-					incomeService.getTotalIncomeForMonth(month == 1 ? year - 1 : year,
-							month == 1 ? 12 : month - 1, userId)));
+			return ResponseEntity.ok().body(
+					incomeService.getIncomeOverviewByUserIdAndTimeFrame(
+							userId,
+							startDate,
+							endDate,
+							year,
+							month,
+							reqStartYear,
+							reqEndYear,
+							reqStart,
+							reqEnd,
+							reqMonth));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
 		}

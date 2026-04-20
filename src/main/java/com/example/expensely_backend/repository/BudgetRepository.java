@@ -1,7 +1,9 @@
 package com.example.expensely_backend.repository;
 
 import com.example.expensely_backend.model.Budget;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
@@ -21,6 +23,10 @@ public interface BudgetRepository extends JpaRepository<Budget, UUID> {
 
 	@Query("SELECT b FROM Budget b WHERE b.user.id = ?1 and b.category.id = ?2 and b.isActive = true")
 	Budget findActiveBudgetsByUserIdAndCategoryId(UUID userId, UUID categoryId);
+
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("SELECT b FROM Budget b WHERE b.user.id = ?1 and b.category.id = ?2 and b.isActive = true")
+	Budget findActiveBudgetByUserIdAndCategoryIdForUpdate(UUID userId, UUID categoryId);
 
 	Boolean existsByUserIdAndCategoryIdAndIsActiveTrue(UUID userId, UUID categoryId);
 

@@ -164,11 +164,15 @@ public class BudgetService {
 		return budgetRepository.findActiveBudgetsByUserIdAndCategoryId(UUID.fromString(user_id), UUID.fromString(category_id));
 	}
 
+	@Transactional
 	public void updateBudgetAmountByUserIdAndCategoryId(String user_id, String category_id, BigDecimal amount, LocalDateTime date) {
 		if (date == null) {
 			throw new IllegalArgumentException("Date must not be null");
 		}
-		Budget budget = findByUserIdAndCategoryId(user_id, category_id);
+		if (amount == null) {
+			throw new IllegalArgumentException("Amount must not be null");
+		}
+		Budget budget = budgetRepository.findActiveBudgetByUserIdAndCategoryIdForUpdate(UUID.fromString(user_id), UUID.fromString(category_id));
 		if (budget == null) {
 			return;
 		}
@@ -176,9 +180,10 @@ public class BudgetService {
 		if (date.toLocalDate().isBefore(budget.getStartDate()) || date.toLocalDate().isAfter(budget.getEndDate())) {
 			return;
 		}
-		BigDecimal newAmount = budget.getAmountLimit().add(amount);
-		if (newAmount.compareTo(BigDecimal.ZERO) >= 0) {
-			budget.setAmountSpent(budget.getAmountSpent().add(amount));
+		BigDecimal currentSpent = budget.getAmountSpent() == null ? BigDecimal.ZERO : budget.getAmountSpent();
+		BigDecimal nextSpent = currentSpent.add(amount);
+		if (nextSpent.compareTo(BigDecimal.ZERO) >= 0) {
+			budget.setAmountSpent(nextSpent);
 		} else {
 			budget.setAmountSpent(BigDecimal.ZERO);
 		}

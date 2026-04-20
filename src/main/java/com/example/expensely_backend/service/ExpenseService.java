@@ -66,6 +66,112 @@ public class ExpenseService {
 
 	}
 
+	private UUID getActiveUserIdOrThrow(String userId) {
+		return userService.GetActiveUserById(userId).getId();
+	}
+
+	private List<ExpenseResponse> getExpenseByUserIdAndStartDateAndEndDate(UUID userId, LocalDateTime startDate, LocalDateTime endDate, String order) {
+		List<Expense> expenses;
+		if (order == null || order.equalsIgnoreCase("desc")) {
+			expenses = expenseRepository.findByUserIdAndTimeFrameDesc(userId, startDate, endDate);
+		} else if (order.equalsIgnoreCase("asc")) {
+			expenses = expenseRepository.findByUserIdAndTimeFrameAsc(userId, startDate, endDate);
+
+		} else {
+			throw new IllegalArgumentException("Order must be 'asc' or 'desc'");
+		}
+
+		return expenses.stream().map(ExpenseResponse::new).collect(Collectors.toList());
+	}
+
+	private List<MonthlyCategoryExpense> getMonthlyCategoryExpense(UUID userId, LocalDateTime startDate, LocalDateTime endDate) {
+		return expenseRepository.findMonthlyCategoryExpenseByUserId(userId, startDate, endDate);
+	}
+
+	private List<DailyExpense> getDailyExpense(UUID userId, LocalDateTime startDate, LocalDateTime endDate) {
+		return expenseRepository.findDailyExpenseByUserIdAndTimeFrame(userId, startDate, endDate);
+	}
+
+	private ExpenseResList fetchExpensesWithConditions(UUID userId, LocalDateTime startDate,
+	                                                  LocalDateTime endDate, String order,
+	                                                  String categoryId, int page, int limit,
+	                                                  String q, String customSortBy, String customSortOrder) {
+		long totalPages;
+		if (page < 1) {
+			throw new IllegalArgumentException("Page must be greater than 0");
+		}
+		int offset = (page - 1) * limit;
+
+		UUID categoryUUID = null;
+		if (q == null) q = "";
+		if (order == null) order = "desc";
+		else order = order.toLowerCase();
+
+		if (categoryId != null) {
+			Category category = categoryService.getCategoryById(categoryId);
+			if (category == null) {
+				throw new IllegalArgumentException("Category not found");
+			}
+			categoryUUID = category.getId();
+		}
+
+		List<Expense> expenses = expenseRepositoryCustomImpl.findExpenses(userId, startDate, endDate,
+				categoryUUID, q, offset, limit, customSortBy, customSortOrder, order);
+		long totalElements = expenseRepositoryCustomImpl.countExpenses(userId, startDate, endDate,
+				categoryUUID, q);
+
+		totalPages = (int) Math.ceil((double) totalElements / limit);
+		return new ExpenseResList(expenses.stream().map(ExpenseResponse::new).collect(Collectors.toList()), totalPages, totalElements, page);
+	}
+
+	private Double getTotalExpenseForMonth(int year, int month, UUID userId) {
+		LocalDateTime startDate = FormatDate.formatStartDate(LocalDateTime.of(year, month, 1, 0, 0), false);
+		YearMonth reqYm = YearMonth.of(year, month);
+		LocalDateTime endDate = reqYm.atEndOfMonth().atTime(23, 59, 59);
+
+		return expenseRepository.getTotalExpenseByUserId(userId, startDate, endDate);
+	}
+
+	private record DateRange(LocalDateTime startDate, LocalDateTime endDate) {
+	}
+
+	private DateRange resolveDateRange(int count, globals.TimeFrame type) {
+		if (type == null) {
+			throw new IllegalArgumentException("Type not allowed to be null");
+		}
+		if (count < 1) {
+			throw new IllegalArgumentException("Count must be greater than 0");
+		}
+		if (type == globals.TimeFrame.MONTH && count > 12) {
+			throw new IllegalArgumentException("Count must be less than or equal to 12 for MONTH type");
+		}
+
+		LocalDateTime date = LocalDateTime.now(ZoneOffset.UTC);
+		LocalDateTime startDate;
+		switch (type) {
+			case YEAR -> startDate = LocalDateTime.of(date.getYear() - count, date.getMonth(), 1, 0, 0, 0);
+			case ALL_TIME -> startDate = date.minusYears(count - 1)
+					.withMonth(1)
+					.withDayOfMonth(1)
+					.withHour(0)
+					.withMinute(0)
+					.withSecond(0)
+					.withNano(0);
+			case MONTH -> startDate = date.minusMonths(count - 1)
+					.withDayOfMonth(1)
+					.withHour(0)
+					.withMinute(0)
+					.withSecond(0)
+					.withNano(0);
+			default -> throw new IllegalArgumentException("Invalid time frame type");
+		}
+
+		YearMonth dateYm = YearMonth.of(date.getYear(), date.getMonth());
+		LocalDateTime endDate = LocalDateTime.of(date.getYear(), date.getMonth(), dateYm.lengthOfMonth(), 23, 59, 59);
+
+		return new DateRange(startDate, endDate);
+	}
+
 	public void save(Expense expense) {
 		if (expense.getCategory() == null || expense.getCategory().getId() == null) {
 			throw new IllegalArgumentException("Category must be provided");
@@ -184,22 +290,7 @@ public class ExpenseService {
 	}
 
 	public List<ExpenseResponse> getExpenseByUserIdAndStartDateAndEndDate(String userId, LocalDateTime startDate, LocalDateTime endDate, String order) {
-		User user = userService.GetActiveUserById(userId);
-		if (user == null) {
-			throw new IllegalArgumentException("User not found");
-		}
-
-		List<Expense> expenses;
-		if (order == null || order.equalsIgnoreCase("desc")) {
-			expenses = expenseRepository.findByUserIdAndTimeFrameDesc(user.getId(), startDate, endDate);
-		} else if (order.equalsIgnoreCase("asc")) {
-			expenses = expenseRepository.findByUserIdAndTimeFrameAsc(user.getId(), startDate, endDate);
-
-		} else {
-			throw new IllegalArgumentException("Order must be 'asc' or 'desc'");
-		}
-
-		return expenses.stream().map(ExpenseResponse::new).collect(Collectors.toList());
+		return getExpenseByUserIdAndStartDateAndEndDate(getActiveUserIdOrThrow(userId), startDate, endDate, order);
 	}
 
 	public void deleteBuUserIDAndExpenseIds(String userId, List<Expense> expenses) {
@@ -234,55 +325,17 @@ public class ExpenseService {
 	                                                  LocalDateTime endDate, String order,
 	                                                  String categoryId, int page, int limit,
 	                                                  String q, String customSortBy, String customSortOrder) {
-		long totalPages, totalElements = 0;
-		User user = userService.GetActiveUserById(userId);
-		if (user == null) {
-			throw new IllegalArgumentException("User not found");
-		}
-		if (page < 1) {
-			throw new IllegalArgumentException("Page must be greater than 0");
-		}
-		int offset = (page - 1) * limit;
-
-		List<Expense> expenses;
-		UUID categoryUUID = null;
-		if (q == null) q = "";
-		if (order == null) order = "desc";
-		else order = order.toLowerCase();
-
-		if (categoryId != null) {
-			Category category = categoryService.getCategoryById(categoryId);
-			if (category == null) {
-				throw new IllegalArgumentException("Category not found");
-			}
-			categoryUUID = category.getId();
-		}
-
-		expenses = expenseRepositoryCustomImpl.findExpenses(user.getId(), startDate, endDate,
-				categoryUUID, q, offset, limit, customSortBy, customSortOrder, order);
-		totalElements = expenseRepositoryCustomImpl.countExpenses(user.getId(), startDate, endDate,
-				categoryUUID, q);
-
-		totalPages = (int) Math.ceil((double) totalElements / limit);
-		return new ExpenseResList(expenses.stream().map(ExpenseResponse::new).collect(Collectors.toList()), totalPages, totalElements, page);
+		return fetchExpensesWithConditions(getActiveUserIdOrThrow(userId), startDate, endDate, order,
+				categoryId, page, limit, q, customSortBy, customSortOrder);
 	}
 
 	public List<MonthlyCategoryExpense> getMonthlyCategoryExpense(String userId, LocalDateTime startDate, LocalDateTime endDate) {
-		User user = userService.GetActiveUserById(userId);
-		if (user == null) {
-			throw new IllegalArgumentException("User not found");
-		}
-
-		return expenseRepository.findMonthlyCategoryExpenseByUserId(user.getId(), startDate, endDate);
+		return getMonthlyCategoryExpense(getActiveUserIdOrThrow(userId), startDate, endDate);
 
 	}
 
 	public List<DailyExpense> getDailyExpense(String userId, LocalDateTime startDate, LocalDateTime endDate) {
-		User user = userService.GetActiveUserById(userId);
-		if (user == null) {
-			throw new IllegalArgumentException("User not found");
-		}
-		return expenseRepository.findDailyExpenseByUserIdAndTimeFrame(user.getId(), startDate, endDate);
+		return getDailyExpense(getActiveUserIdOrThrow(userId), startDate, endDate);
 	}
 
 	public String exportExpensesToCSV(String userId, LocalDateTime startDate, LocalDateTime endDate) throws IOException {
@@ -358,12 +411,7 @@ public class ExpenseService {
 	}
 
 	public Double getTotalExpenseForMonth(int year, int month, String userId) {
-		UUID userIdUUID = UUID.fromString(userId);
-		LocalDateTime startDate = FormatDate.formatStartDate(LocalDateTime.of(year, month, 1, 0, 0), false);
-		YearMonth req_ym = YearMonth.of(year, month);
-		LocalDateTime endDate = req_ym.atEndOfMonth().atTime(23, 59, 59);
-
-		return expenseRepository.getTotalExpenseByUserId(userIdUUID, startDate, endDate);
+		return getTotalExpenseForMonth(year, month, UUID.fromString(userId));
 
 	}
 
@@ -373,54 +421,13 @@ public class ExpenseService {
 		if (user == null) {
 			throw new IllegalArgumentException("User not found");
 		}
-		// checks
-		if (type == null) {
-			throw new IllegalArgumentException("Type not allowed to be null");
-		}
-		if (count < 1) {
-			throw new IllegalArgumentException("Count must be greater than 0");
-		}
-		if (type == globals.TimeFrame.MONTH && count > 12) {
-			throw new IllegalArgumentException("Count must be less than or equal to 12 for MONTH type");
-		}
 
-		LocalDateTime date = LocalDateTime.now(ZoneOffset.UTC);
-		LocalDateTime startDate, endDate;
-		switch (type) {
-			case YEAR ->
-					startDate = LocalDateTime.of(date.getYear() - count, date.getMonth(),
-							1, 0
-							, 0,
-							0);
-			case ALL_TIME -> startDate = date.minusYears(count - 1)
-					.withMonth(1)
-					.withDayOfMonth(1)
-					.withHour(0)
-					.withMinute(0)
-					.withSecond(0)
-					.withNano(0);
-
-			case MONTH -> {
-
-				startDate = date.minusMonths(count - 1)
-						.withDayOfMonth(1)
-						.withHour(0)
-						.withMinute(0)
-						.withSecond(0)
-						.withNano(0);
-
-			}
-			default ->
-					throw new IllegalArgumentException("Invalid time frame type");
-		}
-		YearMonth date_ym = YearMonth.of(date.getYear(), date.getMonth());
-		endDate = LocalDateTime.of(date.getYear(), date.getMonth(), date_ym.lengthOfMonth(), 23, 59
-				, 59);
+		DateRange range = resolveDateRange(count, type);
 
 		return
 				expenseRepositoryCustomImpl.getMonthlyExpenseFromTillTo(user.getId(),
-						startDate,
-						endDate);
+						range.startDate(),
+						range.endDate());
 	}
 
 	public Map<String, Map<String, Double>> getMonthlyCategoryExpenseFromTillTo(String userId, int count,
@@ -429,54 +436,13 @@ public class ExpenseService {
 		if (user == null) {
 			throw new IllegalArgumentException("User not found");
 		}
-		// checks
-		if (type == null) {
-			throw new IllegalArgumentException("Type not allowed to be null");
-		}
-		if (count < 1) {
-			throw new IllegalArgumentException("Count must be greater than 0");
-		}
-		if (type == globals.TimeFrame.MONTH && count > 12) {
-			throw new IllegalArgumentException("Count must be less than or equal to 12 for MONTH type");
-		}
 
-		LocalDateTime date = LocalDateTime.now(ZoneOffset.UTC);
-		LocalDateTime startDate, endDate;
-		switch (type) {
-			case YEAR ->
-					startDate = LocalDateTime.of(date.getYear() - count, date.getMonth(),
-							1, 0
-							, 0,
-							0);
-			case ALL_TIME -> startDate = date.minusYears(count - 1)
-					.withMonth(1)
-					.withDayOfMonth(1)
-					.withHour(0)
-					.withMinute(0)
-					.withSecond(0)
-					.withNano(0);
-
-			case MONTH -> {
-
-				startDate = date.minusMonths(count - 1)
-						.withDayOfMonth(1)
-						.withHour(0)
-						.withMinute(0)
-						.withSecond(0)
-						.withNano(0);
-
-			}
-			default ->
-					throw new IllegalArgumentException("Invalid time frame type");
-		}
-		YearMonth date_ym = YearMonth.of(date.getYear(), date.getMonth());
-		endDate = LocalDateTime.of(date.getYear(), date.getMonth(), date_ym.lengthOfMonth(), 23, 59
-				, 59);
+		DateRange range = resolveDateRange(count, type);
 
 		List<MonthlyCategoryExpense> dbRes =
 				expenseRepositoryCustomImpl.getMonthlyCategoryExpenseFromTillTo(user.getId(),
-						startDate,
-						endDate);
+						range.startDate(),
+						range.endDate());
 
 		Map<String, Map<String, Double>> monthlyCategoryExpense = new LinkedHashMap<>();
 
@@ -517,22 +483,23 @@ public class ExpenseService {
 			LocalDateTime req_end,
 			Integer req_month) {
 
+		UUID activeUserId = getActiveUserIdOrThrow(userId);
 
 		CompletableFuture<List<ExpenseResponse>> f1 =
 				CompletableFuture.supplyAsync(() ->
-						getExpenseByUserIdAndStartDateAndEndDate(userId, startDate, endDate, "desc"), expenseExecutor);
+						getExpenseByUserIdAndStartDateAndEndDate(activeUserId, startDate, endDate, "desc"), expenseExecutor);
 
 		CompletableFuture<List<ExpenseResponse>> f2 =
 				CompletableFuture.supplyAsync(() ->
-						getExpenseByUserIdAndStartDateAndEndDate(userId, req_start_year, req_end_year, "desc"), expenseExecutor);
+						getExpenseByUserIdAndStartDateAndEndDate(activeUserId, req_start_year, req_end_year, "desc"), expenseExecutor);
 
 		CompletableFuture<List<ExpenseResponse>> f3 =
 				CompletableFuture.supplyAsync(() ->
-						getExpenseByUserIdAndStartDateAndEndDate(userId, req_start, req_end, "desc"), expenseExecutor);
+						getExpenseByUserIdAndStartDateAndEndDate(activeUserId, req_start, req_end, "desc"), expenseExecutor);
 
 		CompletableFuture<List<MonthlyCategoryExpense>> monthlyCategory =
 				CompletableFuture.supplyAsync(() ->
-						getMonthlyCategoryExpense(userId, req_start_year, req_end_year), expenseExecutor);
+						getMonthlyCategoryExpense(activeUserId, req_start_year, req_end_year), expenseExecutor);
 
 		CompletableFuture<Iterable<Category>> categories =
 				CompletableFuture.supplyAsync(() ->
@@ -540,11 +507,11 @@ public class ExpenseService {
 
 		CompletableFuture<List<DailyExpense>> daily =
 				CompletableFuture.supplyAsync(() ->
-						getDailyExpense(userId, req_start, req_end), expenseExecutor);
+						getDailyExpense(activeUserId, req_start, req_end), expenseExecutor);
 
 		CompletableFuture<ExpenseResList> recentExpenses =
 				CompletableFuture.supplyAsync(() ->
-						fetchExpensesWithConditions(userId,
+						fetchExpensesWithConditions(activeUserId,
 								FormatDate.formatStartDate(null, false),
 								endDate,
 								"asc", null, 1, 1, "", null, null), expenseExecutor);
@@ -558,7 +525,7 @@ public class ExpenseService {
 						getTotalExpenseForMonth(
 								month == 1 ? year - 1 : year,
 								month == 1 ? 12 : month - 1,
-								userId), expenseExecutor);
+								activeUserId), expenseExecutor);
 
 		CompletableFuture<List<RecurringExpenseDTO>> recurring =
 				CompletableFuture.supplyAsync(() ->
