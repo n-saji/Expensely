@@ -2,6 +2,7 @@ package com.example.expensely_backend.dto;
 
 import com.example.expensely_backend.model.Category;
 import com.example.expensely_backend.model.Income;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 
 import java.time.LocalDate;
@@ -48,6 +49,9 @@ public class IncomeOverview {
 	private final Map<String, Double> thisMonthMostIncomeItem;
 	@Getter
 	private Double lastMonthTotalIncome = 0.0;
+	@Getter
+	@JsonProperty("total_balance")
+	private final Double totalBalance;
 
 	public IncomeOverview(List<IncomeResponse> incomes,
 	                      List<IncomeResponse> reqIncomeRange,
@@ -58,7 +62,8 @@ public class IncomeOverview {
 	                      List<DailyIncome> dailyIncomes,
 	                      Integer reqMonth,
 	                      Income firstIncome,
-	                      Double lastMonthTotalIncome) {
+	                      Double lastMonthTotalIncome,
+	                      Double totalBalance) {
 		this.userId = userId;
 		this.totalCount = incomes.size();
 		this.categoryCount = incomes.stream()
@@ -74,6 +79,7 @@ public class IncomeOverview {
 						Collectors.summingDouble(IncomeResponse::getAmount)));
 		this.thisMonthTotalIncome = round(monthMap.getOrDefault(Month.of(currentMonth + 1), 0.0) * 100.0) / 100.0;
 		this.lastMonthTotalIncome = lastMonthTotalIncome == null ? 0.0 : lastMonthTotalIncome;
+		this.totalBalance = round((totalBalance == null ? 0.0 : totalBalance) * 100.0) / 100.0;
 		this.totalAmount = incomes.stream().mapToDouble(IncomeResponse::getAmount).sum();
 		this.averageMonthlyIncome = totalAmount / (currentMonth + 1);
 		this.mostFrequentCategory = categoryCount.entrySet().stream()

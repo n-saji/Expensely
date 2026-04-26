@@ -10,6 +10,7 @@ import com.example.expensely_backend.model.Category;
 import com.example.expensely_backend.model.Income;
 import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.repository.CategoryRepository;
+import com.example.expensely_backend.repository.ExpenseRepository;
 import com.example.expensely_backend.repository.IncomeRepository;
 import com.example.expensely_backend.repository.IncomeRepositoryCustomImpl;
 import com.example.expensely_backend.utils.FormatDate;
@@ -37,6 +38,7 @@ public class IncomeService {
 	private final UserService userService;
 	private final IncomeRepositoryCustomImpl incomeRepositoryCustomImpl;
 	private final CategoryRepository categoryRepository;
+	private final ExpenseRepository expenseRepository;
 	private final Executor expenseExecutor;
 
 	public IncomeService(IncomeRepository incomeRepository,
@@ -44,12 +46,14 @@ public class IncomeService {
 	                     UserService userService,
 	                     IncomeRepositoryCustomImpl incomeRepositoryCustomImpl,
 	                     CategoryRepository categoryRepository,
+	                     ExpenseRepository expenseRepository,
 	                     @Qualifier("expenseExecutor") Executor expenseExecutor) {
 		this.incomeRepository = incomeRepository;
 		this.categoryService = categoryService;
 		this.userService = userService;
 		this.incomeRepositoryCustomImpl = incomeRepositoryCustomImpl;
 		this.categoryRepository = categoryRepository;
+		this.expenseRepository = expenseRepository;
 		this.expenseExecutor = expenseExecutor;
 	}
 
@@ -167,10 +171,29 @@ public class IncomeService {
 								month == 1 ? 12 : month - 1,
 								userId), expenseExecutor);
 
+		CompletableFuture<Double> totalIncomeAllTime =
+				CompletableFuture.supplyAsync(() -> {
+					Double total = incomeRepository.getTotalIncomeByUserId(
+							activeUserId,
+							LocalDateTime.of(1970, 1, 1, 0, 0),
+							LocalDateTime.now());
+					return total == null ? 0.0 : total;
+				}, expenseExecutor);
+
+		CompletableFuture<Double> totalExpenseAllTime =
+				CompletableFuture.supplyAsync(() -> {
+					Double total = expenseRepository.getTotalExpenseByUserId(
+							activeUserId,
+							LocalDateTime.of(1970, 1, 1, 0, 0),
+							LocalDateTime.now());
+					return total == null ? 0.0 : total;
+				}, expenseExecutor);
+
 		CompletableFuture.allOf(
 				f1, f2, f3, monthlyCategory,
 				categories, daily, firstIncome,
-				prevMonthTotal
+				prevMonthTotal, totalIncomeAllTime,
+				totalExpenseAllTime
 		).join();
 
 		return new IncomeOverview(
@@ -183,7 +206,8 @@ public class IncomeService {
 				daily.join(),
 				reqMonth,
 				firstIncome.join(),
-				prevMonthTotal.join());
+				prevMonthTotal.join(),
+				totalIncomeAllTime.join() - totalExpenseAllTime.join());
 	}
 
 	public Income save(Income income) {

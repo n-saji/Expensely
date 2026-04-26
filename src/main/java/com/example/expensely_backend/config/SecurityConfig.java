@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -27,7 +28,7 @@ public class SecurityConfig {
 	String[] origins = allowedOrigins != null ? allowedOrigins.split(",") : new String[]{};
 
 	public SecurityConfig(JwtAuthFilter jwtAuthFilter, CustomAuthEntryPoint customAuthEntryPoint,
-						  ApiRequestLoggingFilter apiRequestLoggingFilter) {
+	                      ApiRequestLoggingFilter apiRequestLoggingFilter) {
 		this.jwtAuthFilter = jwtAuthFilter;
 		this.customAuthEntryPoint = customAuthEntryPoint;
 		this.apiRequestLoggingFilter = apiRequestLoggingFilter;
@@ -39,18 +40,20 @@ public class SecurityConfig {
 
 		http
 				.cors().and()
-				.csrf().disable()
+				.csrf(AbstractHttpConfigurer::disable)
 				.exceptionHandling()
 				.authenticationEntryPoint(customAuthEntryPoint)
 				.and()
 				.authorizeHttpRequests(
 						auth -> auth
-														.requestMatchers("/api/users/register", "/api/users/login",
-																"/ping", "/api/users/verify-oauth-login", "/api/users" +
-																												"/refresh", "/api/users/verify-otp", "/api/users/resend-otp",
-																												"/api/users/request-password-reset", "/api/users/confirm-password-reset",
-																"/ws/**").permitAll() // Allow public
-								.anyRequest().permitAll()
+								.requestMatchers("/api/users/register", "/api/users/login",
+										"/ping", "/api/users/verify-oauth-login", "/api/users" +
+												"/refresh", "/api/users/verify-otp", "/api/users/resend-otp",
+										"/api/users/request-password-reset", "/api/users/confirm-password-reset",
+										"/users/check-auth",
+										"/ws/**").permitAll() // Allow public
+								.anyRequest().permitAll() // some bug, accept
+						// all
 				)
 				.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
 				.addFilterAfter(apiRequestLoggingFilter, JwtAuthFilter.class);
