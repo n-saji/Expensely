@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -30,6 +31,70 @@ public class BudgetService {
 	private final AlertHandler alertHandler;
 	private final BudgetRepository budgetRepository;
 	private final DbLogService dbLogService;
+
+	private float calculatePercentage(BigDecimal amountSpent, BigDecimal amountLimit) {
+		if (amountLimit == null || amountLimit.compareTo(BigDecimal.ZERO) <= 0) {
+			return 0f;
+		}
+		BigDecimal safeSpent = amountSpent == null ? BigDecimal.ZERO : amountSpent;
+		return safeSpent.multiply(BigDecimal.valueOf(100))
+				.divide(amountLimit, 4, RoundingMode.HALF_UP)
+				.floatValue();
+	}
+
+	private void syncThresholdFlags(Budget budget, float percentage) {
+		budget.setThreshold50Crossed(percentage >= 50f);
+		budget.setThreshold75Crossed(percentage >= 75f);
+		budget.setThreshold100Crossed(percentage >= 100f);
+	}
+
+	private int resolveHighestNewlyCrossedThreshold(Budget budget, float percentage) {
+		boolean crossed50 = percentage >= 50f;
+		boolean crossed75 = percentage >= 75f;
+		boolean crossed100 = percentage >= 100f;
+
+		if (crossed100 && !budget.isThreshold100Crossed()) {
+			return 100;
+		}
+		if (crossed75 && !budget.isThreshold75Crossed()) {
+			return 75;
+		}
+		if (crossed50 && !budget.isThreshold50Crossed()) {
+			return 50;
+		}
+		return 0;
+	}
+
+	private void sendBudgetThresholdAlert(Budget budget, float percentage) {
+		int displayPercent = (int) percentage;
+		String category = budget.getCategory().getName();
+		String text = "";
+		globals.MessageType type = globals.MessageType.ALERT;
+
+		if (percentage >= 50 && percentage <= 100) {
+			text = String.format("Heads up! You've used %d%% of your %s budget.", displayPercent, category);
+			type = globals.MessageType.ALERT;
+		} else if (percentage > 100) {
+			text = String.format("You've exceeded your %s budget limit.", category);
+			type = globals.MessageType.ERROR;
+		}
+
+		if (text.isEmpty()) {
+			return;
+		}
+
+		MessageDTO msg = new MessageDTO();
+		msg.setMessage(text);
+		msg.setSender(globals.SERVER_SENDER);
+		msg.setType(type);
+
+		try {
+			alertHandler.sendAlert(budget.getUser().getId(), msg);
+		} catch (Exception e) {
+			dbLogService.logError("service", getClass().getName(), "updateBudgetAmountByUserIdAndCategoryId",
+					"Failed to send budget alert: " + e.getMessage(), e);
+		}
+	}
 
 	private void validateBudget(Budget budget) {
 		if (budget.getUser() == null)
@@ -82,6 +147,7 @@ public class BudgetService {
 			}
 		}
 		budget.setAmountSpent(total_amount);
+		syncThresholdFlags(budget, calculatePercentage(budget.getAmountSpent(), budget.getAmountLimit()));
 		return budgetRepository.save(budget);
 	}
 
@@ -101,7 +167,7 @@ public class BudgetService {
 	}
 
 	public List<Budget> findAll() {
-		List<Budget> budgets = budgetRepository.findAll();
+		List<Budget> budgets = budgetRepository.findAllOrderByUtilizationDesc();
 		if (budgets.isEmpty()) {
 			throw new IllegalArgumentException("No budgets found");
 		}
@@ -152,7 +218,8 @@ public class BudgetService {
 				existingBudget.setStartDate(budget.getStartDate());
 			if (budget.getEndDate() != null)
 				existingBudget.setEndDate(budget.getEndDate());
-			budget.setUpdatedAt(new java.sql.Timestamp(new Date().getTime()).toLocalDateTime());
+			existingBudget.setUpdatedAt(new java.sql.Timestamp(new Date().getTime()).toLocalDateTime());
+			syncThresholdFlags(existingBudget, calculatePercentage(existingBudget.getAmountSpent(), existingBudget.getAmountLimit()));
 
 			return budgetRepository.save(existingBudget);
 		} catch (Exception e) {
@@ -188,42 +255,18 @@ public class BudgetService {
 			budget.setAmountSpent(BigDecimal.ZERO);
 		}
 
+		float percentage = calculatePercentage(budget.getAmountSpent(), budget.getAmountLimit());
+		int highestNewlyCrossedThreshold = resolveHighestNewlyCrossedThreshold(budget, percentage);
+		syncThresholdFlags(budget, percentage);
+
 		budget.setUpdatedAt(LocalDateTime.now());
 		try {
 			budgetRepository.save(budget);
 		} catch (Exception e) {
 			throw new IllegalArgumentException("Error updating budget amount: " + e.getMessage());
 		}
-
-//        calculate percentage used and send msg
-		float percentage = (budget.getAmountSpent().floatValue() / budget.getAmountLimit().floatValue()) * 100;
-		// Calculate once, format as an integer for the message
-		int displayPercent = (int) percentage;
-		String category = budget.getCategory().getName();
-		String text = "";
-		globals.MessageType type = globals.MessageType.ALERT;
-
-		if (percentage >= 70 && percentage <= 100) {
-			text = String.format("Heads up! You've used %d%% of your %s budget.", displayPercent, category);
-			type = globals.MessageType.ALERT;
-		} else if (percentage > 100) {
-			text = String.format("You've exceeded your %s budget limit.", category);
-			type = globals.MessageType.ERROR;
-		}
-
-		// Only send if a message was actually set
-		if (!text.isEmpty()) {
-			MessageDTO msg = new MessageDTO();
-			msg.setMessage(text);
-			msg.setSender(globals.SERVER_SENDER);
-			msg.setType(type);
-
-			try {
-				alertHandler.sendAlert(budget.getUser().getId(), msg);
-			} catch (Exception e) {
-				dbLogService.logError("service", getClass().getName(), "updateBudgetAmountByUserIdAndCategoryId",
-						"Failed to send budget alert: " + e.getMessage(), e);
-			}
+		if (highestNewlyCrossedThreshold > 0) {
+			sendBudgetThresholdAlert(budget, percentage);
 		}
 
 	}

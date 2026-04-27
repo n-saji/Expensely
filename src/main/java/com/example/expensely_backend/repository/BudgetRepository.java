@@ -15,11 +15,20 @@ import java.util.UUID;
 public interface BudgetRepository extends JpaRepository<Budget, UUID> {
 	Boolean existsByCategoryId(UUID categoryId);
 
-	@Query("SELECT b FROM Budget b WHERE b.category.id = ?1 and b.isActive = true")
+	@Query("SELECT b FROM Budget b WHERE b.category.id = ?1 and b.isActive = true " +
+			"ORDER BY CASE WHEN b.amountLimit IS NULL OR b.amountLimit <= 0 THEN 0 " +
+			"ELSE COALESCE(b.amountSpent, 0) / b.amountLimit END DESC, b.updatedAt DESC")
 	List<Budget> findByCategoryId(UUID categoryId);
 
-	@Query("SELECT b FROM Budget b WHERE b.user.id = ?1 and b.isActive = true")
+	@Query("SELECT b FROM Budget b WHERE b.user.id = ?1 and b.isActive = true " +
+			"ORDER BY CASE WHEN b.amountLimit IS NULL OR b.amountLimit <= 0 THEN 0 " +
+			"ELSE COALESCE(b.amountSpent, 0) / b.amountLimit END DESC, b.updatedAt DESC")
 	List<Budget> findActiveBudgetsByUserId(UUID userId);
+
+	@Query("SELECT b FROM Budget b " +
+			"ORDER BY CASE WHEN b.amountLimit IS NULL OR b.amountLimit <= 0 THEN 0 " +
+			"ELSE COALESCE(b.amountSpent, 0) / b.amountLimit END DESC, b.updatedAt DESC")
+	List<Budget> findAllOrderByUtilizationDesc();
 
 	@Query("SELECT b FROM Budget b WHERE b.user.id = ?1 and b.category.id = ?2 and b.isActive = true")
 	Budget findActiveBudgetsByUserIdAndCategoryId(UUID userId, UUID categoryId);
@@ -30,8 +39,10 @@ public interface BudgetRepository extends JpaRepository<Budget, UUID> {
 
 	Boolean existsByUserIdAndCategoryIdAndIsActiveTrue(UUID userId, UUID categoryId);
 
-	List<Budget> findBudgetByEndDateBeforeAndIsActiveTrue(LocalDate today
-	);
+	@Query("SELECT b FROM Budget b WHERE b.endDate < ?1 and b.isActive = true " +
+			"ORDER BY CASE WHEN b.amountLimit IS NULL OR b.amountLimit <= 0 THEN 0 " +
+			"ELSE COALESCE(b.amountSpent, 0) / b.amountLimit END DESC, b.updatedAt DESC")
+	List<Budget> findBudgetByEndDateBeforeAndIsActiveTrue(LocalDate today);
 
 	long deleteAllByUserId(UUID userId);
 }

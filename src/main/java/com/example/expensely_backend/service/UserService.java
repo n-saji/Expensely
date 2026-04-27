@@ -194,9 +194,17 @@ public class UserService {
 		for (Budget budget : budgets) {
 			float ratio =
 					((budget.getAmountSpent())).divide(budget.getAmountLimit(), RoundingMode.CEILING).floatValue();
-			if (ratio >= 0.70 && ratio <= 1) {
+			if (ratio >= 0.75 && ratio <= 1) {
 				AlertDtos alert =
-						new AlertDtos("You are about to exceed limit set in " + budget.getCategory().getName()
+						new AlertDtos("You’ve used " + Math.round(ratio * 100
+						) +
+								"% " +
+								"of your " +
+								budget.getCategory().getName() +
+								" budget" +
+								". " +
+								"Only " + Math.round((1 - ratio) * 100) + "% " +
+								"left. "
 								, "WARNING");
 				alerts.add(alert);
 			} else if (ratio > 1) {

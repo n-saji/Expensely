@@ -74,5 +74,20 @@ public class Budget {
 	@Column(name = "updated_at")
 	private LocalDateTime updatedAt = LocalDateTime.now();
 
+	@Getter
+	@Setter
+	@Column(name = "threshold_50_crossed", nullable = false, columnDefinition = "boolean default false")
+	private boolean isThreshold50Crossed = false;
+
+	@Getter
+	@Setter
+	@Column(name = "threshold_75_crossed", nullable = false, columnDefinition = "boolean default false")
+	private boolean isThreshold75Crossed = false;
+
+	@Getter
+	@Setter
+	@Column(name = "threshold_100_crossed", nullable = false, columnDefinition = "boolean default false")
+	private boolean isThreshold100Crossed = false;
+
 
 }
