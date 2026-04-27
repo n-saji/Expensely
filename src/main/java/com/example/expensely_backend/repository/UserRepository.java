@@ -1,8 +1,10 @@
 package com.example.expensely_backend.repository;
 
 import com.example.expensely_backend.model.User;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -17,4 +19,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     @Query("SELECT u FROM User u ORDER BY u.createdAt DESC")
     List<User> findAllOrderByCreatedAtDesc();
+
+    @Modifying
+    @Transactional
+    @Query(value = "UPDATE users SET theme_color = 'teal' WHERE theme_color IS NULL", nativeQuery = true)
+    int backfillThemeColorDefaults();
 }

@@ -1,5 +1,7 @@
 package com.example.expensely_backend.model;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.Getter;
@@ -49,7 +51,14 @@ public class User {
 	@Column(nullable = false, columnDefinition = "varchar(255) default 'light'")
 	@Getter
 	@Setter
-	private String theme = "light"; // Default theme set to light
+	private String theme;
+
+	@Column(name = "theme_color", nullable = false, columnDefinition = "varchar(255) default 'teal'")
+	@Getter
+	@Setter
+	@JsonProperty("theme_color")
+	@JsonAlias("themeColor")
+	private String themeColor;
 
 	@Column(nullable = false, columnDefinition = "varchar(255) default 'en'")
 	@Getter
@@ -59,17 +68,17 @@ public class User {
 	@Column(nullable = false, columnDefinition = "boolean default true")
 	@Getter
 	@Setter
-	private Boolean isActive = true; // Default active status set to true
+	private Boolean isActive; // Default active status set to true
 
 	@Column(nullable = false, columnDefinition = "boolean default false")
 	@Getter
 	@Setter
-	private Boolean isAdmin = false;
+	private Boolean isAdmin;
 
 	@Column(nullable = false, columnDefinition = "boolean default true")
 	@Getter
 	@Setter
-	private Boolean NotificationsEnabled = true; // Default notifications enabled status set to true
+	private Boolean NotificationsEnabled;
 
 	@Column(nullable = true, columnDefinition = "varchar(1000)")
 	@Getter
@@ -79,15 +88,15 @@ public class User {
 	@Column(columnDefinition = "boolean default false")
 	@Getter
 	@Setter
-	private boolean isOauth2User = false; // Default OAuth2 user status set to false
+	private boolean isOauth2User;
 
 	@Column(columnDefinition = "boolean default true")
 	@Getter
 	@Setter
-	private boolean isProfileComplete = false;
+	private boolean isProfileComplete;
 
 	@Column(columnDefinition = "boolean default false")
 	@Getter
 	@Setter
-	private boolean isEmailVerified = false; // Default email verified status set to false
+	private boolean isEmailVerified;
 }

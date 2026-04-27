@@ -271,14 +271,17 @@ public class UserController {
 				existingUser.setNotificationsEnabled(user.getNotificationsEnabled());
 			if (user.getLanguage() != null)
 				existingUser.setLanguage(user.getLanguage());
-			if (user.getTheme() != null) existingUser.setTheme(user.getTheme());
+			if (user.getTheme() != null && !user.getTheme().equals(existingUser.getTheme()))
+				existingUser.setTheme(user.getTheme());
+			if (user.getThemeColor() != null)
+				existingUser.setThemeColor(user.getThemeColor());
 			if (user.getCurrency() != null)
 				existingUser.setCurrency(user.getCurrency());
 			if (user.getIsActive() != null)
 				existingUser.setIsActive(user.getIsActive());
 			if (user.getIsAdmin() != null)
 				existingUser.setIsAdmin(user.getIsAdmin());
-
+			System.out.println("hello" + user + " " + existingUser);
 			userService.UpdateUser(existingUser);
 			return ResponseEntity.ok(new UserRes(existingUser, null));
 		} catch (Exception e) {

@@ -4,6 +4,7 @@ import com.example.expensely_backend.dto.AlertDtos;
 import com.example.expensely_backend.model.Budget;
 import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.repository.*;
+import jakarta.annotation.PostConstruct;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +39,12 @@ public class UserService {
 		this.incomeRepository = incomeRepository;
 	}
 
+	@PostConstruct
+	@Transactional
+	public void backfillThemeColorDefaults() {
+		userRepository.backfillThemeColorDefaults();
+	}
+
 
 	public void save(User user) {
 
@@ -58,6 +65,7 @@ public class UserService {
 		if (user.getPassword() != null) {
 			user.setPassword(passwordEncoder.encode(user.getPassword()));
 		}
+		ensureThemeColorDefault(user);
 		try {
 			userRepository.save(user);
 		} catch (Exception e) {
@@ -135,6 +143,7 @@ public class UserService {
 			throw new IllegalArgumentException("Password cannot be null or empty");
 		}
 		user.setPassword(passwordEncoder.encode(password));
+		ensureThemeColorDefault(user);
 		try {
 			userRepository.save(user);
 		} catch (Exception e) {
@@ -200,6 +209,12 @@ public class UserService {
 
 		return alerts;
 
+	}
+
+	private void ensureThemeColorDefault(User user) {
+		if (user.getThemeColor() == null) {
+			user.setThemeColor("teal");
+		}
 	}
 
 
