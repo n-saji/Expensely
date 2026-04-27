@@ -44,5 +44,5 @@ public interface BudgetRepository extends JpaRepository<Budget, UUID> {
 			"ELSE COALESCE(b.amountSpent, 0) / b.amountLimit END DESC, b.updatedAt DESC")
 	List<Budget> findBudgetByEndDateBeforeAndIsActiveTrue(LocalDate today);
 
-	long deleteAllByUserId(UUID userId);
+	void deleteAllByUserId(UUID userId);
 }

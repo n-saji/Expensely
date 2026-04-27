@@ -77,5 +77,5 @@ public interface IncomeRepository extends JpaRepository<Income, UUID> {
 
 	Income findFirstByUserIdOrderByIncomeDateAsc(UUID userId);
 
-	long deleteAllByUserId(UUID userId);
+	void deleteAllByUserId(UUID userId);
 }

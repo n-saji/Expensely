@@ -15,65 +15,65 @@ import java.util.UUID;
 @Repository
 public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
 
-    List<Expense> findByUserId(UUID userId);
+	List<Expense> findByUserId(UUID userId);
 
-    List<Expense> findByCategoryIdAndUserId(UUID categoryId, UUID userId);
+	List<Expense> findByCategoryIdAndUserId(UUID categoryId, UUID userId);
 
-    @Query("SELECT e from Expense e where e.user.id = :userId and e.expenseDate >= :startDate and e.expenseDate < :endDate order by e.expenseDate DESC")
-    List<Expense> findByUserIdAndTimeFrameDesc(
-            @Param("userId") UUID userId,
-            @Param("startDate") LocalDateTime startDate,
-            @Param("endDate") LocalDateTime endDate
-    );
+	@Query("SELECT e from Expense e where e.user.id = :userId and e.expenseDate >= :startDate and e.expenseDate < :endDate order by e.expenseDate DESC")
+	List<Expense> findByUserIdAndTimeFrameDesc(
+			@Param("userId") UUID userId,
+			@Param("startDate") LocalDateTime startDate,
+			@Param("endDate") LocalDateTime endDate
+	);
 
-    @Query("SELECT e from Expense e where e.user.id = :userId and e.expenseDate >= :startDate and e.expenseDate < :endDate order by e.expenseDate ASC")
-    List<Expense> findByUserIdAndTimeFrameAsc(
-            @Param("userId") UUID userId,
-            @Param("startDate") LocalDateTime startDate,
-            @Param("endDate") LocalDateTime endDate
-    );
+	@Query("SELECT e from Expense e where e.user.id = :userId and e.expenseDate >= :startDate and e.expenseDate < :endDate order by e.expenseDate ASC")
+	List<Expense> findByUserIdAndTimeFrameAsc(
+			@Param("userId") UUID userId,
+			@Param("startDate") LocalDateTime startDate,
+			@Param("endDate") LocalDateTime endDate
+	);
 
 
-    @Query(value = """
-             SELECT\s
-                 TO_CHAR(e.expense_date, 'FMMonth') AS month,\s
-                   c."name" AS categoryName, \s
-                 SUM(e.amount) AS totalAmount\s
-             FROM expenses e\s
-             JOIN categories c on e.category_id  = c.id\s
-             WHERE e.user_id = :userId\s
-                AND  e.expense_date >= :startDate and e.expense_date < :endDate
-            
-             GROUP BY month,c."name"\s
-             ORDER BY MIN(e.expense_date)
-            \s""", nativeQuery = true)
-    List<MonthlyCategoryExpense> findMonthlyCategoryExpenseByUserId(@Param("userId") UUID userId, @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+	@Query(value = """
+			 SELECT\s
+			     TO_CHAR(e.expense_date, 'FMMonth') AS month,\s
+			       c."name" AS categoryName, \s
+			     SUM(e.amount) AS totalAmount\s
+			 FROM expenses e\s
+			 JOIN categories c on e.category_id  = c.id\s
+			 WHERE e.user_id = :userId\s
+			    AND  e.expense_date >= :startDate and e.expense_date < :endDate
+			
+			 GROUP BY month,c."name"\s
+			 ORDER BY MIN(e.expense_date)
+			\s""", nativeQuery = true)
+	List<MonthlyCategoryExpense> findMonthlyCategoryExpenseByUserId(@Param("userId") UUID userId, @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 
-    @Query(value = """
-                SELECT
-                    TO_CHAR(e.expense_date, 'YYYY-MM-DD') AS expenseDate,
-                    SUM(e.amount) AS totalAmount
-                FROM expenses e
-                WHERE e.user_id = :userId
-                  AND e.expense_date >= :startDate
-                  AND e.expense_date < :endDate
-                GROUP BY expenseDate
-                ORDER BY expenseDate
-            """, nativeQuery = true)
-    List<DailyExpense> findDailyExpenseByUserIdAndTimeFrame(@Param("userId") UUID userId,
-                                                            @Param("startDate") LocalDateTime startDate,
-                                                            @Param("endDate") LocalDateTime endDate);
+	@Query(value = """
+			    SELECT
+			        TO_CHAR(e.expense_date, 'YYYY-MM-DD') AS expenseDate,
+			        SUM(e.amount) AS totalAmount
+			    FROM expenses e
+			    WHERE e.user_id = :userId
+			      AND e.expense_date >= :startDate
+			      AND e.expense_date < :endDate
+			    GROUP BY expenseDate
+			    ORDER BY expenseDate
+			""", nativeQuery = true)
+	List<DailyExpense> findDailyExpenseByUserIdAndTimeFrame(@Param("userId") UUID userId,
+	                                                        @Param("startDate") LocalDateTime startDate,
+	                                                        @Param("endDate") LocalDateTime endDate);
 
-    long deleteAllByUserId(UUID id);
+	void deleteAllByUserId(UUID id);
 
-    @Query(value = """
-            SELECT sum(e.amount)
-                        from expenses e
-                        where e.user_id = :userId
-                        AND e.expense_date >= :startDate
-                        AND e.expense_date <= :endDate
-            """, nativeQuery = true)
-    Double getTotalExpenseByUserId(UUID userId, LocalDateTime startDate, LocalDateTime endDate);
+	@Query(value = """
+			SELECT sum(e.amount)
+			            from expenses e
+			            where e.user_id = :userId
+			            AND e.expense_date >= :startDate
+			            AND e.expense_date <= :endDate
+			""", nativeQuery = true)
+	Double getTotalExpenseByUserId(UUID userId, LocalDateTime startDate, LocalDateTime endDate);
 
 }
 

@@ -11,5 +11,5 @@ import java.util.UUID;
 public interface ExpiredTokenRepository extends JpaRepository<ExpiredToken, String> {
 
 
-    long deleteAllByUserId(UUID userId);
+	void deleteAllByUserId(UUID userId);
 }

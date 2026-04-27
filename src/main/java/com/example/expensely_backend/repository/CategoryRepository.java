@@ -15,7 +15,7 @@ public interface CategoryRepository extends JpaRepository<Category, UUID> {
 
 	List<Category> findByUserId(UUID userId);
 
-	long deleteByUserId(UUID userId);
+	void deleteByUserId(UUID userId);
 
 	List<Category> findByUserIdAndTypeAndIdNotIn(UUID id, String type,
 	                                             List<UUID> excludeIds);
