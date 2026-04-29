@@ -80,6 +80,13 @@ public class User {
 	@Setter
 	private Boolean NotificationsEnabled;
 
+	@Column(nullable = false, columnDefinition = "boolean default true")
+	@Getter
+	@Setter
+	@JsonProperty("alerts_enabled")
+	@JsonAlias("alertsEnabled")
+	private Boolean alertsEnabled;
+
 	@Column(nullable = true, columnDefinition = "varchar(1000)")
 	@Getter
 	@Setter

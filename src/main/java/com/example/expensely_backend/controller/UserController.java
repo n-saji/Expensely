@@ -269,6 +269,8 @@ public class UserController {
 			}
 			if (user.getNotificationsEnabled() != null)
 				existingUser.setNotificationsEnabled(user.getNotificationsEnabled());
+			if (user.getAlertsEnabled() != null)
+				existingUser.setAlertsEnabled(user.getAlertsEnabled());
 			if (user.getLanguage() != null)
 				existingUser.setLanguage(user.getLanguage());
 			if (user.getTheme() != null && !user.getTheme().equals(existingUser.getTheme()))
@@ -537,6 +539,11 @@ public class UserController {
 
 		String userId = (String) authentication.getPrincipal();
 		try {
+			// Respect user's alerts setting: if alerts are disabled, return empty list
+			User user = userService.GetUserById(userId);
+			if (user.getAlertsEnabled() != null && !user.getAlertsEnabled()) {
+				return ResponseEntity.ok(Collections.emptyList());
+			}
 			return ResponseEntity.ok(userService.fetchAllAlertsForUser(userId));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(new AuthResponse("Error fetching alerts: " + e.getMessage(), null, "internal server error"));
