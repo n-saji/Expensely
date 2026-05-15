@@ -6,9 +6,11 @@ import com.example.expensely_backend.globals.globals;
 import com.example.expensely_backend.model.*;
 import com.example.expensely_backend.repository.*;
 import com.example.expensely_backend.utils.FormatDate;
+import com.example.expensely_backend.utils.S3Service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencsv.CSVWriter;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
@@ -18,10 +20,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
@@ -41,6 +40,9 @@ public class ExpenseService {
 	private final DbLogService dbLogService;
 	private final RecurringExpenseService recurringExpenseService;
 	private final Executor expenseExecutor;
+
+	@Autowired
+	private S3Service s3Service;
 
 	public ExpenseService(ExpenseRepository expenseRepository, CategoryService categoryService,
 	                      UserService userService,
@@ -93,9 +95,9 @@ public class ExpenseService {
 	}
 
 	private ExpenseResList fetchExpensesWithConditions(UUID userId, LocalDateTime startDate,
-	                                                  LocalDateTime endDate, String order,
-	                                                  String categoryId, int page, int limit,
-	                                                  String q, String customSortBy, String customSortOrder) {
+	                                                   LocalDateTime endDate, String order,
+	                                                   String categoryId, int page, int limit,
+	                                                   String q, String customSortBy, String customSortOrder) {
 		long totalPages;
 		if (page < 1) {
 			throw new IllegalArgumentException("Page must be greater than 0");
@@ -132,9 +134,6 @@ public class ExpenseService {
 		return expenseRepository.getTotalExpenseByUserId(userId, startDate, endDate);
 	}
 
-	private record DateRange(LocalDateTime startDate, LocalDateTime endDate) {
-	}
-
 	private DateRange resolveDateRange(int count, globals.TimeFrame type) {
 		if (type == null) {
 			throw new IllegalArgumentException("Type not allowed to be null");
@@ -149,7 +148,8 @@ public class ExpenseService {
 		LocalDateTime date = LocalDateTime.now(ZoneOffset.UTC);
 		LocalDateTime startDate;
 		switch (type) {
-			case YEAR -> startDate = LocalDateTime.of(date.getYear() - count, date.getMonth(), 1, 0, 0, 0);
+			case YEAR ->
+					startDate = LocalDateTime.of(date.getYear() - count, date.getMonth(), 1, 0, 0, 0);
 			case ALL_TIME -> startDate = date.minusYears(count - 1)
 					.withMonth(1)
 					.withDayOfMonth(1)
@@ -163,7 +163,8 @@ public class ExpenseService {
 					.withMinute(0)
 					.withSecond(0)
 					.withNano(0);
-			default -> throw new IllegalArgumentException("Invalid time frame type");
+			default ->
+					throw new IllegalArgumentException("Invalid time frame type");
 		}
 
 		YearMonth dateYm = YearMonth.of(date.getYear(), date.getMonth());
@@ -172,7 +173,7 @@ public class ExpenseService {
 		return new DateRange(startDate, endDate);
 	}
 
-	public void save(Expense expense) {
+	public Expense save(Expense expense) {
 		if (expense.getCategory() == null || expense.getCategory().getId() == null) {
 			throw new IllegalArgumentException("Category must be provided");
 		}
@@ -190,7 +191,7 @@ public class ExpenseService {
 		}
 
 		expense.setUser(user);
-		expenseRepository.save(expense);
+		Expense exp = expenseRepository.save(expense);
 
 
 		// calculate if budget set
@@ -200,6 +201,8 @@ public class ExpenseService {
 		} catch (Exception e) {
 			throw new IllegalArgumentException("Error updating budget: " + e.getMessage());
 		}
+
+		return exp;
 
 	}
 
@@ -552,6 +555,62 @@ public class ExpenseService {
 				prevMonthTotal.join(),
 				recurring.join()
 		);
+	}
+
+	public Map<String, String> GenerateS3PresignedURLForExpense(String userId,
+	                                                            String fileName,
+	                                                            String ContentType) {
+
+		String key = userId + "/" + fileName;
+		try {
+			return Map.of("presignedURL", s3Service.generatePresignedURL(key,
+					ContentType), "fileURL", key);
+
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+
+	}
+
+	public void UpdateExpenseAttachment(String UserID, String expenseId,
+	                                    String key) {
+
+		try {
+			Expense expense =
+					expenseRepository.findByUserIdAndId(UUID.fromString(UserID),
+							UUID.fromString(expenseId));
+
+			if (expense == null) {
+				throw new IllegalArgumentException("Expense not found");
+			}
+
+			expense.setReceiptUrl(key);
+
+			expenseRepository.save(expense);
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+
+
+	}
+
+	public String GenerateDownloadURLForExpense(String eid) {
+		try {
+			Optional<Expense> expense =
+					expenseRepository.findById(UUID.fromString(eid));
+			if (expense.isEmpty()) {
+				throw new IllegalArgumentException("Expense not found");
+			}
+			if (expense.get().getReceiptUrl() == null) {
+				throw new IllegalArgumentException("Receipt URL not found");
+			}
+			return s3Service.generateDownloadUrl(expense.get().getReceiptUrl());
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	private record DateRange(LocalDateTime startDate, LocalDateTime endDate) {
 	}
 
 

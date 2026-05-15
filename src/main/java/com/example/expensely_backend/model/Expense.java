@@ -10,40 +10,45 @@ import java.util.UUID;
 
 @Entity
 @Table(
-        name = "expenses",
-        indexes = {
-                @Index(name = "idx_expense_date_user_id", columnList = "user_id,expense_date")
-        }
+		name = "expenses",
+		indexes = {
+				@Index(name = "idx_expense_date_user_id", columnList = "user_id,expense_date")
+		}
 )
 public class Expense {
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    @Getter
-    @Setter
-    private UUID id;
+	@Id
+	@GeneratedValue(strategy = GenerationType.UUID)
+	@Getter
+	@Setter
+	private UUID id;
 
-    @ManyToOne
-    @Getter
-    @Setter
-    private User user;
+	@ManyToOne
+	@Getter
+	@Setter
+	private User user;
 
-    @ManyToOne
-    @Getter
-    @Setter
-    private Category category;
+	@ManyToOne
+	@Getter
+	@Setter
+	private Category category;
 
-    @Column(nullable = false)
-    @Getter
-    @Setter
-    private BigDecimal amount;
+	@Column(nullable = false)
+	@Getter
+	@Setter
+	private BigDecimal amount;
 
-    @Getter
-    @Setter
-    private String description;
+	@Getter
+	@Setter
+	private String description;
 
-    @Column(name = "expense_date")
-    @Getter
-    @Setter
-    private LocalDateTime expenseDate;
+	@Column(name = "expense_date")
+	@Getter
+	@Setter
+	private LocalDateTime expenseDate;
+
+	@Column(name = "receipt_url")
+	@Getter
+	@Setter
+	private String receiptUrl;
 
 }

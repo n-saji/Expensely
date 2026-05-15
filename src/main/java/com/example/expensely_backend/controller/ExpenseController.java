@@ -1,9 +1,7 @@
 package com.example.expensely_backend.controller;
 
 
-import com.example.expensely_backend.dto.AuthResponse;
-import com.example.expensely_backend.dto.BulkValidationResponse;
-import com.example.expensely_backend.dto.UserRes;
+import com.example.expensely_backend.dto.*;
 import com.example.expensely_backend.globals.globals;
 import com.example.expensely_backend.model.Expense;
 import com.example.expensely_backend.service.*;
@@ -19,25 +17,20 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/expenses")
 public class ExpenseController {
 
 	private final ExpenseService expenseService;
-	private final CategoryService categoryService;
-	private final BudgetService budgetService;
 	private final ExpenseFilesService expenseFilesService;
-	private final RecurringExpenseService recurringExpenseService;
 
-	public ExpenseController(ExpenseService expenseService, CategoryService categoryService,
-	                         BudgetService budgetService,
-	                         ExpenseFilesService expenseFilesService, RecurringExpenseService recurringExpenseService) {
+	public ExpenseController(ExpenseService expenseService,
+
+	                         ExpenseFilesService expenseFilesService) {
 		this.expenseService = expenseService;
-		this.categoryService = categoryService;
-		this.budgetService = budgetService;
 		this.expenseFilesService = expenseFilesService;
-		this.recurringExpenseService = recurringExpenseService;
 	}
 
 	@PostMapping("/create")
@@ -47,8 +40,8 @@ public class ExpenseController {
 			if (expense.getExpenseDate() == null) {
 				expense.setExpenseDate(LocalDateTime.now());
 			}
-			expenseService.save(expense);
-			return ResponseEntity.ok(new AuthResponse("Expense created successfully!", null, ""));
+			Expense exp = expenseService.save(expense);
+			return ResponseEntity.ok(new ExpenseResponse(exp));
 
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(new AuthResponse("Expense creation failed!", null, e.getMessage()));
@@ -296,4 +289,63 @@ public class ExpenseController {
 		}
 	}
 
+	@GetMapping("/get-presigned-url")
+	public ResponseEntity<?> getPresignedURL(Authentication authentication,
+	                                         @RequestParam(name = "expenseId") String expenseID,
+	                                         @RequestParam(name =
+			                                         "contentType") String contentType,
+	                                         @RequestParam(name = "fileName") String fileName
+	) {
+
+		String userId = (String) authentication.getPrincipal();
+
+		try {
+			Expense expense = expenseService.getExpenseById(expenseID);
+			if (expense == null) {
+				return ResponseEntity.badRequest().body("Expense not found");
+			}
+			fileName = expenseID + "-" + fileName;
+			Map<String, String> resp =
+					expenseService.GenerateS3PresignedURLForExpense(userId,
+							fileName,
+							contentType);
+			return ResponseEntity.ok().body(new S3Resp(resp.get("presignedURL"), resp.get("fileURL")));
+		} catch (Exception e) {
+			return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
+		}
+	}
+
+	@PutMapping("/update-expense-attachment-url/eid/{eid}")
+	public ResponseEntity<?> updateExpenseAttachment(Authentication authentication,
+	                                                 @PathVariable(name = "eid") String expenseID,
+	                                                 @RequestBody S3Resp url
+
+	) {
+
+		String userId = (String) authentication.getPrincipal();
+		try {
+			expenseService.UpdateExpenseAttachment(userId, expenseID, url.getUrl());
+		} catch (Exception e) {
+			return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
+		}
+		return ResponseEntity.ok().body("Expense attachment updated successfully");
+	}
+
+
+	@GetMapping("/get-download-url/eid/{eid}")
+	public ResponseEntity<?> getDownloadURL(Authentication authentication,
+	                                        @PathVariable String eid
+	) {
+
+		String userId = (String) authentication.getPrincipal();
+		try {
+
+			return ResponseEntity.ok().body(new S3Resp("",
+					expenseService.GenerateDownloadURLForExpense(eid)));
+		} catch (Exception e) {
+			return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
+		}
+	}
+
 }
+
