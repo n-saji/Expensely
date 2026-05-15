@@ -64,6 +64,8 @@ jobs:
             PORT=${{ vars.PORT }}
             MAILGUN_API_KEY=${{ secrets.MAILGUN_API_KEY }}
             FRONTEND_URL=${{ vars.FRONTEND_URL }}
+            AWS_REGION=${{ vars.AWS_REGION }}
+            AWS_BUCKET_NAME=${{ secrets.AWS_BUCKET_NAME }}
             EOF
 
 
