@@ -3,6 +3,8 @@ package com.example.expensely_backend.utils;
 import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
@@ -54,5 +56,13 @@ public class S3Service {
 		}
 	}
 
-
+	public void deleteObject(String key) {
+		try (S3Client s3Client = S3Client.builder().region(region).build()) {
+			DeleteObjectRequest deleteObjectRequest = DeleteObjectRequest.builder()
+					.bucket(BUCKET_NAME)
+					.key(key)
+					.build();
+			s3Client.deleteObject(deleteObjectRequest);
+		}
+	}
 }

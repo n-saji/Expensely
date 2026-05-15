@@ -610,6 +610,25 @@ public class ExpenseService {
 		}
 	}
 
+	public void DeleteExpenseAttachment(String userId, String expenseId) {
+		try {
+			Expense expense = expenseRepository.findByUserIdAndId(UUID.fromString(userId),
+					UUID.fromString(expenseId));
+			if (expense == null) {
+				throw new IllegalArgumentException("Expense not found");
+			}
+			String receiptUrl = expense.getReceiptUrl();
+			if (receiptUrl == null || receiptUrl.isBlank()) {
+				throw new IllegalArgumentException("Receipt URL not found");
+			}
+			s3Service.deleteObject(receiptUrl);
+			expense.setReceiptUrl(null);
+			expenseRepository.save(expense);
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+	}
+
 	private record DateRange(LocalDateTime startDate, LocalDateTime endDate) {
 	}
 

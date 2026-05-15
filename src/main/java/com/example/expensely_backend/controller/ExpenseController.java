@@ -347,5 +347,17 @@ public class ExpenseController {
 		}
 	}
 
-}
+	@DeleteMapping("/delete-attachment/eid/{eid}")
+	public ResponseEntity<?> deleteExpenseAttachment(Authentication authentication,
+	                                                 @PathVariable String eid
+	) {
+		String userId = (String) authentication.getPrincipal();
+		try {
+			expenseService.DeleteExpenseAttachment(userId, eid);
+			return ResponseEntity.ok().body("Expense attachment deleted successfully");
+		} catch (Exception e) {
+			return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
+		}
+	}
 
+}
