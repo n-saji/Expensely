@@ -1,14 +1,19 @@
 package com.example.expensely_backend.service;
 
+import com.example.expensely_backend.globals.globals;
 import com.example.expensely_backend.model.Category;
 import com.example.expensely_backend.repository.CategoryRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 @Service
 public class CategoryService {
+    private static final Pattern ICON_PATTERN = Pattern.compile("^[A-Za-z0-9_-]{1,64}$");
+    private static final Pattern HEX_COLOR_PATTERN = Pattern.compile("^#[0-9A-Fa-f]{6}$");
+
     private final CategoryRepository categoryRepository;
     private final UserService userService;
 
@@ -29,6 +34,19 @@ public class CategoryService {
             throw new IllegalArgumentException("User not found");
         }
         category.setUser(user);
+
+        if (category.getIcon() == null || category.getIcon().isBlank()) {
+            category.setIcon(globals.DEFAULT_CATEGORY_ICON);
+        } else if (!ICON_PATTERN.matcher(category.getIcon()).matches()) {
+            throw new IllegalArgumentException("Unsupported icon identifier");
+        }
+
+        if (category.getColor() == null || category.getColor().isBlank()) {
+            category.setColor(globals.DEFAULT_CATEGORY_COLOR);
+        } else if (!HEX_COLOR_PATTERN.matcher(category.getColor()).matches()) {
+            throw new IllegalArgumentException("Color must be a hex value like #RRGGBB");
+        }
+
         return categoryRepository.save(category);
     }
 
@@ -90,6 +108,18 @@ public class CategoryService {
         }
         if (category.getType() != null && !category.getType().isEmpty()) {
             existingCategory.setType(category.getType());
+        }
+        if (category.getIcon() != null && !category.getIcon().isBlank()) {
+            if (!ICON_PATTERN.matcher(category.getIcon()).matches()) {
+                throw new IllegalArgumentException("Unsupported icon identifier");
+            }
+            existingCategory.setIcon(category.getIcon());
+        }
+        if (category.getColor() != null && !category.getColor().isBlank()) {
+            if (!HEX_COLOR_PATTERN.matcher(category.getColor()).matches()) {
+                throw new IllegalArgumentException("Color must be a hex value like #RRGGBB");
+            }
+            existingCategory.setColor(category.getColor());
         }
         try{
             categoryRepository.save(existingCategory);

@@ -6,6 +6,8 @@ public class globals {
 	public static final String SERVER_SENDER = "SERVER";
 	public static final String TYPE_EXPENSE = "expense";
 	public static final String TYPE_INCOME = "income";
+	public static final String DEFAULT_CATEGORY_ICON = "DollarSign";
+	public static final String DEFAULT_CATEGORY_COLOR = "#808080";
 
 	public enum MessageType {
 		ALERT, INFO, ERROR, SUCCESS
