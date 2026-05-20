@@ -4,8 +4,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Table(name = "exchange_rates", uniqueConstraints = {@UniqueConstraint(columnNames = {"base_currency", "target_currency"})})
 @Entity
@@ -24,8 +24,8 @@ public class ExchangeRate {
 	@Column(name = "target_currency", nullable = false, length = 3)
 	private String targetCurrency;
 
-	@Column(name = "rate", nullable = false)
-	private Double rate;
+	@Column(name = "rate", nullable = false, precision = 19, scale = 8)
+	private BigDecimal rate;
 
 	@Column(name = "fetched_at", nullable = false)
 	private LocalDateTime updatedAt;

@@ -9,6 +9,8 @@ import jakarta.transaction.Transactional;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -20,6 +22,9 @@ import java.util.Optional;
 
 @Service
 public class ExchangeRateService {
+	private static final String BASE_CURRENCY = "USD";
+	private static final int DISPLAY_SCALE = 2;
+	private static final int RATE_SCALE = 8;
 
 	private final ExchangeRateRepository
 			exchangeRateRepository;
@@ -127,10 +132,10 @@ public class ExchangeRateService {
 								apiRate.getTarget()
 						);
 
-				exchangeRate
-						.setRate(
-								apiRate.getRate()
-						);
+						exchangeRate
+								.setRate(
+										BigDecimal.valueOf(apiRate.getRate())
+								);
 
 				exchangeRate
 						.setUpdatedAt(
@@ -159,5 +164,48 @@ public class ExchangeRateService {
 
 			e.printStackTrace();
 		}
+	}
+
+	public BigDecimal getUsdToCurrencyRate(String targetCurrency) {
+		if (targetCurrency == null || targetCurrency.isBlank() || BASE_CURRENCY.equalsIgnoreCase(targetCurrency)) {
+			return BigDecimal.ONE;
+		}
+		Optional<ExchangeRate> rate = exchangeRateRepository
+				.findByBaseCurrencyAndTargetCurrency(BASE_CURRENCY, targetCurrency.toUpperCase());
+		return rate.map(ExchangeRate::getRate)
+				.orElseThrow(() -> new IllegalArgumentException("Exchange rate not found for " + BASE_CURRENCY + " -> " + targetCurrency));
+	}
+
+	public BigDecimal convertToUsd(BigDecimal amount, String currency) {
+		if (amount == null) {
+			return null;
+		}
+		if (currency == null || currency.isBlank() || BASE_CURRENCY.equalsIgnoreCase(currency)) {
+			return amount.setScale(DISPLAY_SCALE, RoundingMode.HALF_UP);
+		}
+		BigDecimal rate = getUsdToCurrencyRate(currency);
+		return amount
+				.divide(rate, RATE_SCALE, RoundingMode.HALF_UP)
+				.setScale(DISPLAY_SCALE, RoundingMode.HALF_UP);
+	}
+
+	public BigDecimal convertFromUsd(BigDecimal baseAmount, String targetCurrency) {
+		if (baseAmount == null) {
+			return null;
+		}
+		if (targetCurrency == null || targetCurrency.isBlank() || BASE_CURRENCY.equalsIgnoreCase(targetCurrency)) {
+			return baseAmount.setScale(DISPLAY_SCALE, RoundingMode.HALF_UP);
+		}
+		BigDecimal rate = getUsdToCurrencyRate(targetCurrency);
+		return baseAmount
+				.multiply(rate)
+				.setScale(DISPLAY_SCALE, RoundingMode.HALF_UP);
+	}
+
+	public BigDecimal normalizeDisplayAmount(BigDecimal amount) {
+		if (amount == null) {
+			return null;
+		}
+		return amount.setScale(DISPLAY_SCALE, RoundingMode.HALF_UP);
 	}
 }

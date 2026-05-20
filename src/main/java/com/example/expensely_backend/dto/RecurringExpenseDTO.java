@@ -16,6 +16,7 @@ public class RecurringExpenseDTO {
 	private String userId;
 	private String categoryId;
 	private BigDecimal amount;
+	private String currency;
 	private String description;
 	private globals.Recurrence recurrence; // DAILY, WEEKLY, MONTHLY, YEARLY
 	private LocalDate date; // The date when the recurring expense starts

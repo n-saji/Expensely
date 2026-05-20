@@ -13,4 +13,6 @@ public interface RecurringExpenseRepository extends JpaRepository<RecurringExpen
 	List<RecurringExpense> findByActiveTrueAndNextOccurrence(LocalDate nextOccurrence);
 
 	List<RecurringExpense> findByUserIdOrderByCreatedAtDesc(UUID userId);
+
+	List<RecurringExpense> findByCurrencyIsNullOrCurrencyEquals(String currency);
 }

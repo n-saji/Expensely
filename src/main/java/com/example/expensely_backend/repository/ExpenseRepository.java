@@ -40,7 +40,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
 			 SELECT\s
 			     TO_CHAR(e.expense_date, 'FMMonth') AS month,\s
 			       c."name" AS categoryName, \s
-			     SUM(e.amount) AS totalAmount\s
+						     SUM(e.base_currency_amount) AS totalAmount\s
 			 FROM expenses e\s
 			 JOIN categories c on e.category_id  = c.id\s
 			 WHERE e.user_id = :userId\s
@@ -54,7 +54,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
 	@Query(value = """
 			    SELECT
 			        TO_CHAR(e.expense_date, 'YYYY-MM-DD') AS expenseDate,
-			        SUM(e.amount) AS totalAmount
+						        SUM(e.base_currency_amount) AS totalAmount
 			    FROM expenses e
 			    WHERE e.user_id = :userId
 			      AND e.expense_date >= :startDate
@@ -69,13 +69,16 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
 	void deleteAllByUserId(UUID id);
 
 	@Query(value = """
-			SELECT sum(e.amount)
+			SELECT sum(e.base_currency_amount)
 			            from expenses e
 			            where e.user_id = :userId
 			            AND e.expense_date >= :startDate
 			            AND e.expense_date <= :endDate
 			""", nativeQuery = true)
 	Double getTotalExpenseByUserId(UUID userId, LocalDateTime startDate, LocalDateTime endDate);
+
+	@Query("SELECT e FROM Expense e WHERE e.currency IS NULL OR e.currency = '' OR e.baseCurrencyAmount IS NULL OR e.exchangeRate IS NULL OR e.baseCurrency IS NULL")
+	List<Expense> findExpensesMissingCurrencySnapshot();
 
 }
 

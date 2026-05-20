@@ -6,6 +6,7 @@ import com.example.expensely_backend.repository.ExpenseRepository;
 import com.example.expensely_backend.repository.RecurringExpenseRepository;
 import com.example.expensely_backend.service.BudgetService;
 import com.example.expensely_backend.service.DbLogService;
+import com.example.expensely_backend.service.ExchangeRateService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -18,18 +19,21 @@ import java.util.List;
 
 @Component
 public class ExpenseRecurrenceJob {
+	private static final String BASE_CURRENCY = "USD";
 	private static final Logger logger = LoggerFactory.getLogger(ExpenseRecurrenceJob.class);
 
 	private final RecurringExpenseRepository recurringExpenseRepository;
 	private final ExpenseRepository expenseRepository;
 	private final BudgetService budgetService;
 	private final DbLogService dbLogService;
+	private final ExchangeRateService exchangeRateService;
 
-	public ExpenseRecurrenceJob(RecurringExpenseRepository recurringExpenseRepository, ExpenseRepository expenseRepository, BudgetService budgetService, DbLogService dbLogService) {
+	public ExpenseRecurrenceJob(RecurringExpenseRepository recurringExpenseRepository, ExpenseRepository expenseRepository, BudgetService budgetService, DbLogService dbLogService, ExchangeRateService exchangeRateService) {
 		this.recurringExpenseRepository = recurringExpenseRepository;
 		this.expenseRepository = expenseRepository;
 		this.budgetService = budgetService;
 		this.dbLogService = dbLogService;
+		this.exchangeRateService = exchangeRateService;
 	}
 
 	/**
@@ -55,7 +59,15 @@ public class ExpenseRecurrenceJob {
 				Expense expense = new Expense();
 				expense.setUser(rec.getUser());
 				expense.setCategory(rec.getCategory());
-				expense.setAmount(rec.getAmount());
+				expense.setAmount(exchangeRateService.normalizeDisplayAmount(rec.getAmount()));
+				String currency = rec.getCurrency();
+				if (currency == null || currency.isBlank()) {
+					currency = BASE_CURRENCY;
+				}
+				expense.setCurrency(currency);
+				expense.setBaseCurrency(BASE_CURRENCY);
+				expense.setExchangeRate(exchangeRateService.getUsdToCurrencyRate(currency));
+				expense.setBaseCurrencyAmount(exchangeRateService.convertToUsd(rec.getAmount(), currency));
 				expense.setDescription(rec.getDescription());
 				expense.setExpenseDate(LocalDateTime.now());
 				expenseRepository.save(expense);

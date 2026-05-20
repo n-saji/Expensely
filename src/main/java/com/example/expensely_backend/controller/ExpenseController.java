@@ -41,7 +41,7 @@ public class ExpenseController {
 				expense.setExpenseDate(LocalDateTime.now());
 			}
 			Expense exp = expenseService.save(expense);
-			return ResponseEntity.ok(new ExpenseResponse(exp));
+			return ResponseEntity.ok(expenseService.getExpenseResponseById(exp.getId().toString()));
 
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(new AuthResponse("Expense creation failed!", null, e.getMessage()));
@@ -49,10 +49,9 @@ public class ExpenseController {
 	}
 
 	@GetMapping("/{id}")
-	public ResponseEntity<Expense> getExpenseById(@PathVariable String id) {
+	public ResponseEntity<?> getExpenseById(@PathVariable String id) {
 		try {
-			Expense expense = expenseService.getExpenseById(id);
-			return ResponseEntity.ok(expense);
+			return ResponseEntity.ok(expenseService.getExpenseResponseById(id));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(null);
 		}
@@ -191,6 +190,9 @@ public class ExpenseController {
 			if (!customSortBy.equals("amount") && !customSortBy.equals("expenseDate") &&
 					!customSortBy.equals("description") && !customSortBy.equals("category")) {
 				return ResponseEntity.badRequest().body(new UserRes(null, "Error: Invalid sort column"));
+			}
+			if (customSortBy.equals("amount")) {
+				customSortBy = "baseCurrencyAmount";
 			}
 		}
 		try {
