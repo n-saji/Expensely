@@ -37,6 +37,18 @@ public class Expense {
 	@Setter
 	private BigDecimal amount;
 
+	@Column(nullable = false, length = 3)
+	private String currency;
+
+	@Column(name = "base_currency_amount", precision = 19, scale = 4)
+	private BigDecimal baseCurrencyAmount;
+
+	@Column(name = "base_currency", length = 3)
+	private String baseCurrency; // usually USD
+
+	@Column(name = "exchange_rate", precision = 19, scale = 8)
+	private BigDecimal exchangeRate; // snapshot rate
+
 	@Getter
 	@Setter
 	private String description;
