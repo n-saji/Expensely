@@ -52,7 +52,7 @@ public class Budget {
 	@Getter
 	@Setter
 	private BigDecimal baseCurrencyAmount; // the base currency is USD
-	// accross the system
+	// across the system
 
 	@Column(name = "exchange_rate", precision = 19, scale = 8)
 	@Getter

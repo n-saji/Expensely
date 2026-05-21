@@ -1,6 +1,7 @@
 package com.example.expensely_backend.repository;
 
 import com.example.expensely_backend.model.Budget;
+import com.example.expensely_backend.model.Expense;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -44,4 +45,9 @@ public interface BudgetRepository extends JpaRepository<Budget, UUID> {
 	List<Budget> findBudgetByEndDateBeforeAndIsActiveTrue(LocalDate today);
 
 	void deleteAllByUserId(UUID userId);
+
+
+	@Query("SELECT b FROM Budget b WHERE b.currency IS NULL OR b" +
+			".baseCurrencyAmount IS NULL OR b.exchangeRate IS NULL")
+	List<Budget> findBudgetMissingCurrencySnapshot();
 }
