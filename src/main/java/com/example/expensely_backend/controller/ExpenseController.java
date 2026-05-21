@@ -86,8 +86,10 @@ public class ExpenseController {
 			}
 
 			// Save updated expense
-			expenseService.updateExpense(updatedExpense);
-			return ResponseEntity.ok(new AuthResponse("Expense updated successfully!", null, ""));
+			Expense exp =
+					expenseService.updateExpense(updatedExpense);
+			return ResponseEntity.ok(new AuthResponse("Expense updated " +
+					"successfully!", exp.getId().toString(), ""));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(new AuthResponse("Expense update failed!", null, e.getMessage()));
 		}

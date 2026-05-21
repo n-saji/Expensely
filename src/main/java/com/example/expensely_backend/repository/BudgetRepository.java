@@ -13,7 +13,6 @@ import java.util.UUID;
 
 @Repository
 public interface BudgetRepository extends JpaRepository<Budget, UUID> {
-	Boolean existsByCategoryId(UUID categoryId);
 
 	@Query("SELECT b FROM Budget b WHERE b.category.id = ?1 and b.isActive = true " +
 			"ORDER BY CASE WHEN b.amountLimit IS NULL OR b.amountLimit <= 0 THEN 0 " +

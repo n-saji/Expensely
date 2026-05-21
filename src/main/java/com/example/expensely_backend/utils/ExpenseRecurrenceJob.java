@@ -83,7 +83,7 @@ public class ExpenseRecurrenceJob {
 				}
 
 				recurringExpenseRepository.save(rec);
-				budgetService.updateBudgetAmountByUserIdAndCategoryId(rec.getUser().getId().toString(), rec.getCategory().getId().toString(), rec.getAmount(), expense.getExpenseDate());
+				budgetService.updateBudgetAmountByUserIdAndCategoryId(rec.getUser().getId().toString(), rec.getCategory().getId().toString(), expense.getBaseCurrencyAmount(), expense.getExpenseDate());
 				createdCount++;
 				dbLogService.logMessage("job",
 						getClass().getName(), "ExpenseRecurrenceJob",

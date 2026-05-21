@@ -1,6 +1,7 @@
 package com.example.expensely_backend.service;
 
 import com.example.expensely_backend.dto.ExchangeRateApiResponse;
+import com.example.expensely_backend.globals.globals;
 import com.example.expensely_backend.model.ExchangeRate;
 import com.example.expensely_backend.repository.ExchangeRateRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -22,7 +23,7 @@ import java.util.Optional;
 
 @Service
 public class ExchangeRateService {
-	private static final String BASE_CURRENCY = "USD";
+
 	private static final int DISPLAY_SCALE = 2;
 	private static final int RATE_SCALE = 8;
 
@@ -132,10 +133,10 @@ public class ExchangeRateService {
 								apiRate.getTarget()
 						);
 
-						exchangeRate
-								.setRate(
-										BigDecimal.valueOf(apiRate.getRate())
-								);
+				exchangeRate
+						.setRate(
+								BigDecimal.valueOf(apiRate.getRate())
+						);
 
 				exchangeRate
 						.setUpdatedAt(
@@ -167,20 +168,20 @@ public class ExchangeRateService {
 	}
 
 	public BigDecimal getUsdToCurrencyRate(String targetCurrency) {
-		if (targetCurrency == null || targetCurrency.isBlank() || BASE_CURRENCY.equalsIgnoreCase(targetCurrency)) {
+		if (targetCurrency == null || targetCurrency.isBlank() || globals.BASE_CURRENCY.equalsIgnoreCase(targetCurrency)) {
 			return BigDecimal.ONE;
 		}
 		Optional<ExchangeRate> rate = exchangeRateRepository
-				.findByBaseCurrencyAndTargetCurrency(BASE_CURRENCY, targetCurrency.toUpperCase());
+				.findByBaseCurrencyAndTargetCurrency(globals.BASE_CURRENCY, targetCurrency.toUpperCase());
 		return rate.map(ExchangeRate::getRate)
-				.orElseThrow(() -> new IllegalArgumentException("Exchange rate not found for " + BASE_CURRENCY + " -> " + targetCurrency));
+				.orElseThrow(() -> new IllegalArgumentException("Exchange rate not found for " + globals.BASE_CURRENCY + " -> " + targetCurrency));
 	}
 
 	public BigDecimal convertToUsd(BigDecimal amount, String currency) {
 		if (amount == null) {
 			return null;
 		}
-		if (currency == null || currency.isBlank() || BASE_CURRENCY.equalsIgnoreCase(currency)) {
+		if (currency == null || currency.isBlank() || globals.BASE_CURRENCY.equalsIgnoreCase(currency)) {
 			return amount.setScale(DISPLAY_SCALE, RoundingMode.HALF_UP);
 		}
 		BigDecimal rate = getUsdToCurrencyRate(currency);
@@ -193,7 +194,7 @@ public class ExchangeRateService {
 		if (baseAmount == null) {
 			return null;
 		}
-		if (targetCurrency == null || targetCurrency.isBlank() || BASE_CURRENCY.equalsIgnoreCase(targetCurrency)) {
+		if (targetCurrency == null || targetCurrency.isBlank() || globals.BASE_CURRENCY.equalsIgnoreCase(targetCurrency)) {
 			return baseAmount.setScale(DISPLAY_SCALE, RoundingMode.HALF_UP);
 		}
 		BigDecimal rate = getUsdToCurrencyRate(targetCurrency);

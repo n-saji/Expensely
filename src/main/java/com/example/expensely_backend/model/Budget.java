@@ -41,7 +41,23 @@ public class Budget {
 	@Getter
 	@Setter
 	@Column(precision = 15, scale = 2)
-	private BigDecimal amountSpent;
+	private BigDecimal amountSpent; // store base currency amount
+
+	@Column(nullable = false, length = 3, columnDefinition = "varchar(3) default 'USD'")
+	@Getter
+	@Setter
+	private String currency;
+
+	@Column(name = "base_currency_amount", precision = 19, scale = 4)
+	@Getter
+	@Setter
+	private BigDecimal baseCurrencyAmount; // the base currency is USD
+	// accross the system
+
+	@Column(name = "exchange_rate", precision = 19, scale = 8)
+	@Getter
+	@Setter
+	private BigDecimal exchangeRate; // snapshot rate
 
 	@Getter
 	@Setter
