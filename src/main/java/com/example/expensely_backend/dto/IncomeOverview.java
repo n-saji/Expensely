@@ -76,11 +76,11 @@ public class IncomeOverview {
 
 		Map<Month, Double> monthMap = incomes.stream()
 				.collect(Collectors.groupingBy(income -> income.getIncomeDate().getMonth(), TreeMap::new,
-						Collectors.summingDouble(IncomeResponse::getAmount)));
+						Collectors.summingDouble(income -> income.getDisplayAmount().doubleValue())));
 		this.thisMonthTotalIncome = round(monthMap.getOrDefault(Month.of(currentMonth + 1), 0.0) * 100.0) / 100.0;
 		this.lastMonthTotalIncome = lastMonthTotalIncome == null ? 0.0 : lastMonthTotalIncome;
 		this.totalBalance = round((totalBalance == null ? 0.0 : totalBalance) * 100.0) / 100.0;
-		this.totalAmount = incomes.stream().mapToDouble(IncomeResponse::getAmount).sum();
+		this.totalAmount = incomes.stream().mapToDouble(income -> income.getDisplayAmount().doubleValue()).sum();
 		this.averageMonthlyIncome = totalAmount / (currentMonth + 1);
 		this.mostFrequentCategory = categoryCount.entrySet().stream()
 				.max(Map.Entry.comparingByValue())
@@ -97,13 +97,13 @@ public class IncomeOverview {
 
 		IncomeResponse mostExpensive = incomes.stream()
 				.filter(income -> income.getIncomeDate().getMonthValue() == (currentMonth + 1))
-				.max(Comparator.comparingDouble(IncomeResponse::getAmount))
+				.max(Comparator.comparing(IncomeResponse::getDisplayAmount))
 				.orElse(null);
 
 		if (mostExpensive != null) {
 			this.thisMonthMostIncomeItem = Map.of(
 					mostExpensive.getDescription(),
-					mostExpensive.getAmount()
+					mostExpensive.getDisplayAmount().doubleValue()
 			);
 		} else {
 			this.thisMonthMostIncomeItem = Map.of();
@@ -111,7 +111,7 @@ public class IncomeOverview {
 
 		Map<Month, Double> monthMapReq = reqIncomeRange.stream()
 				.collect(Collectors.groupingBy(income -> income.getIncomeDate().getMonth(), TreeMap::new,
-						Collectors.summingDouble(IncomeResponse::getAmount)));
+						Collectors.summingDouble(income -> income.getDisplayAmount().doubleValue())));
 		this.amountByMonth = monthMapReq.entrySet().stream()
 				.collect(Collectors.toMap(entry -> entry.getKey().getDisplayName(TextStyle.FULL, Locale.ENGLISH),
 						entry -> round(entry.getValue() * 100.0) / 100.0, (a, b) -> a, LinkedHashMap::new));
@@ -119,7 +119,7 @@ public class IncomeOverview {
 		Map<String, Double> rawSums = reqIncomeRange.stream()
 				.collect(Collectors.groupingBy(
 						IncomeResponse::getCategoryName,
-						Collectors.summingDouble(IncomeResponse::getAmount)
+						Collectors.summingDouble(income -> income.getDisplayAmount().doubleValue())
 				));
 		this.amountByCategory = rawSums.entrySet().stream()
 				.collect(Collectors.toMap(
@@ -152,9 +152,9 @@ public class IncomeOverview {
 
 		this.topFiveMostIncomeItemThisMonth = reqIncomeRangeMonthly.stream()
 				.filter(income -> income.getIncomeDate().getMonth() == Month.of(reqMonth))
-				.sorted(Comparator.comparingDouble(IncomeResponse::getAmount).reversed())
+				.sorted(Comparator.comparing(IncomeResponse::getDisplayAmount).reversed())
 				.limit(5)
-				.collect(Collectors.toMap(IncomeResponse::getDescription, IncomeResponse::getAmount, (a, b) -> a,
+				.collect(Collectors.toMap(IncomeResponse::getDescription, income -> income.getDisplayAmount().doubleValue(), (a, b) -> a,
 						LinkedHashMap::new));
 
 		this.overTheDaysThisMonth = new LinkedHashMap<>();
@@ -168,4 +168,3 @@ public class IncomeOverview {
 		}
 	}
 }
-

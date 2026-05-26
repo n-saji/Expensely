@@ -209,4 +209,69 @@ public class ExchangeRateService {
 		}
 		return amount.setScale(DISPLAY_SCALE, RoundingMode.HALF_UP);
 	}
+
+	public List<ExchangeRate> getUsdRates(String targetCurrencyQuery) {
+		String query = targetCurrencyQuery == null ? null : targetCurrencyQuery.trim();
+		if (query == null || query.isBlank()) {
+			return exchangeRateRepository
+					.findByBaseCurrencyIgnoreCaseOrderByTargetCurrencyAsc(globals.BASE_CURRENCY);
+		}
+		return exchangeRateRepository
+				.findByBaseCurrencyIgnoreCaseAndTargetCurrencyContainingIgnoreCaseOrderByTargetCurrencyAsc(
+							globals.BASE_CURRENCY,
+							query
+				);
+	}
+
+	public BigDecimal getCrossRate(String baseCurrency, String targetCurrency) {
+		String base = normalizeCurrencyOrDefault(baseCurrency);
+		String target = normalizeCurrencyOrThrow(targetCurrency);
+		if (base.equalsIgnoreCase(target)) {
+			return BigDecimal.ONE.setScale(RATE_SCALE, RoundingMode.HALF_UP);
+		}
+		if (globals.BASE_CURRENCY.equalsIgnoreCase(base)) {
+			return getUsdToCurrencyRate(target).setScale(RATE_SCALE, RoundingMode.HALF_UP);
+		}
+		if (globals.BASE_CURRENCY.equalsIgnoreCase(target)) {
+			return BigDecimal.ONE.divide(
+					getUsdToCurrencyRate(base),
+					RATE_SCALE,
+					RoundingMode.HALF_UP
+			);
+		}
+		BigDecimal targetRate = getUsdToCurrencyRate(target);
+		BigDecimal baseRate = getUsdToCurrencyRate(base);
+		return targetRate.divide(baseRate, RATE_SCALE, RoundingMode.HALF_UP);
+	}
+
+	public BigDecimal convertAmount(BigDecimal amount, String baseCurrency, String targetCurrency) {
+		BigDecimal resolvedAmount = amount == null ? BigDecimal.ONE : amount;
+		BigDecimal rate = getCrossRate(baseCurrency, targetCurrency);
+		return resolvedAmount.multiply(rate)
+				.setScale(DISPLAY_SCALE, RoundingMode.HALF_UP);
+	}
+
+	private String normalizeCurrencyOrDefault(String currency) {
+		if (currency == null || currency.isBlank()) {
+			return globals.BASE_CURRENCY;
+		}
+		return currency.trim().toUpperCase();
+	}
+
+	private String normalizeCurrencyOrThrow(String currency) {
+		if (currency == null || currency.isBlank()) {
+			throw new IllegalArgumentException("Target currency is required");
+		}
+		return currency.trim().toUpperCase();
+	}
+
+	public List<String> getAvailableCurrencies() {
+		List<String> currencies = new ArrayList<>(exchangeRateRepository.findDistinctCurrencies());
+		String base = globals.BASE_CURRENCY.toUpperCase();
+		if (currencies.stream().noneMatch(currency -> currency.equalsIgnoreCase(base))) {
+			currencies.add(base);
+		}
+		currencies.sort(String.CASE_INSENSITIVE_ORDER);
+		return currencies;
+	}
 }

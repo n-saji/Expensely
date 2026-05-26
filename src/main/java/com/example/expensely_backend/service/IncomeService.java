@@ -20,11 +20,15 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.io.StringWriter;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
@@ -33,6 +37,8 @@ import java.util.stream.Collectors;
 @Service
 public class IncomeService {
 
+	private static final String BASE_CURRENCY = "USD";
+
 	private final IncomeRepository incomeRepository;
 	private final CategoryService categoryService;
 	private final UserService userService;
@@ -40,6 +46,7 @@ public class IncomeService {
 	private final CategoryRepository categoryRepository;
 	private final ExpenseRepository expenseRepository;
 	private final Executor expenseExecutor;
+	private final ExchangeRateService exchangeRateService;
 
 	public IncomeService(IncomeRepository incomeRepository,
 	                     CategoryService categoryService,
@@ -47,7 +54,8 @@ public class IncomeService {
 	                     IncomeRepositoryCustomImpl incomeRepositoryCustomImpl,
 	                     CategoryRepository categoryRepository,
 	                     ExpenseRepository expenseRepository,
-	                     @Qualifier("expenseExecutor") Executor expenseExecutor) {
+	                     @Qualifier("expenseExecutor") Executor expenseExecutor,
+	                     ExchangeRateService exchangeRateService) {
 		this.incomeRepository = incomeRepository;
 		this.categoryService = categoryService;
 		this.userService = userService;
@@ -55,6 +63,44 @@ public class IncomeService {
 		this.categoryRepository = categoryRepository;
 		this.expenseRepository = expenseRepository;
 		this.expenseExecutor = expenseExecutor;
+		this.exchangeRateService = exchangeRateService;
+	}
+
+	private BigDecimal normalizeAmount(BigDecimal amount) {
+		return exchangeRateService.normalizeDisplayAmount(amount);
+	}
+
+	private BigDecimal resolveUsdRate(String currency) {
+		return exchangeRateService.getUsdToCurrencyRate(currency);
+	}
+
+	private void applyCurrencySnapshot(Income income, String currency) {
+		income.setAmount(normalizeAmount(income.getAmount()));
+		income.setCurrency(currency.toUpperCase());
+		income.setBaseCurrency(BASE_CURRENCY);
+		BigDecimal rate = resolveUsdRate(currency);
+		income.setExchangeRate(rate);
+		income.setBaseCurrencyAmount(exchangeRateService.convertToUsd(income.getAmount(), currency));
+	}
+
+	private List<IncomeResponse> mapIncomesToResponse(List<Income> incomes, String displayCurrency) {
+		BigDecimal displayRate = resolveUsdRate(displayCurrency);
+		return incomes.stream()
+				.map(income -> {
+					BigDecimal displayAmount = income.getBaseCurrencyAmount() == null
+							? normalizeAmount(income.getAmount())
+							: income.getBaseCurrencyAmount().multiply(displayRate).setScale(2, RoundingMode.HALF_UP);
+					return new IncomeResponse(income, displayCurrency, displayAmount);
+				})
+				.collect(Collectors.toList());
+	}
+
+	private IncomeResponse mapIncomeToResponse(Income income, String displayCurrency) {
+		BigDecimal displayRate = resolveUsdRate(displayCurrency);
+		BigDecimal displayAmount = income.getBaseCurrencyAmount() == null
+				? normalizeAmount(income.getAmount())
+				: income.getBaseCurrencyAmount().multiply(displayRate).setScale(2, RoundingMode.HALF_UP);
+		return new IncomeResponse(income, displayCurrency, displayAmount);
 	}
 
 	private UUID getActiveUserIdOrThrow(String userId) {
@@ -71,7 +117,9 @@ public class IncomeService {
 			throw new IllegalArgumentException("Order must be 'asc' or 'desc'");
 		}
 
-		return incomes.stream().map(IncomeResponse::new).collect(Collectors.toList());
+		User user = userService.GetActiveUserById(userId.toString());
+		String displayCurrency = user == null ? BASE_CURRENCY : user.getCurrency();
+		return mapIncomesToResponse(incomes, displayCurrency);
 	}
 
 	private List<MonthlyCategoryIncome> getMonthlyCategoryIncome(UUID userId, LocalDateTime startDate, LocalDateTime endDate) {
@@ -135,6 +183,9 @@ public class IncomeService {
 			Integer reqMonth) {
 
 		UUID activeUserId = getActiveUserIdOrThrow(userId);
+		User user = userService.GetActiveUserById(userId);
+		String displayCurrency = user == null ? BASE_CURRENCY : user.getCurrency();
+		BigDecimal displayRate = resolveUsdRate(displayCurrency);
 
 		CompletableFuture<List<IncomeResponse>> f1 =
 				CompletableFuture.supplyAsync(() ->
@@ -196,18 +247,71 @@ public class IncomeService {
 				totalExpenseAllTime
 		).join();
 
+		List<MonthlyCategoryIncome> convertedMonthly = new ArrayList<>();
+		for (MonthlyCategoryIncome dto : monthlyCategory.join()) {
+			convertedMonthly.add(new MonthlyCategoryIncome() {
+				@Override
+				public String getMonth() {
+					return dto.getMonth();
+				}
+
+				@Override
+				public String getCategoryName() {
+					return dto.getCategoryName();
+				}
+
+				@Override
+				public Double getTotalAmount() {
+					BigDecimal amount = BigDecimal.valueOf(dto.getTotalAmount() == null ? 0.0 : dto.getTotalAmount());
+					BigDecimal converted = amount.multiply(displayRate).setScale(2, RoundingMode.HALF_UP);
+					return converted.doubleValue();
+				}
+			});
+		}
+
+		List<DailyIncome> convertedDaily = new ArrayList<>();
+		for (DailyIncome dto : daily.join()) {
+			convertedDaily.add(new DailyIncome() {
+				@Override
+				public String getIncomeDate() {
+					return dto.getIncomeDate();
+				}
+
+				@Override
+				public Double getTotalAmount() {
+					BigDecimal amount = BigDecimal.valueOf(dto.getTotalAmount() == null ? 0.0 : dto.getTotalAmount());
+					BigDecimal converted = amount.multiply(displayRate).setScale(2, RoundingMode.HALF_UP);
+					return converted.doubleValue();
+				}
+			});
+		}
+
+		Double prevMonthDisplay = BigDecimal.valueOf(prevMonthTotal.join() == null ? 0.0 : prevMonthTotal.join())
+				.multiply(displayRate)
+				.setScale(2, RoundingMode.HALF_UP)
+				.doubleValue();
+
+		Double totalIncomeDisplay = BigDecimal.valueOf(totalIncomeAllTime.join() == null ? 0.0 : totalIncomeAllTime.join())
+				.multiply(displayRate)
+				.setScale(2, RoundingMode.HALF_UP)
+				.doubleValue();
+		Double totalExpenseDisplay = BigDecimal.valueOf(totalExpenseAllTime.join() == null ? 0.0 : totalExpenseAllTime.join())
+				.multiply(displayRate)
+				.setScale(2, RoundingMode.HALF_UP)
+				.doubleValue();
+
 		return new IncomeOverview(
 				f1.join(),
 				f2.join(),
 				f3.join(),
 				userId,
-				monthlyCategory.join(),
+				convertedMonthly,
 				categories.join(),
-				daily.join(),
+				convertedDaily,
 				reqMonth,
 				firstIncome.join(),
-				prevMonthTotal.join(),
-				totalIncomeAllTime.join() - totalExpenseAllTime.join());
+				prevMonthDisplay,
+				totalIncomeDisplay - totalExpenseDisplay);
 	}
 
 	public Income save(Income income) {
@@ -230,7 +334,19 @@ public class IncomeService {
 			income.setIncomeDate(LocalDateTime.now());
 		}
 
+		String currency = income.getCurrency();
+		if (currency == null || currency.isBlank()) {
+			currency = user.getCurrency();
+		}
+		applyCurrencySnapshot(income, currency);
+
 		return incomeRepository.save(income);
+	}
+
+	public IncomeResponse getIncomeResponseById(String id) {
+		Income income = getIncomeById(id);
+		String displayCurrency = income.getUser() == null ? BASE_CURRENCY : income.getUser().getCurrency();
+		return mapIncomeToResponse(income, displayCurrency);
 	}
 
 	public Income getIncomeById(String id) {
@@ -289,15 +405,15 @@ public class IncomeService {
 		incomeRepository.deleteAll(incomes);
 	}
 
-	public List<Income> getIncomesByUserId(String userId) {
+	public List<IncomeResponse> getIncomesByUserId(String userId) {
 		User user = userService.GetActiveUserById(userId);
 		if (user == null) {
 			throw new IllegalArgumentException("User not found");
 		}
-		return incomeRepository.findByUserId(user.getId());
+		return mapIncomesToResponse(incomeRepository.findByUserId(user.getId()), user.getCurrency());
 	}
 
-	public List<Income> getIncomesByCategoryIdAndUserID(String categoryId, String userId) {
+	public List<IncomeResponse> getIncomesByCategoryIdAndUserID(String categoryId, String userId) {
 		Category category = categoryService.getCategoryById(categoryId);
 		if (!globals.TYPE_INCOME.equals(category.getType())) {
 			throw new IllegalArgumentException("Category must be income type");
@@ -306,7 +422,7 @@ public class IncomeService {
 		if (user == null) {
 			throw new IllegalArgumentException("User not found");
 		}
-		return incomeRepository.findByCategoryIdAndUserId(category.getId(), user.getId());
+		return mapIncomesToResponse(incomeRepository.findByCategoryIdAndUserId(category.getId(), user.getId()), user.getCurrency());
 	}
 
 	public Income updateIncome(Income income) {
@@ -325,7 +441,19 @@ public class IncomeService {
 		}
 
 		if (income.getAmount() != null && income.getAmount().compareTo(oldIncome.getAmount()) != 0) {
-			oldIncome.setAmount(income.getAmount());
+			oldIncome.setAmount(normalizeAmount(income.getAmount()));
+			String currency = oldIncome.getCurrency() == null ? BASE_CURRENCY : oldIncome.getCurrency();
+			BigDecimal rate = oldIncome.getExchangeRate();
+			if (rate == null) {
+				rate = resolveUsdRate(currency);
+			}
+			if (BASE_CURRENCY.equalsIgnoreCase(currency)) {
+				oldIncome.setBaseCurrencyAmount(oldIncome.getAmount().setScale(2, RoundingMode.HALF_UP));
+			} else {
+				oldIncome.setBaseCurrencyAmount(oldIncome.getAmount()
+						.divide(rate, 8, RoundingMode.HALF_UP)
+						.setScale(2, RoundingMode.HALF_UP));
+			}
 		}
 		if (income.getDescription() != null && !income.getDescription().equals(oldIncome.getDescription())) {
 			oldIncome.setDescription(income.getDescription());
@@ -342,11 +470,58 @@ public class IncomeService {
 	}
 
 	public List<MonthlyCategoryIncome> getMonthlyCategoryIncome(String userId, LocalDateTime startDate, LocalDateTime endDate) {
-		return getMonthlyCategoryIncome(getActiveUserIdOrThrow(userId), startDate, endDate);
+		User user = userService.GetActiveUserById(userId);
+		if (user == null) {
+			throw new IllegalArgumentException("User not found");
+		}
+		BigDecimal rate = resolveUsdRate(user.getCurrency());
+		List<MonthlyCategoryIncome> converted = new ArrayList<>();
+		for (MonthlyCategoryIncome dto : getMonthlyCategoryIncome(getActiveUserIdOrThrow(userId), startDate, endDate)) {
+			converted.add(new MonthlyCategoryIncome() {
+				@Override
+				public String getMonth() {
+					return dto.getMonth();
+				}
+
+				@Override
+				public String getCategoryName() {
+					return dto.getCategoryName();
+				}
+
+				@Override
+				public Double getTotalAmount() {
+					BigDecimal amount = BigDecimal.valueOf(dto.getTotalAmount() == null ? 0.0 : dto.getTotalAmount());
+					BigDecimal converted = amount.multiply(rate).setScale(2, RoundingMode.HALF_UP);
+					return converted.doubleValue();
+				}
+			});
+		}
+		return converted;
 	}
 
 	public List<DailyIncome> getDailyIncome(String userId, LocalDateTime startDate, LocalDateTime endDate) {
-		return getDailyIncome(getActiveUserIdOrThrow(userId), startDate, endDate);
+		User user = userService.GetActiveUserById(userId);
+		if (user == null) {
+			throw new IllegalArgumentException("User not found");
+		}
+		BigDecimal rate = resolveUsdRate(user.getCurrency());
+		List<DailyIncome> converted = new ArrayList<>();
+		for (DailyIncome dto : getDailyIncome(getActiveUserIdOrThrow(userId), startDate, endDate)) {
+			converted.add(new DailyIncome() {
+				@Override
+				public String getIncomeDate() {
+					return dto.getIncomeDate();
+				}
+
+				@Override
+				public Double getTotalAmount() {
+					BigDecimal amount = BigDecimal.valueOf(dto.getTotalAmount() == null ? 0.0 : dto.getTotalAmount());
+					BigDecimal converted = amount.multiply(rate).setScale(2, RoundingMode.HALF_UP);
+					return converted.doubleValue();
+				}
+			});
+		}
+		return converted;
 	}
 
 	public LinkedHashMap<String, Double> getMonthlyIncomeFromTillTo(String userId, int count,
@@ -355,9 +530,21 @@ public class IncomeService {
 		if (user == null) {
 			throw new IllegalArgumentException("User not found");
 		}
+		String displayCurrency = user.getCurrency();
+		BigDecimal rate = resolveUsdRate(displayCurrency);
 
 		DateRange range = resolveDateRange(count, type);
-		return incomeRepositoryCustomImpl.getMonthlyIncomeFromTillTo(user.getId(), range.startDate(), range.endDate());
+
+		LinkedHashMap<String, Double> baseTotals =
+				incomeRepositoryCustomImpl.getMonthlyIncomeFromTillTo(user.getId(), range.startDate(), range.endDate());
+		LinkedHashMap<String, Double> displayTotals = new LinkedHashMap<>();
+		for (Map.Entry<String, Double> entry : baseTotals.entrySet()) {
+			BigDecimal converted = BigDecimal.valueOf(entry.getValue())
+					.multiply(rate)
+					.setScale(2, RoundingMode.HALF_UP);
+			displayTotals.put(entry.getKey(), converted.doubleValue());
+		}
+		return displayTotals;
 	}
 
 	public LinkedHashMap<String, java.util.Map<String, Double>> getMonthlyCategoryIncomeFromTillTo(String userId, int count,
@@ -366,6 +553,7 @@ public class IncomeService {
 		if (user == null) {
 			throw new IllegalArgumentException("User not found");
 		}
+		BigDecimal rate = resolveUsdRate(user.getCurrency());
 
 		DateRange range = resolveDateRange(count, type);
 
@@ -387,11 +575,14 @@ public class IncomeService {
 
 			String category = dto.getCategoryName();
 			Double amount = dto.getTotalAmount();
+			BigDecimal converted = BigDecimal.valueOf(amount == null ? 0.0 : amount)
+					.multiply(rate)
+					.setScale(2, RoundingMode.HALF_UP);
 
 			if (category != null) {
 				monthlyCategoryIncome
 						.computeIfAbsent(month, k -> new LinkedHashMap<>())
-						.merge(category, amount, Double::sum);
+						.merge(category, converted.doubleValue(), Double::sum);
 			}
 		}
 
@@ -457,7 +648,8 @@ public class IncomeService {
 				categoryUUID, q);
 
 		totalPages = (int) Math.ceil((double) totalElements / limit);
-		return new IncomeResList(incomes.stream().map(IncomeResponse::new).collect(Collectors.toList()),
+		String displayCurrency = user.getCurrency();
+		return new IncomeResList(mapIncomesToResponse(incomes, displayCurrency),
 				totalPages, totalElements, page);
 	}
 
@@ -465,17 +657,22 @@ public class IncomeService {
 		UUID userIdUUID = UUID.fromString(userId);
 		User user = userService.GetActiveUserById(userId);
 		List<Income> incomes = incomeRepository.findByUserIdAndTimeFrameAsc(userIdUUID, startDate, endDate);
+		String displayCurrency = user == null ? BASE_CURRENCY : user.getCurrency();
+		BigDecimal displayRate = resolveUsdRate(displayCurrency);
 
 		StringWriter sw = new StringWriter();
 		CSVWriter writer = new CSVWriter(sw);
 
-		writer.writeNext(new String[]{"Date", "Description", "Amount (in " + user.getCurrency() + ")", "Category"});
+		writer.writeNext(new String[]{"Date", "Description", "Amount (in " + displayCurrency + ")", "Category"});
 
 		for (Income income : incomes) {
+			BigDecimal displayAmount = income.getBaseCurrencyAmount() == null
+					? normalizeAmount(income.getAmount())
+					: income.getBaseCurrencyAmount().multiply(displayRate).setScale(2, RoundingMode.HALF_UP);
 			writer.writeNext(new String[]{
 					income.getIncomeDate().toString(),
 					income.getDescription(),
-					String.valueOf(income.getAmount()),
+					displayAmount.toString(),
 					income.getCategory().getName()
 			});
 		}

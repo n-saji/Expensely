@@ -44,25 +44,20 @@ public class IncomeController {
 			User user = userService.GetActiveUserById(userId);
 			income.setUser(user);
 			Income savedIncome = incomeService.save(income);
-			return ResponseEntity.ok(new AuthResponse("Income created successfully!", savedIncome.getId().toString(), ""));
+			return ResponseEntity.ok(incomeService.getIncomeResponseById(savedIncome.getId().toString()));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(new AuthResponse("Income creation failed!", null, e.getMessage()));
 		}
 	}
 
 	@GetMapping("/{id}")
-	public ResponseEntity<Income> getIncomeById(Authentication authentication, @PathVariable String id) {
+	public ResponseEntity<?> getIncomeById(Authentication authentication, @PathVariable String id) {
 		String userId = (String) authentication.getPrincipal();
 		if (userId == null) {
 			return ResponseEntity.status(401).body(null);
 		}
 		try {
-			Income income = incomeService.getIncomeByIdForUser(id, userId);
-			income.setUser(null);
-			if (income.getCategory() != null) {
-				income.getCategory().setUser(null);
-			}
-			return ResponseEntity.ok(income);
+			return ResponseEntity.ok(incomeService.getIncomeResponseById(id));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(null);
 		}
@@ -89,14 +84,7 @@ public class IncomeController {
 			return ResponseEntity.status(401).body("Unauthorized");
 		}
 		try {
-			List<Income> incomes = incomeService.getIncomesByUserId(userId);
-			incomes.forEach(income -> {
-				income.setUser(null);
-				if (income.getCategory() != null) {
-					income.getCategory().setUser(null);
-				}
-			});
-			return ResponseEntity.ok(incomes);
+			return ResponseEntity.ok(incomeService.getIncomesByUserId(userId));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body("Error: " + e.getMessage());
 		}
@@ -110,14 +98,7 @@ public class IncomeController {
 			return ResponseEntity.status(401).body("Unauthorized");
 		}
 		try {
-			List<Income> incomes = incomeService.getIncomesByCategoryIdAndUserID(categoryId, userId);
-			incomes.forEach(income -> {
-				income.setUser(null);
-				if (income.getCategory() != null) {
-					income.getCategory().setUser(null);
-				}
-			});
-			return ResponseEntity.ok(incomes);
+			return ResponseEntity.ok(incomeService.getIncomesByCategoryIdAndUserID(categoryId, userId));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
 		}
@@ -243,8 +224,11 @@ public class IncomeController {
 		}
 		if (customSortBy != null) {
 			if (!customSortBy.equals("amount") && !customSortBy.equals("incomeDate") &&
-					!customSortBy.equals("description") && !customSortBy.equals("category")) {
+						!customSortBy.equals("description") && !customSortBy.equals("category")) {
 				return ResponseEntity.badRequest().body(new UserRes(null, "Error: Invalid sort column"));
+			}
+			if (customSortBy.equals("amount")) {
+				customSortBy = "baseCurrencyAmount";
 			}
 		}
 		try {
