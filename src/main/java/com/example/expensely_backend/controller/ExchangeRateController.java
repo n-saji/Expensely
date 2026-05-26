@@ -26,7 +26,7 @@ public class ExchangeRateController {
 		this.exchangeRateService = exchangeRateService;
 	}
 
-	@GetMapping
+	@GetMapping("")
 	public ResponseEntity<?> getUsdRates(
 			@RequestParam(name = "targetCurrency", required = false) String targetCurrency
 	) {
