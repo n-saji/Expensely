@@ -26,14 +26,14 @@ public class User {
 	@Column(nullable = false, unique = true)
 	private String email;
 
-	@Column()
+	@Column(nullable = false)
 	private String password;
 
 	@Getter
+	@Column(nullable = false)
 	private String name;
 
 	@Getter
-	@Column()
 	private String country_code;
 
 	@Getter
@@ -51,7 +51,7 @@ public class User {
 	@Column(nullable = false, columnDefinition = "varchar(255) default 'light'")
 	@Getter
 	@Setter
-	private String theme;
+	private String theme = "light";
 
 	@Column(name = "theme_color", nullable = false, columnDefinition = "varchar(255) default 'teal'")
 	@Getter
@@ -87,7 +87,7 @@ public class User {
 	@JsonAlias("alertsEnabled")
 	private Boolean alertsEnabled;
 
-	@Column(nullable = true, columnDefinition = "varchar(1000)")
+	@Column(columnDefinition = "varchar(1000)")
 	@Getter
 	@Setter
 	private String profilePicFilePath;

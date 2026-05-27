@@ -53,6 +53,9 @@ public class UserController {
 			user.setProfileComplete(true);
 			user.setEmailVerified(false);
 			user.setNotificationsEnabled(true);
+			user.setIsActive(true);
+			user.setAlertsEnabled(true);
+			user.setIsAdmin(false);
 			userService.save(user);
 			String otp = emailOtpService.createOrUpdateOtp(user);
 			mailgun.sendSimpleMessage(user.getEmail(), "Verify your email",
