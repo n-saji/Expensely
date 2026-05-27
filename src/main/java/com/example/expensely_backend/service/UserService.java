@@ -1,6 +1,7 @@
 package com.example.expensely_backend.service;
 
 import com.example.expensely_backend.dto.AlertDtos;
+import com.example.expensely_backend.globals.globals;
 import com.example.expensely_backend.model.Budget;
 import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.repository.*;
@@ -192,9 +193,15 @@ public class UserService {
 
 
 		for (Budget budget : budgets) {
-			float ratio =
-					((budget.getAmountSpent())).divide(budget.getAmountLimit(), RoundingMode.CEILING).floatValue();
-			if (ratio >= 0.75 && ratio <= 1) {
+			if (budget.isThreshold100Crossed()) {
+				AlertDtos alert =
+						new AlertDtos("You have exceeded limit set in " + budget.getCategory().getName()
+								, "CRITICAL");
+				alerts.add(alert);
+			} else if (budget.isThreshold75Crossed()) {
+				float ratio =
+						((budget.getAmountSpent())).divide(budget.getBaseCurrencyAmount(),
+								RoundingMode.CEILING).floatValue();
 				AlertDtos alert =
 						new AlertDtos("You’ve used " + Math.round(ratio * 100
 						) +
@@ -207,11 +214,24 @@ public class UserService {
 								"left. "
 								, "WARNING");
 				alerts.add(alert);
-			} else if (ratio > 1) {
+			} else if (budget.isThreshold50Crossed()) {
+				float ratio =
+						((budget.getAmountSpent())).divide(budget.getBaseCurrencyAmount(),
+								RoundingMode.CEILING).floatValue();
+
 				AlertDtos alert =
-						new AlertDtos("You have exceeded limit set in " + budget.getCategory().getName()
-								, "CRITICAL");
+						new AlertDtos("You’ve used " + Math.round(ratio * 100
+						) +
+								"% " +
+								"of your " +
+								budget.getCategory().getName() +
+								" budget" +
+								". " +
+								"Only " + Math.round((1 - ratio) * 100) + "% " +
+								"left. "
+								, "INFO");
 				alerts.add(alert);
+
 			}
 		}
 

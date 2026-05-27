@@ -17,7 +17,7 @@ public interface BudgetRepository extends JpaRepository<Budget, UUID> {
 
 	@Query("SELECT b FROM Budget b WHERE b.user.id = ?1 and b.isActive = true " +
 			"ORDER BY CASE WHEN b.amountLimit IS NULL OR b.amountLimit <= 0 THEN 0 " +
-			"ELSE COALESCE(b.amountSpent, 0) / b.amountLimit END DESC, b.updatedAt DESC")
+			"ELSE COALESCE(b.amountSpent, 0) / b.baseCurrencyAmount END DESC, b.updatedAt DESC")
 	List<Budget> findActiveBudgetsByUserId(UUID userId);
 
 	@Query("SELECT b FROM Budget b " +
@@ -33,7 +33,7 @@ public interface BudgetRepository extends JpaRepository<Budget, UUID> {
 
 	@Query("SELECT b FROM Budget b WHERE b.endDate < ?1 and b.isActive = true " +
 			"ORDER BY CASE WHEN b.amountLimit IS NULL OR b.amountLimit <= 0 THEN 0 " +
-			"ELSE COALESCE(b.amountSpent, 0) / b.amountLimit END DESC, b.updatedAt DESC")
+			"ELSE COALESCE(b.amountSpent, 0) / b.baseCurrencyAmount END DESC, b.updatedAt DESC")
 	List<Budget> findBudgetByEndDateBeforeAndIsActiveTrue(LocalDate today);
 
 	void deleteAllByUserId(UUID userId);
