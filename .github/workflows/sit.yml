@@ -66,6 +66,7 @@ jobs:
             FRONTEND_URL=${{ vars.FRONTEND_URL }}
             AWS_REGION=${{ vars.AWS_REGION }}
             AWS_BUCKET_NAME=${{ secrets.AWS_BUCKET_NAME }}
+            EXCHANGE_RATE_API_KEY=${{ secrets.EXCHANGE_RATE_API_KEY }}
             EOF
 
 

@@ -77,10 +77,10 @@ public class ExpenseOverview {
 		Calendar calendar = Calendar.getInstance();
 		int currentMonth = calendar.get(Calendar.MONTH);
 
-		Map<Month, Double> monthMap = expenses.stream().collect(Collectors.groupingBy(expense -> expense.getExpenseDate().getMonth(), TreeMap::new, Collectors.summingDouble(ExpenseResponse::getAmount)));
+		Map<Month, Double> monthMap = expenses.stream().collect(Collectors.groupingBy(expense -> expense.getExpenseDate().getMonth(), TreeMap::new, Collectors.summingDouble(e -> e.getDisplayAmount().doubleValue())));
 		this.thisMonthTotalExpense = round(monthMap.getOrDefault(Month.of(currentMonth + 1), 0.0) * 100.0) / 100.0;
 		this.lastMonthTotalExpense = LastMonthTotalExpense;
-		this.TotalAmount = expenses.stream().mapToDouble(ExpenseResponse::getAmount).sum();
+		this.TotalAmount = expenses.stream().mapToDouble(e -> e.getDisplayAmount().doubleValue()).sum();
 		this.averageMonthlyExpense = TotalAmount / (currentMonth + 1);
 		this.mostFrequentCategory = categoryCount.entrySet().stream()
 				.max(Map.Entry.comparingByValue())
@@ -97,13 +97,13 @@ public class ExpenseOverview {
 
 		ExpenseResponse mostExpensive = expenses.stream()
 				.filter(expense -> expense.getExpenseDate().getMonthValue() == (currentMonth + 1))
-				.max(Comparator.comparingDouble(ExpenseResponse::getAmount))
+				.max(Comparator.comparing(ExpenseResponse::getDisplayAmount))
 				.orElse(null);
 
 		if (mostExpensive != null) {
 			this.thisMonthMostExpensiveItem = Map.of(
 					mostExpensive.getDescription(),  // or category, description, etc.
-					mostExpensive.getAmount()
+					mostExpensive.getDisplayAmount().doubleValue()
 			);
 		} else {
 			this.thisMonthMostExpensiveItem = Map.of(); // empty map
@@ -111,14 +111,14 @@ public class ExpenseOverview {
 
 
 		// Requested Yearly view
-		Map<Month, Double> monthMapReq = req_expenses_range.stream().collect(Collectors.groupingBy(expense -> expense.getExpenseDate().getMonth(), TreeMap::new, Collectors.summingDouble(ExpenseResponse::getAmount)));
+		Map<Month, Double> monthMapReq = req_expenses_range.stream().collect(Collectors.groupingBy(expense -> expense.getExpenseDate().getMonth(), TreeMap::new, Collectors.summingDouble(e -> e.getDisplayAmount().doubleValue())));
 		this.amountByMonth = monthMapReq.entrySet().stream().
 				collect(Collectors.toMap(entry -> entry.getKey().getDisplayName(TextStyle.FULL, Locale.ENGLISH), entry -> round(entry.getValue() * 100.0) / 100.0, (a, b) -> a, LinkedHashMap::new));
 
 		Map<String, Double> rawSums = req_expenses_range.stream()
 				.collect(Collectors.groupingBy(
 						ExpenseResponse::getCategoryName,
-						Collectors.summingDouble(ExpenseResponse::getAmount)
+						Collectors.summingDouble(e -> e.getDisplayAmount().doubleValue())
 				));
 		this.amountByCategory = rawSums.entrySet().stream()
 				.collect(Collectors.toMap(
@@ -152,9 +152,9 @@ public class ExpenseOverview {
 		// Monthly requested data
 		this.topFiveMostExpensiveItemThisMonth = req_expenses_range_monthly.stream()
 				.filter(expense -> expense.getExpenseDate().getMonth() == Month.of(reqMonth))
-				.sorted(Comparator.comparingDouble(ExpenseResponse::getAmount).reversed())
+				.sorted(Comparator.comparing(ExpenseResponse::getDisplayAmount).reversed())
 				.limit(5) //only 5 is required
-				.collect(Collectors.toMap(ExpenseResponse::getDescription, ExpenseResponse::getAmount, (a, b) -> a, LinkedHashMap::new));
+				.collect(Collectors.toMap(ExpenseResponse::getDescription, e -> e.getDisplayAmount().doubleValue(), (a, b) -> a, LinkedHashMap::new));
 
 		this.overTheDaysThisMonth = new LinkedHashMap<>();
 		for (DailyExpense dailyExpense : dailyExpenses) {

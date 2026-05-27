@@ -8,6 +8,7 @@ public class globals {
 	public static final String TYPE_INCOME = "income";
 	public static final String DEFAULT_CATEGORY_ICON = "DollarSign";
 	public static final String DEFAULT_CATEGORY_COLOR = "#808080";
+	public static final String BASE_CURRENCY = "USD";
 
 	public enum MessageType {
 		ALERT, INFO, ERROR, SUCCESS

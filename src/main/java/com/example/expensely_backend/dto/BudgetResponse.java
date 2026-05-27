@@ -4,17 +4,16 @@ import com.example.expensely_backend.model.Budget;
 
 public record BudgetResponse(Budget budget, String error, String message) {
 
-    public BudgetResponse(Budget budget, String message) {
-        this(budget, null, message);
-    }
+	public BudgetResponse(Budget budget, String message) {
+		this(budget, null, message);
+	}
 
-    public BudgetResponse(String error, String message) {
-        this(null, error, message);
-    }
-    public BudgetResponse(Budget budget) {
-        this(budget, null, null);
-    }
+	public BudgetResponse(String error, String message) {
+		this(null, error, message);
+	}
 
-
+	public BudgetResponse(Budget budget) {
+		this(budget, null, null);
+	}
 
 }

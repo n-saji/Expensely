@@ -29,6 +29,9 @@ public class RecurringExpense {
 
 	private BigDecimal amount;
 
+	@Column(nullable = false, length = 3, columnDefinition = "varchar(3) default 'USD'")
+	private String currency = "USD";
+
 	private String description;
 
 	private globals.Recurrence recurrence; // "daily", "weekly", "monthly"

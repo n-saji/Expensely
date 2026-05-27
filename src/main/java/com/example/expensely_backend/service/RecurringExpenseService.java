@@ -18,16 +18,19 @@ import java.util.UUID;
 
 @Service
 public class RecurringExpenseService {
+	private static final String BASE_CURRENCY = "USD";
 	private final RecurringExpenseRepository recurringExpenseRepository;
 	private final UserRepository userRepository;
 	private final CategoryRepository categoryRepository;
 	private final ExpenseRepository expenseRepository;
+	private final ExchangeRateService exchangeRateService;
 
-	public RecurringExpenseService(RecurringExpenseRepository recurringExpenseRepository, UserRepository userRepository, CategoryRepository categoryRepository, ExpenseRepository expenseRepository) {
+	public RecurringExpenseService(RecurringExpenseRepository recurringExpenseRepository, UserRepository userRepository, CategoryRepository categoryRepository, ExpenseRepository expenseRepository, ExchangeRateService exchangeRateService) {
 		this.userRepository = userRepository;
 		this.categoryRepository = categoryRepository;
 		this.recurringExpenseRepository = recurringExpenseRepository;
 		this.expenseRepository = expenseRepository;
+		this.exchangeRateService = exchangeRateService;
 	}
 
 	public void createRecurringExpense(RecurringExpenseDTO recExpenseDTO) {
@@ -48,7 +51,12 @@ public class RecurringExpenseService {
 		RecurringExpense recurringExpense = new RecurringExpense();
 		recurringExpense.setUser(usr);
 		recurringExpense.setCategory(category);
-		recurringExpense.setAmount(recExpenseDTO.getAmount());
+		recurringExpense.setAmount(exchangeRateService.normalizeDisplayAmount(recExpenseDTO.getAmount()));
+		String currency = recExpenseDTO.getCurrency();
+		if (currency == null || currency.isBlank()) {
+			currency = BASE_CURRENCY;
+		}
+		recurringExpense.setCurrency(currency.toUpperCase());
 		recurringExpense.setDescription(recExpenseDTO.getDescription());
 		recurringExpense.setRecurrence(recExpenseDTO.getRecurrence());
 		recurringExpense.setActive(true);
@@ -64,7 +72,11 @@ public class RecurringExpenseService {
 				Expense expense = new Expense();
 				expense.setUser(usr);
 				expense.setCategory(category);
-				expense.setAmount(recExpenseDTO.getAmount());
+				expense.setAmount(exchangeRateService.normalizeDisplayAmount(recExpenseDTO.getAmount()));
+				expense.setCurrency(recurringExpense.getCurrency());
+				expense.setBaseCurrency(BASE_CURRENCY);
+				expense.setExchangeRate(exchangeRateService.getUsdToCurrencyRate(recurringExpense.getCurrency()));
+				expense.setBaseCurrencyAmount(exchangeRateService.convertToUsd(recExpenseDTO.getAmount(), recurringExpense.getCurrency()));
 				expense.setDescription(recExpenseDTO.getDescription());
 				expense.setExpenseDate(LocalDateTime.now());
 				expenseRepository.save(expense);
@@ -116,6 +128,7 @@ public class RecurringExpenseService {
 				rEM.getUser().getId().toString(),
 				rEM.getCategory().getId().toString(),
 				rEM.getAmount(),
+				rEM.getCurrency(),
 				rEM.getDescription(),
 				rEM.getRecurrence(),
 				rEM.getDate(),
@@ -130,7 +143,10 @@ public class RecurringExpenseService {
 		RecurringExpense existingExpense =
 				recurringExpenseRepository.findById(uuid).orElseThrow(() -> new IllegalArgumentException("Recurring expense not found"));
 		if (recExpenseDTO.getAmount() != null) {
-			existingExpense.setAmount(recExpenseDTO.getAmount());
+			existingExpense.setAmount(exchangeRateService.normalizeDisplayAmount(recExpenseDTO.getAmount()));
+		}
+		if (recExpenseDTO.getCurrency() != null && !recExpenseDTO.getCurrency().isBlank()) {
+			existingExpense.setCurrency(recExpenseDTO.getCurrency().toUpperCase());
 		}
 		if (recExpenseDTO.getDescription() != null) {
 			existingExpense.setDescription(recExpenseDTO.getDescription());
@@ -147,7 +163,11 @@ public class RecurringExpenseService {
 					Expense expense = new Expense();
 					expense.setUser(existingExpense.getUser());
 					expense.setCategory(existingExpense.getCategory());
-					expense.setAmount(existingExpense.getAmount());
+					expense.setAmount(exchangeRateService.normalizeDisplayAmount(existingExpense.getAmount()));
+					expense.setCurrency(existingExpense.getCurrency());
+					expense.setBaseCurrency(BASE_CURRENCY);
+					expense.setExchangeRate(exchangeRateService.getUsdToCurrencyRate(existingExpense.getCurrency()));
+					expense.setBaseCurrencyAmount(exchangeRateService.convertToUsd(existingExpense.getAmount(), existingExpense.getCurrency()));
 					expense.setDescription(existingExpense.getDescription());
 					expense.setExpenseDate(LocalDateTime.now());
 					expenseRepository.save(expense);
@@ -211,6 +231,7 @@ public class RecurringExpenseService {
 				expense.getUser().getId().toString(),
 				expense.getCategory().getId().toString(),
 				expense.getAmount(),
+				expense.getCurrency(),
 				expense.getDescription(),
 				expense.getRecurrence(),
 				expense.getDate(),

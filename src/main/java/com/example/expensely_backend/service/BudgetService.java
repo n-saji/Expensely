@@ -12,6 +12,7 @@ import com.example.expensely_backend.repository.CategoryRepository;
 import com.example.expensely_backend.repository.ExpenseRepository;
 import com.example.expensely_backend.utils.FormatDate;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +32,9 @@ public class BudgetService {
 	private final AlertHandler alertHandler;
 	private final BudgetRepository budgetRepository;
 	private final DbLogService dbLogService;
+
+	@Autowired
+	private final ExchangeRateService exchangeRateService;
 
 	private float calculatePercentage(BigDecimal amountSpent, BigDecimal amountLimit) {
 		if (amountLimit == null || amountLimit.compareTo(BigDecimal.ZERO) <= 0) {
@@ -127,7 +131,20 @@ public class BudgetService {
 			throw new IllegalArgumentException("A budget already exists for this user and category");
 		}
 
-
+		if (budget.getCurrency() == null || budget.getCurrency().isBlank()) {
+			budget.setCurrency(globals.BASE_CURRENCY);
+			budget.setBaseCurrencyAmount(budget.getAmountLimit());
+			budget.setExchangeRate(BigDecimal.ONE);
+		}
+		if (!budget.getCurrency().equals(globals.BASE_CURRENCY)) {
+			BigDecimal excRateAmount =
+					exchangeRateService.convertToUsd(budget.getAmountLimit(),
+							budget.getCurrency());
+			budget.setBaseCurrencyAmount(excRateAmount);
+			BigDecimal excRate =
+					exchangeRateService.getUsdToCurrencyRate(budget.getCurrency());
+			budget.setExchangeRate(excRate);
+		}
 		try {
 			validateBudget(budget);
 		} catch (Exception e) {
@@ -143,11 +160,12 @@ public class BudgetService {
 		List<Expense> expense = expenseRepository.findByUserIdAndTimeFrameAsc(user.getId(), FormatDate.formatStartDate(budget.getStartDate().atStartOfDay(), true), FormatDate.formatEndDate(budget.getEndDate().atStartOfDay()));
 		for (Expense exp : expense) {
 			if (exp.getCategory().getId().equals(budget.getCategory().getId())) {
-				total_amount = total_amount.add(exp.getAmount());
+				total_amount = total_amount.add(exp.getBaseCurrencyAmount());
 			}
 		}
 		budget.setAmountSpent(total_amount);
-		syncThresholdFlags(budget, calculatePercentage(budget.getAmountSpent(), budget.getAmountLimit()));
+		syncThresholdFlags(budget,
+				calculatePercentage(budget.getAmountSpent(), budget.getBaseCurrencyAmount()));
 		return budgetRepository.save(budget);
 	}
 
@@ -174,21 +192,38 @@ public class BudgetService {
 		return budgets;
 	}
 
-	public List<Budget> getBudgetByCategoryId(String categoryId) {
-		UUID categoryUUID = UUID.fromString(categoryId);
-		try {
-			return budgetRepository.findByCategoryId(categoryUUID);
-		} catch (Exception e) {
-			throw new IllegalArgumentException("Error retrieving budget for category ID: " + categoryId + " - " + e.getMessage());
-		}
-	}
 
 	public List<Budget> getBudgetsByUserId(String userId) {
 		User user = userService.GetActiveUserById(userId);
 		if (user == null) {
 			throw new IllegalArgumentException("User not found");
 		}
-		return budgetRepository.findActiveBudgetsByUserId(user.getId());
+		List<Budget> res = budgetRepository.findActiveBudgetsByUserId(user.getId());
+
+		return res.stream().peek(b -> {
+			b.setUser(null);
+			b.getCategory().setUser(null);
+		}).peek(b -> {
+			BigDecimal spentUsd =
+					b.getAmountSpent() == null
+							? BigDecimal.ZERO
+							: b.getAmountSpent();
+
+			BigDecimal rate =
+					exchangeRateService
+							.getUsdToCurrencyRate(
+									b.getCurrency()
+							);
+
+			b.setAmountSpent(
+					spentUsd
+							.multiply(rate)
+							.setScale(
+									2,
+									RoundingMode.HALF_UP
+							)
+			);
+		}).toList();
 	}
 
 	public Budget updateBudget(String UserId, String budgetId, Budget budget) {
@@ -209,17 +244,32 @@ public class BudgetService {
 			throw new IllegalArgumentException("Budget period must not be " +
 					"empty");
 		}
+		if (budget.getCurrency() != null && budget.getCurrency().isBlank()) {
+			throw new IllegalArgumentException("Currency must not be empty");
+		}
 		try {
-			if (budget.getAmountLimit() != null)
+			if (budget.getAmountLimit() != null && !budget.getAmountLimit().subtract(existingBudget.getAmountLimit()).equals(BigDecimal.ZERO)) {
+				BigDecimal excRateAmount =
+						exchangeRateService.convertToUsd(budget.getAmountLimit(),
+								budget.getCurrency());
+				existingBudget.setBaseCurrencyAmount(excRateAmount);
+				BigDecimal excRate =
+						exchangeRateService.getUsdToCurrencyRate(budget.getCurrency());
+				existingBudget.setExchangeRate(excRate);
 				existingBudget.setAmountLimit(budget.getAmountLimit());
+			}
 			if (budget.getPeriod() != null && (!budget.getPeriod().name().isEmpty()))
 				existingBudget.setPeriod(budget.getPeriod());
 			if (budget.getStartDate() != null)
 				existingBudget.setStartDate(budget.getStartDate());
 			if (budget.getEndDate() != null)
 				existingBudget.setEndDate(budget.getEndDate());
+			if (budget.getCurrency() != null)
+				existingBudget.setCurrency(budget.getCurrency());
 			existingBudget.setUpdatedAt(new java.sql.Timestamp(new Date().getTime()).toLocalDateTime());
-			syncThresholdFlags(existingBudget, calculatePercentage(existingBudget.getAmountSpent(), existingBudget.getAmountLimit()));
+			syncThresholdFlags(existingBudget,
+					calculatePercentage(existingBudget.getAmountSpent(),
+							existingBudget.getBaseCurrencyAmount()));
 
 			return budgetRepository.save(existingBudget);
 		} catch (Exception e) {
@@ -227,9 +277,6 @@ public class BudgetService {
 		}
 	}
 
-	public Budget findByUserIdAndCategoryId(String user_id, String category_id) {
-		return budgetRepository.findActiveBudgetsByUserIdAndCategoryId(UUID.fromString(user_id), UUID.fromString(category_id));
-	}
 
 	@Transactional
 	public void updateBudgetAmountByUserIdAndCategoryId(String user_id, String category_id, BigDecimal amount, LocalDateTime date) {
@@ -255,7 +302,8 @@ public class BudgetService {
 			budget.setAmountSpent(BigDecimal.ZERO);
 		}
 
-		float percentage = calculatePercentage(budget.getAmountSpent(), budget.getAmountLimit());
+		float percentage = calculatePercentage(budget.getAmountSpent(),
+				budget.getBaseCurrencyAmount());
 		int highestNewlyCrossedThreshold = resolveHighestNewlyCrossedThreshold(budget, percentage);
 		syncThresholdFlags(budget, percentage);
 

@@ -37,6 +37,26 @@ public class Expense {
 	@Setter
 	private BigDecimal amount;
 
+	@Column(nullable = false, length = 3, columnDefinition = "varchar(3) default 'USD'")
+	@Getter
+	@Setter
+	private String currency;
+
+	@Column(name = "base_currency_amount", precision = 19, scale = 4)
+	@Getter
+	@Setter
+	private BigDecimal baseCurrencyAmount;
+
+	@Column(name = "base_currency", length = 3)
+	@Getter
+	@Setter
+	private String baseCurrency; // usually USD
+
+	@Column(name = "exchange_rate", precision = 19, scale = 8)
+	@Getter
+	@Setter
+	private BigDecimal exchangeRate; // snapshot rate
+
 	@Getter
 	@Setter
 	private String description;

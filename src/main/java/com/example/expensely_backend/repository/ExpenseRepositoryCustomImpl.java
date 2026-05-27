@@ -140,7 +140,7 @@ public class ExpenseRepositoryCustomImpl {
 
         query.multiselect(
                 formattedMonth.alias("month"),
-                cb.sum(expense.get("amount")).alias("total")
+                cb.sum(expense.get("baseCurrencyAmount")).alias("total")
         );
 
         query.where(
@@ -188,7 +188,7 @@ public class ExpenseRepositoryCustomImpl {
         query.multiselect(
                 formattedMonth.alias("month"),
                 category.get("name").alias("category"),
-                cb.sum(expense.get("amount")).alias("total")
+                cb.sum(expense.get("baseCurrencyAmount")).alias("total")
         );
 
 

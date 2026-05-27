@@ -40,6 +40,7 @@ public class ExpenseService {
 	private final DbLogService dbLogService;
 	private final RecurringExpenseService recurringExpenseService;
 	private final Executor expenseExecutor;
+	private final ExchangeRateService exchangeRateService;
 
 	@Autowired
 	private S3Service s3Service;
@@ -52,7 +53,8 @@ public class ExpenseService {
 			              CategoryRepository categoryRepository,
 			              DbLogService dbLogService,
 			              RecurringExpenseService recurringExpenseService,
-			              @Qualifier("expenseExecutor") Executor expenseExecutor) {
+			              @Qualifier("expenseExecutor") Executor expenseExecutor,
+			              ExchangeRateService exchangeRateService) {
 		this.expenseRepository = expenseRepository;
 		this.categoryService = categoryService;
 		this.userService = userService;
@@ -65,7 +67,45 @@ public class ExpenseService {
 		this.dbLogService = dbLogService;
 		this.recurringExpenseService = recurringExpenseService;
 		this.expenseExecutor = expenseExecutor;
+		this.exchangeRateService = exchangeRateService;
 
+	}
+
+	private BigDecimal normalizeAmount(BigDecimal amount) {
+		return exchangeRateService.normalizeDisplayAmount(amount);
+	}
+
+	private BigDecimal resolveUsdRate(String currency) {
+		return exchangeRateService.getUsdToCurrencyRate(currency);
+	}
+
+	private void applyCurrencySnapshot(Expense expense, String currency) {
+		expense.setAmount(normalizeAmount(expense.getAmount()));
+		expense.setCurrency(currency.toUpperCase());
+		expense.setBaseCurrency(globals.BASE_CURRENCY);
+		BigDecimal rate = resolveUsdRate(currency);
+		expense.setExchangeRate(rate);
+		expense.setBaseCurrencyAmount(exchangeRateService.convertToUsd(expense.getAmount(), currency));
+	}
+
+	private List<ExpenseResponse> mapExpensesToResponse(List<Expense> expenses, String displayCurrency) {
+		BigDecimal displayRate = resolveUsdRate(displayCurrency);
+		return expenses.stream()
+				.map(expense -> {
+					BigDecimal displayAmount = expense.getBaseCurrencyAmount() == null
+							? normalizeAmount(expense.getAmount())
+							: expense.getBaseCurrencyAmount().multiply(displayRate).setScale(2, java.math.RoundingMode.HALF_UP);
+					return new ExpenseResponse(expense, displayCurrency, displayAmount);
+				})
+				.collect(Collectors.toList());
+	}
+
+	private ExpenseResponse mapExpenseToResponse(Expense expense, String displayCurrency) {
+		BigDecimal displayRate = resolveUsdRate(displayCurrency);
+		BigDecimal displayAmount = expense.getBaseCurrencyAmount() == null
+				? normalizeAmount(expense.getAmount())
+				: expense.getBaseCurrencyAmount().multiply(displayRate).setScale(2, java.math.RoundingMode.HALF_UP);
+		return new ExpenseResponse(expense, displayCurrency, displayAmount);
 	}
 
 	private UUID getActiveUserIdOrThrow(String userId) {
@@ -83,7 +123,9 @@ public class ExpenseService {
 			throw new IllegalArgumentException("Order must be 'asc' or 'desc'");
 		}
 
-		return expenses.stream().map(ExpenseResponse::new).collect(Collectors.toList());
+		User user = userService.GetActiveUserById(userId.toString());
+		String displayCurrency = user == null ? globals.BASE_CURRENCY : user.getCurrency();
+		return mapExpensesToResponse(expenses, displayCurrency);
 	}
 
 	private List<MonthlyCategoryExpense> getMonthlyCategoryExpense(UUID userId, LocalDateTime startDate, LocalDateTime endDate) {
@@ -123,7 +165,9 @@ public class ExpenseService {
 				categoryUUID, q);
 
 		totalPages = (int) Math.ceil((double) totalElements / limit);
-		return new ExpenseResList(expenses.stream().map(ExpenseResponse::new).collect(Collectors.toList()), totalPages, totalElements, page);
+		User user = userService.GetActiveUserById(userId.toString());
+		String displayCurrency = user == null ? globals.BASE_CURRENCY : user.getCurrency();
+		return new ExpenseResList(mapExpensesToResponse(expenses, displayCurrency), totalPages, totalElements, page);
 	}
 
 	private Double getTotalExpenseForMonth(int year, int month, UUID userId) {
@@ -191,13 +235,18 @@ public class ExpenseService {
 		}
 
 		expense.setUser(user);
+		String currency = expense.getCurrency();
+		if (currency == null || currency.isBlank()) {
+			currency = user.getCurrency();
+		}
+		applyCurrencySnapshot(expense, currency);
 		Expense exp = expenseRepository.save(expense);
 
 
 		// calculate if budget set
 
 		try {
-			budgetService.updateBudgetAmountByUserIdAndCategoryId(user.getId().toString(), category.getId().toString(), expense.getAmount(), expense.getExpenseDate());
+			budgetService.updateBudgetAmountByUserIdAndCategoryId(user.getId().toString(), category.getId().toString(), expense.getBaseCurrencyAmount(), expense.getExpenseDate());
 		} catch (Exception e) {
 			throw new IllegalArgumentException("Error updating budget: " + e.getMessage());
 		}
@@ -208,6 +257,12 @@ public class ExpenseService {
 
 	public Expense getExpenseById(String id) {
 		return expenseRepository.findById(UUID.fromString(id)).orElseThrow(() -> new IllegalArgumentException("Expense not found"));
+	}
+
+	public ExpenseResponse getExpenseResponseById(String id) {
+		Expense expense = getExpenseById(id);
+		String displayCurrency = expense.getUser() == null ? globals.BASE_CURRENCY : expense.getUser().getCurrency();
+		return mapExpenseToResponse(expense, displayCurrency);
 	}
 
 	public void deleteExpenseById(String id) {
@@ -221,7 +276,7 @@ public class ExpenseService {
 			expenseRepository.deleteById(UUID.fromString(id));
 
 			try {
-				budgetService.updateBudgetAmountByUserIdAndCategoryId(expense.getUser().getId().toString(), expense.getCategory().getId().toString(), expense.getAmount().negate(), expense.getExpenseDate());
+				budgetService.updateBudgetAmountByUserIdAndCategoryId(expense.getUser().getId().toString(), expense.getCategory().getId().toString(), expense.getBaseCurrencyAmount().negate(), expense.getExpenseDate());
 			} catch (Exception e) {
 				throw new IllegalArgumentException("Error updating budget: " + e.getMessage());
 			}
@@ -230,15 +285,15 @@ public class ExpenseService {
 		}
 	}
 
-	public Iterable<Expense> getExpensesByUserId(String userId) {
+	public List<ExpenseResponse> getExpensesByUserId(String userId) {
 		User user = userService.GetActiveUserById(userId);
 		if (user == null) {
 			throw new IllegalArgumentException("User not found");
 		}
-		return expenseRepository.findByUserId(user.getId());
+		return mapExpensesToResponse(expenseRepository.findByUserId(user.getId()), user.getCurrency());
 	}
 
-	public List<Expense> getExpensesByCategoryIdAndUserID(String categoryId, String userId) {
+	public List<ExpenseResponse> getExpensesByCategoryIdAndUserID(String categoryId, String userId) {
 		Category category = categoryService.getCategoryById(categoryId);
 		if (category == null) {
 			throw new IllegalArgumentException("Category not found");
@@ -247,32 +302,51 @@ public class ExpenseService {
 		if (user == null) {
 			throw new IllegalArgumentException("User not found");
 		}
-
-		return expenseRepository.findByCategoryIdAndUserId(category.getId(), user.getId());
+		return mapExpensesToResponse(expenseRepository.findByCategoryIdAndUserId(category.getId(), user.getId()), user.getCurrency());
 	}
 
 	public Expense updateExpense(Expense expense) {
 
 		Expense oldExpense = getExpenseById(expense.getId().toString());
-		BigDecimal changed_amount = expense.getAmount().subtract(oldExpense.getAmount());
-
+		if (oldExpense == null) {
+			throw new IllegalArgumentException("Expense not found");
+		}
+		BigDecimal previousBaseAmount = oldExpense.getBaseCurrencyAmount();
 		if (expense.getCategory() != null && expense.getCategory().getId() != null && !expense.getCategory().getId().equals(oldExpense.getCategory().getId())) {
 			Category category = categoryService.getCategoryById(expense.getCategory().getId().toString());
 			if (category == null) {
 				throw new IllegalArgumentException("Category not found");
 			}
+
+			try {
+				budgetService.updateBudgetAmountByUserIdAndCategoryId(oldExpense.getUser().getId().toString(), oldExpense.getCategory().getId().toString(), oldExpense.getBaseCurrencyAmount().negate(), oldExpense.getExpenseDate());
+			} catch (Exception e) {
+				throw new IllegalArgumentException("Error updating budget: " + e.getMessage());
+			}
 			oldExpense.setCategory(category);
 		}
 
 
-		if (!expenseRepository.existsById(expense.getId())) {
-			throw new IllegalArgumentException("Expense not found");
+		if (expense.getCurrency() != null && !expense.getCurrency().equalsIgnoreCase(oldExpense.getCurrency())) {
+			applyCurrencySnapshot(oldExpense, expense.getCurrency());
 		}
-
 
 		if (expense.getAmount() != null && expense.getAmount().compareTo(oldExpense.getAmount()) != 0) {
-			oldExpense.setAmount(expense.getAmount());
+			oldExpense.setAmount(normalizeAmount(expense.getAmount()));
+			String currency = oldExpense.getCurrency() == null ? globals.BASE_CURRENCY : oldExpense.getCurrency();
+			BigDecimal rate = oldExpense.getExchangeRate();
+			if (rate == null) {
+				rate = resolveUsdRate(currency);
+			}
+			if (globals.BASE_CURRENCY.equalsIgnoreCase(currency)) {
+				oldExpense.setBaseCurrencyAmount(oldExpense.getAmount().setScale(2, java.math.RoundingMode.HALF_UP));
+			} else {
+				oldExpense.setBaseCurrencyAmount(oldExpense.getAmount()
+						.divide(rate, 8, java.math.RoundingMode.HALF_UP)
+						.setScale(2, java.math.RoundingMode.HALF_UP));
+			}
 		}
+
 		if (expense.getDescription() != null && !expense.getDescription().equals(oldExpense.getDescription())) {
 			oldExpense.setDescription(expense.getDescription());
 		}
@@ -283,9 +357,10 @@ public class ExpenseService {
 
 		Expense exp = expenseRepository.save(oldExpense);
 
+
 //        update budget
 		try {
-			budgetService.updateBudgetAmountByUserIdAndCategoryId(exp.getUser().getId().toString(), exp.getCategory().getId().toString(), changed_amount, exp.getExpenseDate());
+			budgetService.updateBudgetAmountByUserIdAndCategoryId(exp.getUser().getId().toString(), exp.getCategory().getId().toString(), oldExpense.getBaseCurrencyAmount().subtract(previousBaseAmount), exp.getExpenseDate());
 		} catch (Exception e) {
 			throw new IllegalArgumentException("Error updating budget: " + e.getMessage());
 		}
@@ -317,7 +392,7 @@ public class ExpenseService {
 		expenseRepository.deleteAll(expenses);
 		for (Expense expense : expenses) {
 			try {
-				budgetService.updateBudgetAmountByUserIdAndCategoryId(expense.getUser().getId().toString(), expense.getCategory().getId().toString(), expense.getAmount().negate(), expense.getExpenseDate());
+				budgetService.updateBudgetAmountByUserIdAndCategoryId(expense.getUser().getId().toString(), expense.getCategory().getId().toString(), expense.getBaseCurrencyAmount().negate(), expense.getExpenseDate());
 			} catch (Exception e) {
 				throw new IllegalArgumentException("Error updating budget: " + e.getMessage());
 			}
@@ -332,32 +407,28 @@ public class ExpenseService {
 				categoryId, page, limit, q, customSortBy, customSortOrder);
 	}
 
-	public List<MonthlyCategoryExpense> getMonthlyCategoryExpense(String userId, LocalDateTime startDate, LocalDateTime endDate) {
-		return getMonthlyCategoryExpense(getActiveUserIdOrThrow(userId), startDate, endDate);
-
-	}
-
-	public List<DailyExpense> getDailyExpense(String userId, LocalDateTime startDate, LocalDateTime endDate) {
-		return getDailyExpense(getActiveUserIdOrThrow(userId), startDate, endDate);
-	}
-
 	public String exportExpensesToCSV(String userId, LocalDateTime startDate, LocalDateTime endDate) throws IOException {
 		UUID userIdUUID = UUID.fromString(userId);
 		User user = userService.GetActiveUserById(userId);
 		List<Expense> expenses = expenseRepository.findByUserIdAndTimeFrameAsc(userIdUUID, startDate, endDate);
+		String displayCurrency = user == null ? globals.BASE_CURRENCY : user.getCurrency();
+		BigDecimal displayRate = resolveUsdRate(displayCurrency);
 
 		StringWriter sw = new StringWriter();
 		CSVWriter writer = new CSVWriter(sw);
 
 		// header
-		writer.writeNext(new String[]{"Date", "Description", "Amount (in " + user.getCurrency() + ")", "Category"});
+		writer.writeNext(new String[]{"Date", "Description", "Amount (in " + displayCurrency + ")", "Category"});
 
 		// rows
 		for (Expense expense : expenses) {
+			BigDecimal displayAmount = expense.getBaseCurrencyAmount() == null
+					? normalizeAmount(expense.getAmount())
+					: expense.getBaseCurrencyAmount().multiply(displayRate).setScale(2, java.math.RoundingMode.HALF_UP);
 			writer.writeNext(new String[]{
 					expense.getExpenseDate().toString(),
 					expense.getDescription(),
-					String.valueOf(expense.getAmount()),
+					displayAmount.toString(),
 					expense.getCategory().getName()
 			});
 		}
@@ -401,21 +472,17 @@ public class ExpenseService {
 		cats.forEach(cat -> catsList.put(cat.getName(), cat));
 		List<Expense> expenses = rows.stream().map(dto -> {
 			Expense expense = new Expense();
-			expense.setAmount(BigDecimal.valueOf(dto.getAmount()));
+			expense.setAmount(normalizeAmount(BigDecimal.valueOf(dto.getAmount())));
 			expense.setCategory(catsList.get(dto.getCategory()));
 			expense.setExpenseDate(dto.getExpense_date().atStartOfDay());
 			expense.setDescription(dto.getDescription());
 			expense.setUser(user);
+			applyCurrencySnapshot(expense, globals.BASE_CURRENCY);
 			return expense;
 		}).toList();
 		expenseRepository.saveAll(expenses);
 		expenseFilesRepository.deleteById(fileUUID);
 		return "Expenses inserted successfully";
-	}
-
-	public Double getTotalExpenseForMonth(int year, int month, String userId) {
-		return getTotalExpenseForMonth(year, month, UUID.fromString(userId));
-
 	}
 
 	public LinkedHashMap<String, Double> getMonthlyExpenseFromTillTo(String userId, int count,
@@ -424,13 +491,23 @@ public class ExpenseService {
 		if (user == null) {
 			throw new IllegalArgumentException("User not found");
 		}
+		String displayCurrency = user.getCurrency();
+		BigDecimal rate = resolveUsdRate(displayCurrency);
 
 		DateRange range = resolveDateRange(count, type);
 
-		return
+		LinkedHashMap<String, Double> baseTotals =
 				expenseRepositoryCustomImpl.getMonthlyExpenseFromTillTo(user.getId(),
 						range.startDate(),
 						range.endDate());
+		LinkedHashMap<String, Double> displayTotals = new LinkedHashMap<>();
+		for (Map.Entry<String, Double> entry : baseTotals.entrySet()) {
+			BigDecimal converted = BigDecimal.valueOf(entry.getValue())
+					.multiply(rate)
+					.setScale(2, java.math.RoundingMode.HALF_UP);
+			displayTotals.put(entry.getKey(), converted.doubleValue());
+		}
+		return displayTotals;
 	}
 
 	public Map<String, Map<String, Double>> getMonthlyCategoryExpenseFromTillTo(String userId, int count,
@@ -439,6 +516,7 @@ public class ExpenseService {
 		if (user == null) {
 			throw new IllegalArgumentException("User not found");
 		}
+		BigDecimal rate = resolveUsdRate(user.getCurrency());
 
 		DateRange range = resolveDateRange(count, type);
 
@@ -462,11 +540,14 @@ public class ExpenseService {
 
 			String category = dto.getCategoryName();
 			Double amount = dto.getTotalAmount();
+			BigDecimal converted = BigDecimal.valueOf(amount == null ? 0.0 : amount)
+					.multiply(rate)
+					.setScale(2, java.math.RoundingMode.HALF_UP);
 
 			if (category != null) {
 				monthlyCategoryExpense
 						.computeIfAbsent(month, k -> new LinkedHashMap<>())
-						.merge(category, amount, Double::sum);
+						.merge(category, converted.doubleValue(), Double::sum);
 
 			}
 		}
@@ -488,17 +569,21 @@ public class ExpenseService {
 
 		UUID activeUserId = getActiveUserIdOrThrow(userId);
 
+		User user = userService.GetActiveUserById(userId);
+		String displayCurrency = user == null ? globals.BASE_CURRENCY : user.getCurrency();
+		BigDecimal displayRate = resolveUsdRate(displayCurrency);
+
 		CompletableFuture<List<ExpenseResponse>> f1 =
 				CompletableFuture.supplyAsync(() ->
-						getExpenseByUserIdAndStartDateAndEndDate(activeUserId, startDate, endDate, "desc"), expenseExecutor);
+						mapExpensesToResponse(expenseRepository.findByUserIdAndTimeFrameDesc(activeUserId, startDate, endDate), displayCurrency), expenseExecutor);
 
 		CompletableFuture<List<ExpenseResponse>> f2 =
 				CompletableFuture.supplyAsync(() ->
-						getExpenseByUserIdAndStartDateAndEndDate(activeUserId, req_start_year, req_end_year, "desc"), expenseExecutor);
+						mapExpensesToResponse(expenseRepository.findByUserIdAndTimeFrameDesc(activeUserId, req_start_year, req_end_year), displayCurrency), expenseExecutor);
 
 		CompletableFuture<List<ExpenseResponse>> f3 =
 				CompletableFuture.supplyAsync(() ->
-						getExpenseByUserIdAndStartDateAndEndDate(activeUserId, req_start, req_end, "desc"), expenseExecutor);
+						mapExpensesToResponse(expenseRepository.findByUserIdAndTimeFrameDesc(activeUserId, req_start, req_end), displayCurrency), expenseExecutor);
 
 		CompletableFuture<List<MonthlyCategoryExpense>> monthlyCategory =
 				CompletableFuture.supplyAsync(() ->
@@ -514,7 +599,7 @@ public class ExpenseService {
 
 		CompletableFuture<ExpenseResList> recentExpenses =
 				CompletableFuture.supplyAsync(() ->
-						fetchExpensesWithConditions(activeUserId,
+						fetchExpensesWithConditions(userId,
 								FormatDate.formatStartDate(null, false),
 								endDate,
 								"asc", null, 1, 1, "", null, null), expenseExecutor);
@@ -541,18 +626,62 @@ public class ExpenseService {
 				prevMonthTotal, recurring
 		).join();
 
+		List<MonthlyCategoryExpense> convertedMonthly = new ArrayList<>();
+		for (MonthlyCategoryExpense dto : monthlyCategory.join()) {
+			convertedMonthly.add(new MonthlyCategoryExpense() {
+				@Override
+				public String getMonth() {
+					return dto.getMonth();
+				}
+
+				@Override
+				public String getCategoryName() {
+					return dto.getCategoryName();
+				}
+
+				@Override
+				public Double getTotalAmount() {
+					BigDecimal amount = BigDecimal.valueOf(dto.getTotalAmount() == null ? 0.0 : dto.getTotalAmount());
+					BigDecimal converted = amount.multiply(displayRate).setScale(2, java.math.RoundingMode.HALF_UP);
+					return converted.doubleValue();
+				}
+			});
+		}
+
+		List<DailyExpense> convertedDaily = new ArrayList<>();
+		for (DailyExpense dto : daily.join()) {
+			convertedDaily.add(new DailyExpense() {
+				@Override
+				public String getExpenseDate() {
+					return dto.getExpenseDate();
+				}
+
+				@Override
+				public Double getTotalAmount() {
+					BigDecimal amount = BigDecimal.valueOf(dto.getTotalAmount() == null ? 0.0 : dto.getTotalAmount());
+					BigDecimal converted = amount.multiply(displayRate).setScale(2, java.math.RoundingMode.HALF_UP);
+					return converted.doubleValue();
+				}
+			});
+		}
+
+		Double prevMonthDisplay = BigDecimal.valueOf(prevMonthTotal.join() == null ? 0.0 : prevMonthTotal.join())
+				.multiply(displayRate)
+				.setScale(2, java.math.RoundingMode.HALF_UP)
+				.doubleValue();
+
 		return new ExpenseOverview(
 				f1.join(),
 				f2.join(),
 				f3.join(),
 				userId,
-				monthlyCategory.join(),
+				convertedMonthly,
 				categories.join(),
-				daily.join(),
+				convertedDaily,
 				recentExpenses.join(),
 				req_month,
 				budgets.join(),
-				prevMonthTotal.join(),
+				prevMonthDisplay,
 				recurring.join()
 		);
 	}
@@ -629,6 +758,7 @@ public class ExpenseService {
 		}
 	}
 
+	//	dont remove
 	private record DateRange(LocalDateTime startDate, LocalDateTime endDate) {
 	}
 

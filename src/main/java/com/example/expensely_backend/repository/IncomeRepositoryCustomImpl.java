@@ -41,7 +41,7 @@ public class IncomeRepositoryCustomImpl {
 
 		query.multiselect(
 				formattedMonth.alias("month"),
-				cb.sum(income.get("amount")).alias("total")
+				cb.sum(income.get("baseCurrencyAmount")).alias("total")
 		);
 
 		query.where(
@@ -173,7 +173,7 @@ public class IncomeRepositoryCustomImpl {
 		query.multiselect(
 				formattedMonth.alias("month"),
 				category.get("name").alias("category"),
-				cb.sum(income.get("amount")).alias("total")
+				cb.sum(income.get("baseCurrencyAmount")).alias("total")
 		);
 
 		query.where(
@@ -213,4 +213,3 @@ public class IncomeRepositoryCustomImpl {
 		return monthlyCategoryIncome;
 	}
 }
-
