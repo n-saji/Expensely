@@ -15,11 +15,6 @@ import java.util.UUID;
 @Repository
 public interface BudgetRepository extends JpaRepository<Budget, UUID> {
 
-	@Query("SELECT b FROM Budget b WHERE b.category.id = ?1 and b.isActive = true " +
-			"ORDER BY CASE WHEN b.amountLimit IS NULL OR b.amountLimit <= 0 THEN 0 " +
-			"ELSE COALESCE(b.amountSpent, 0) / b.amountLimit END DESC, b.updatedAt DESC")
-	List<Budget> findByCategoryId(UUID categoryId);
-
 	@Query("SELECT b FROM Budget b WHERE b.user.id = ?1 and b.isActive = true " +
 			"ORDER BY CASE WHEN b.amountLimit IS NULL OR b.amountLimit <= 0 THEN 0 " +
 			"ELSE COALESCE(b.amountSpent, 0) / b.amountLimit END DESC, b.updatedAt DESC")
@@ -27,11 +22,8 @@ public interface BudgetRepository extends JpaRepository<Budget, UUID> {
 
 	@Query("SELECT b FROM Budget b " +
 			"ORDER BY CASE WHEN b.amountLimit IS NULL OR b.amountLimit <= 0 THEN 0 " +
-			"ELSE COALESCE(b.amountSpent, 0) / b.amountLimit END DESC, b.updatedAt DESC")
+			"ELSE COALESCE(b.amountSpent, 0) / b.baseCurrencyAmount END DESC, b.updatedAt DESC")
 	List<Budget> findAllOrderByUtilizationDesc();
-
-	@Query("SELECT b FROM Budget b WHERE b.user.id = ?1 and b.category.id = ?2 and b.isActive = true")
-	Budget findActiveBudgetsByUserIdAndCategoryId(UUID userId, UUID categoryId);
 
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("SELECT b FROM Budget b WHERE b.user.id = ?1 and b.category.id = ?2 and b.isActive = true")
