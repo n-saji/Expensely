@@ -142,7 +142,7 @@ public class RedisSession {
 		}
 	}
 
-	public Map<String, Map<String, String>> fetchAllSessionsForUser(String userId) {
+	public Map<String, Map<String, String>> fetchAllSessionsForUser(String userId, String myIP) {
 		try {
 			if (userId == null || userId.isBlank()) {
 				return null;
@@ -152,8 +152,12 @@ public class RedisSession {
 			Map<String, Map<String, String>> result = new HashMap<>();
 			for (String session : sessions) {
 				Map<String, String> response = redis.hgetAll(sessionKey(session));
-				System.out.println(response + " hit");
 				if (response != null) {
+					if (response.get("ipAddress") != null && response.get("ipAddress").equals(myIP)) {
+						response.put("current", "true");
+					} else {
+						response.put("current", "false");
+					}
 					result.put(session, response);
 				}
 			}
