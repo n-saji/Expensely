@@ -677,12 +677,13 @@ public class UserController {
 	}
 
 	@GetMapping("/sessions/get-all")
-	public ResponseEntity<?> getAllSessions(Authentication authentication) {
+	public ResponseEntity<?> getAllSessions(Authentication authentication,
+	                                        HttpServletRequest request) {
 		String userId = (String) authentication.getPrincipal();
 		try {
 			User user = userService.GetUserById(userId);
 
-			return ResponseEntity.ok(redisSession.fetchAllSessionsForUser(userId));
+			return ResponseEntity.ok(redisSession.fetchAllSessionsForUser(userId, request.getHeader("X-Forwarded-For").split(",")[0]));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(new AuthResponse("Error " +
 					"fetching users session", userId, e.getMessage()));
