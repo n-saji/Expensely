@@ -681,9 +681,9 @@ public class UserController {
 	                                        HttpServletRequest request) {
 		String userId = (String) authentication.getPrincipal();
 		try {
-			User user = userService.GetUserById(userId);
 
-			return ResponseEntity.ok(redisSession.fetchAllSessionsForUser(userId, request.getHeader("X-Forwarded-For").split(",")[0]));
+
+			return ResponseEntity.ok(redisSession.fetchAllSessionsForUser(userId, getCookieValue(request, "refreshToken")));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(new AuthResponse("Error " +
 					"fetching users session", userId, e.getMessage()));

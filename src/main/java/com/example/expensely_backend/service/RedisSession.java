@@ -142,7 +142,7 @@ public class RedisSession {
 		}
 	}
 
-	public Map<String, Map<String, String>> fetchAllSessionsForUser(String userId, String myIP) {
+	public Map<String, Map<String, String>> fetchAllSessionsForUser(String userId, String myRefreshToken) {
 		try {
 			if (userId == null || userId.isBlank()) {
 				return null;
@@ -153,7 +153,7 @@ public class RedisSession {
 			for (String session : sessions) {
 				Map<String, String> response = redis.hgetAll(sessionKey(session));
 				if (response != null) {
-					if (response.get("ipAddress") != null && response.get("ipAddress").equals(myIP)) {
+					if (session.equals(myRefreshToken)) {
 						response.put("current", "true");
 					} else {
 						response.put("current", "false");
