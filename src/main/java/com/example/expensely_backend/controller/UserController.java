@@ -700,7 +700,7 @@ public class UserController {
 		}
 		try {
 			redisSession.revokeSession(userId, id);
-			return ResponseEntity.ok().headers(clearAuthCookies())
+			return ResponseEntity.ok()
 					.body(new AuthResponse("Session revoked", userId, ""));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(new AuthResponse("Error revoking session", null, e.getMessage()));
