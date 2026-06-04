@@ -1,6 +1,9 @@
 package com.example.expensely_backend.service;
 
+import com.example.expensely_backend.model.User;
+import com.example.expensely_backend.repository.UserRepository;
 import jakarta.annotation.PreDestroy;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import redis.clients.jedis.DefaultJedisClientConfig;
@@ -18,6 +21,8 @@ public class RedisSession {
 	private static final String USER_SESSIONS_PREFIX = "user:sessions:";
 
 	private final JedisPooled redis;
+	@Autowired
+	private UserRepository userRepository;
 
 	public RedisSession(
 			@Value("${redis.host:oriole-alarm-outshining-32200.db.redis.io}") String host,
@@ -169,8 +174,8 @@ public class RedisSession {
 		}
 	}
 
-	public List<String> fetchAllActiveUsers() {
-		List<String> activeUsers = new ArrayList<>();
+	public List<User> fetchAllActiveUsers() {
+		List<User> activeUsers = new ArrayList<>();
 		try {
 			String cursor = "0";
 			do {
@@ -180,7 +185,7 @@ public class RedisSession {
 				for (String key : result.getResult()) {
 					// key is "user:sessions:{userId}", strip the prefix to get userId
 					String userId = key.substring(USER_SESSIONS_PREFIX.length());
-					activeUsers.add(userId);
+					userRepository.findById(UUID.fromString(userId)).ifPresent(activeUsers::add);
 				}
 			} while (!cursor.equals("0"));
 
