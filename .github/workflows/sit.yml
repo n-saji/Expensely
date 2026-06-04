@@ -67,6 +67,10 @@ jobs:
             AWS_REGION=${{ vars.AWS_REGION }}
             AWS_BUCKET_NAME=${{ secrets.AWS_BUCKET_NAME }}
             EXCHANGE_RATE_API_KEY=${{ secrets.EXCHANGE_RATE_API_KEY }}
+            REDIS_HOST=${{ secrets.REDIS_HOST }}
+            REDIS_PORT=${{ secrets.REDIS_PORT }}
+            REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+            REDIS_USERNAME=${{ secrets.REDIS_USERNAME }}
             EOF
 
 

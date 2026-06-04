@@ -7,25 +7,25 @@ import org.springframework.stereotype.Component;
 @Component
 public class CookieUtils {
 
-    private final JwtUtil jwtUtil;
+	private final JwtUtil jwtUtil;
 
-    public CookieUtils(JwtUtil jwtUtil) {
-        this.jwtUtil = jwtUtil;
-    }
+	public CookieUtils(JwtUtil jwtUtil) {
+		this.jwtUtil = jwtUtil;
+	}
 
 
-    public String getStringFromCookie(HttpServletRequest request) {
-        Cookie[] cookies = request.getCookies();
-        String refreshToken = null;
-        for (Cookie cookie : cookies) {
-            if (cookie.getName().equals("refreshToken")) {
-                refreshToken = cookie.getValue();
-            }
-        }
-        if (refreshToken == null) {
-            return "";
-        }
+	public String getStringFromCookie(HttpServletRequest request) {
+		Cookie[] cookies = request.getCookies();
+		String accessToken = null;
+		for (Cookie cookie : cookies) {
+			if (cookie.getName().equals("accessToken")) {
+				accessToken = cookie.getValue();
+			}
+		}
+		if (accessToken == null) {
+			return "";
+		}
 
-        return jwtUtil.GetStringFromToken(refreshToken);
-    }
+		return jwtUtil.GetStringFromToken(accessToken);
+	}
 }
