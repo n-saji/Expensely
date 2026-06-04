@@ -185,7 +185,11 @@ public class RedisSession {
 				for (String key : result.getResult()) {
 					// key is "user:sessions:{userId}", strip the prefix to get userId
 					String userId = key.substring(USER_SESSIONS_PREFIX.length());
-					userRepository.findById(UUID.fromString(userId)).ifPresent(activeUsers::add);
+					userRepository.findById(UUID.fromString(userId)).ifPresent(u -> {
+						u.setPassword(null);
+						activeUsers.add(u);
+					});
+
 				}
 			} while (!cursor.equals("0"));
 
