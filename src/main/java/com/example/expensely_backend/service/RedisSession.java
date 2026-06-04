@@ -50,7 +50,7 @@ public class RedisSession {
 
 
 	public String createSession(String userId, String deviceId,
-	                            String refreshToken) {
+	                            String refreshToken, String ipAddress) {
 
 		try {
 			if (refreshToken == null || refreshToken.isBlank()) {
@@ -63,6 +63,7 @@ public class RedisSession {
 			fields.put("userId", userId);
 			fields.put("deviceId", normalizedDeviceId);
 			fields.put("lastSeen", String.valueOf(System.currentTimeMillis()));
+			fields.put("ipAddress", ipAddress);
 			redis.hset(sessionKey, fields);
 			redis.expire(sessionKey, SESSION_TTL_SECONDS);
 			redis.sadd(userSessionsKey(userId), refreshToken);
