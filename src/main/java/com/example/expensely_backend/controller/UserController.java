@@ -197,7 +197,7 @@ public class UserController {
 
 				redisSession.createSession(client.getId().toString(),
 						httprequest.getHeader("User-Agent"), refreshToken,
-						httprequest.getHeader("X-Forwarded-For"));
+						httprequest.getHeader("X-Forwarded-For").split(",")[0]);
 
 				ResponseCookie accessCookie = ResponseCookie.from("accessToken", accessToken)
 						.httpOnly(true)
@@ -501,7 +501,7 @@ public class UserController {
 								.maxAge(7 * 24 * 60 * 60) // 7 days
 								.build();
 
-						redisSession.createSession(existingUser.getId().toString(), request.getHeader("User-Agent"), refreshToken, request.getHeader("X-Forwarded-For"));
+						redisSession.createSession(existingUser.getId().toString(), request.getHeader("User-Agent"), refreshToken, request.getHeader("X-Forwarded-For").split(",")[0]);
 						return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, accessCookie.toString()).header(
 								HttpHeaders.SET_COOKIE, refreshCookie.toString()).body(new AuthResponse("User authenticated " +
 								"successfully!", existingUser.getId().toString(), ""));
@@ -533,7 +533,7 @@ public class UserController {
 
 						redisSession.createSession(res.getId().toString(),
 								request.getHeader("User-Agent"), refreshToken
-								, request.getHeader("X-Forwarded-For"));
+								, request.getHeader("X-Forwarded-For").split(",")[0]);
 						return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, accessCookie.toString()).header(
 								HttpHeaders.SET_COOKIE, refreshCookie.toString()).body(new AuthResponse("profile incomplete",
 								user.getId().toString(), ""));
