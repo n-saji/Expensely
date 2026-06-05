@@ -194,10 +194,15 @@ public class UserController {
 				}
 				String accessToken = result.get("accessToken");
 				refreshToken = result.get("refreshToken");
-
+				String myIP = "";
+				if (httprequest.getHeader("X-Forwarded-For") != null) {
+					myIP = httprequest.getHeader("X-Forwarded-For").split(",")[0];
+				} else {
+					myIP = httprequest.getRemoteAddr();
+				}
 				redisSession.createSession(client.getId().toString(),
 						httprequest.getHeader("User-Agent"), refreshToken,
-						httprequest.getHeader("X-Forwarded-For").split(",")[0]);
+						myIP);
 
 				ResponseCookie accessCookie = ResponseCookie.from("accessToken", accessToken)
 						.httpOnly(true)

@@ -1,5 +1,8 @@
 package com.example.expensely_backend.service;
 
+import com.example.expensely_backend.dto.MessageDTO;
+import com.example.expensely_backend.globals.globals;
+import com.example.expensely_backend.handler.AlertHandler;
 import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.repository.UserRepository;
 import jakarta.annotation.PreDestroy;
@@ -23,6 +26,9 @@ public class RedisSession {
 	private final JedisPooled redis;
 	@Autowired
 	private UserRepository userRepository;
+
+	@Autowired
+	private AlertHandler alertHandler;
 
 	public RedisSession(
 			@Value("${redis.host:oriole-alarm-outshining-32200.db.redis.io}") String host,
@@ -83,13 +89,16 @@ public class RedisSession {
 
 	public void revokeSession(String userId, String sessionId) {
 		try {
-			if (sessionId == null || sessionId.isBlank()) {
+			if (sessionId == null || sessionId.isBlank() || userId == null) {
 				return;
 			}
 			redis.del(sessionKey(sessionId));
-			if (userId != null && !userId.isBlank()) {
+			if (!userId.isBlank()) {
 				redis.srem(userSessionsKey(userId), sessionId);
 			}
+			alertHandler.sendSessionLogOut(UUID.fromString(userId), sessionId
+					,
+					MessageDTO.builder().message("User: " + userId + " is booted").type(globals.MessageType.LOGOUT).build());
 
 		} catch (Exception e) {
 			e.printStackTrace();

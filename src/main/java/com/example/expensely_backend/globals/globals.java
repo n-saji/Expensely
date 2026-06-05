@@ -11,7 +11,7 @@ public class globals {
 	public static final String BASE_CURRENCY = "USD";
 
 	public enum MessageType {
-		ALERT, INFO, ERROR, SUCCESS
+		ALERT, INFO, ERROR, SUCCESS, LOGOUT
 	}
 
 	public enum TimeFrame {
