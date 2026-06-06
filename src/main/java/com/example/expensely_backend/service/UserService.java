@@ -47,7 +47,7 @@ public class UserService {
 	}
 
 
-	public void save(User user) {
+	public User save(User user) {
 
 		if (user.getEmail() == null) {
 			throw new IllegalArgumentException("Email must be provided");
@@ -68,7 +68,7 @@ public class UserService {
 		}
 		ensureThemeColorDefault(user);
 		try {
-			userRepository.save(user);
+			return userRepository.save(user);
 		} catch (Exception e) {
 			throw new IllegalArgumentException("Error saving user: " + e.getMessage());
 		}

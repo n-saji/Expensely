@@ -2,10 +2,7 @@ package com.example.expensely_backend.controller;
 
 import com.example.expensely_backend.dto.*;
 import com.example.expensely_backend.model.User;
-import com.example.expensely_backend.service.DbLogService;
-import com.example.expensely_backend.service.EmailOtpService;
-import com.example.expensely_backend.service.ExpiredTokenService;
-import com.example.expensely_backend.service.UserService;
+import com.example.expensely_backend.service.*;
 import com.example.expensely_backend.utils.JwtUtil;
 import com.example.expensely_backend.utils.Mailgun;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
@@ -33,10 +30,12 @@ public class UserController {
 	private final Mailgun mailgun;
 	private final EmailOtpService emailOtpService;
 	private final DbLogService dbLogService;
+	private final RedisSession redisSession;
 
 	public UserController(UserService userService, JwtUtil jwtUtil,
 	                      ExpiredTokenService expiredTokenService, Environment environment, Mailgun mailgun,
-	                      EmailOtpService emailOtpService, DbLogService dbLogService) {
+	                      EmailOtpService emailOtpService,
+	                      DbLogService dbLogService, RedisSession redisSession) {
 		this.userService = userService;
 		this.jwtUtil = jwtUtil;
 		this.expiredTokenService = expiredTokenService;
@@ -44,6 +43,69 @@ public class UserController {
 		this.mailgun = mailgun;
 		this.emailOtpService = emailOtpService;
 		this.dbLogService = dbLogService;
+		this.redisSession = redisSession;
+	}
+
+	private String getCookieValue(HttpServletRequest request, String name) {
+		if (request.getCookies() == null) {
+			return null;
+		}
+		for (Cookie cookie : request.getCookies()) {
+			if (cookie.getName().equals(name)) {
+				return cookie.getValue();
+			}
+		}
+		return null;
+	}
+
+	private String resolveSubjectFromCookies(HttpServletRequest request) {
+		String accessToken = getCookieValue(request, "accessToken");
+		String subject = null;
+		if (accessToken != null) {
+			subject = jwtUtil.GetStringFromToken(accessToken);
+		}
+		if (subject == null) {
+			String refreshToken = getCookieValue(request, "refreshToken");
+			if (refreshToken != null) {
+				subject = jwtUtil.GetStringFromToken(refreshToken);
+			}
+		}
+		return subject;
+	}
+
+	private HttpHeaders clearAuthCookies() {
+		ResponseCookie clearAccess = ResponseCookie.from("accessToken", "")
+				.path("/")
+				.maxAge(0)
+				.httpOnly(true)
+				.secure(true)
+				.sameSite("None")
+				.build();
+
+		ResponseCookie clearRefresh = ResponseCookie.from("refreshToken", "")
+				.path("/")
+				.maxAge(0)
+				.httpOnly(true)
+				.secure(true)
+				.sameSite("None")
+				.build();
+
+		HttpHeaders headers = new HttpHeaders();
+		headers.add(HttpHeaders.SET_COOKIE, clearAccess.toString());
+		headers.add(HttpHeaders.SET_COOKIE, clearRefresh.toString());
+		return headers;
+	}
+
+	private User resolveUserFromSubject(String subject) {
+		try {
+			return userService.GetUserById(subject);
+		} catch (Exception e) {
+			try {
+				return userService.GetUserByEmail(subject);
+			} catch (Exception ignored) {
+				return null;
+			}
+		}
 	}
 
 
@@ -67,7 +129,9 @@ public class UserController {
 	}
 
 	@PostMapping("/login")
-	public ResponseEntity<?> login(@RequestBody User user) {
+	public ResponseEntity<?> login(
+			HttpServletRequest httprequest,
+			@RequestBody User user) {
 		if (user.getEmail() == null && user.getPhone() == null) {
 			{
 				return ResponseEntity.badRequest().body(new AuthResponse("Email or Phone is required!", user.getId().toString(), "email or phone is required"));
@@ -87,12 +151,58 @@ public class UserController {
 							"email not verified", client.getId().toString(), "email not verified"));
 				}
 
-				Map<String, String> result = jwtUtil.GenerateToken(client.getId().toString());
+				String refreshToken = null;
+
+				if (httprequest.getCookies() != null) {
+					for (Cookie cookie : httprequest.getCookies()) {
+						if (cookie.getName().equals("refreshToken")) {
+							refreshToken = cookie.getValue();
+						}
+					}
+				}
+
+				if (refreshToken != null && redisSession.isSessionActive(refreshToken)) {
+					String subject = jwtUtil.GetStringFromToken(refreshToken);
+					if (subject != null) {
+						// Generate new access token
+						Map<String, String> tokens =
+								jwtUtil.GenerateToken(client.getId().toString());
+
+
+						ResponseCookie accessCookie = ResponseCookie.from("accessToken", tokens.get("accessToken"))
+								.httpOnly(true)
+								.secure(true)
+								.path("/")
+								.sameSite("None")
+								.maxAge(15 * 60)  // 15 mins
+								.build();
+						redisSession.updateLastSeen(refreshToken);
+						AuthResponse authResponse = new AuthResponse("User authenticated successfully!"
+								, client.getId().toString(), "");
+						return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, accessCookie.toString()).header(
+								HttpHeaders.SET_COOKIE).body(authResponse);
+
+					}
+
+
+				}
+
+				Map<String, String> result =
+						jwtUtil.GenerateToken(client.getId().toString());
 				if (result == null) {
 					return ResponseEntity.status(500).body(new AuthResponse("Token generation failed", user.getId().toString(), "token generation failed"));
 				}
 				String accessToken = result.get("accessToken");
-				String refreshToken = result.get("refreshToken");
+				refreshToken = result.get("refreshToken");
+				String myIP = "";
+				if (httprequest.getHeader("X-Forwarded-For") != null) {
+					myIP = httprequest.getHeader("X-Forwarded-For").split(",")[0];
+				} else {
+					myIP = httprequest.getRemoteAddr();
+				}
+				redisSession.createSession(client.getId().toString(),
+						httprequest.getHeader("User-Agent"), refreshToken,
+						myIP);
 
 				ResponseCookie accessCookie = ResponseCookie.from("accessToken", accessToken)
 						.httpOnly(true)
@@ -314,7 +424,10 @@ public class UserController {
 	}
 
 	@DeleteMapping("/delete-account/{id}")
-	public ResponseEntity<?> deleteUser(@PathVariable String id) {
+	public ResponseEntity<?> deleteUser(
+			@PathVariable String id) {
+
+
 		try {
 			User user = userService.GetUserById(id);
 			if (user == null) {
@@ -344,7 +457,8 @@ public class UserController {
 	}
 
 	@PostMapping("/verify-oauth-login")
-	public ResponseEntity<?> verifyOAuthLogin(@RequestHeader("Authorization") String authHeader, @RequestBody User user) {
+	public ResponseEntity<?> verifyOAuthLogin(HttpServletRequest request,
+	                                          @RequestHeader("Authorization") String authHeader, @RequestBody User user) {
 		String token = authHeader.replace("Bearer ", "");
 		try {
 			GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
@@ -372,7 +486,8 @@ public class UserController {
 							userService.UpdateUser(existingUser);
 						}
 						user.setOauth2User(true);
-						Map<String, String> result = jwtUtil.GenerateToken(existingUser.getId().toString());
+						Map<String, String> result =
+								jwtUtil.GenerateToken(existingUser.getId().toString());
 						String accessToken = result.get("accessToken");
 						String refreshToken = result.get("refreshToken");
 						ResponseCookie accessCookie = ResponseCookie.from("accessToken", accessToken)
@@ -390,6 +505,8 @@ public class UserController {
 								.sameSite("None")
 								.maxAge(7 * 24 * 60 * 60) // 7 days
 								.build();
+
+						redisSession.createSession(existingUser.getId().toString(), request.getHeader("User-Agent"), refreshToken, request.getHeader("X-Forwarded-For").split(",")[0]);
 						return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, accessCookie.toString()).header(
 								HttpHeaders.SET_COOKIE, refreshCookie.toString()).body(new AuthResponse("User authenticated " +
 								"successfully!", existingUser.getId().toString(), ""));
@@ -397,8 +514,10 @@ public class UserController {
 						// Register new user
 						user.setOauth2User(true);
 						user.setEmailVerified(true);
-						userService.save(user);
-						Map<String, String> result = jwtUtil.GenerateToken(user.getEmail());
+						User res = userService.save(user);
+
+						Map<String, String> result =
+								jwtUtil.GenerateToken(res.getId().toString());
 						String accessToken = result.get("accessToken");
 						String refreshToken = result.get("refreshToken");
 						ResponseCookie accessCookie = ResponseCookie.from("accessToken", accessToken)
@@ -416,6 +535,10 @@ public class UserController {
 								.sameSite("None")
 								.maxAge(7 * 24 * 60 * 60) // 7 days
 								.build();
+
+						redisSession.createSession(res.getId().toString(),
+								request.getHeader("User-Agent"), refreshToken
+								, request.getHeader("X-Forwarded-For").split(",")[0]);
 						return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, accessCookie.toString()).header(
 								HttpHeaders.SET_COOKIE, refreshCookie.toString()).body(new AuthResponse("profile incomplete",
 								user.getId().toString(), ""));
@@ -471,6 +594,10 @@ public class UserController {
 			return ResponseEntity.status(401).body("Invalid refresh token");
 		}
 
+		if (!redisSession.isSessionActive(refreshToken)) {
+			return ResponseEntity.status(401).body("Session revoked");
+		}
+
 		User user = resolveUserFromSubject(subject);
 		if (user == null) {
 			return ResponseEntity.status(401).body("Invalid refresh token");
@@ -480,7 +607,8 @@ public class UserController {
 		}
 
 		// Generate new access token
-		Map<String, String> tokens = jwtUtil.GenerateToken(user.getId().toString());
+		Map<String, String> tokens =
+				jwtUtil.GenerateToken(user.getId().toString());
 
 
 		ResponseCookie accessCookie = ResponseCookie.from("accessToken", tokens.get("accessToken"))
@@ -491,46 +619,18 @@ public class UserController {
 				.maxAge(15 * 60)  // 15 mins
 				.build();
 
-
+		redisSession.updateLastSeen(refreshToken);
 		return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, accessCookie.toString()).body(new AuthResponse("Token refreshed successfully!", null, ""));
 	}
 
-	private User resolveUserFromSubject(String subject) {
-		try {
-			return userService.GetUserById(subject);
-		} catch (Exception e) {
-			try {
-				return userService.GetUserByEmail(subject);
-			} catch (Exception ignored) {
-				return null;
-			}
-		}
-	}
-
 	@GetMapping("/logout")
-	public ResponseEntity<?> logout() {
+	public ResponseEntity<?> logout(HttpServletRequest request) {
 		try {
-			ResponseCookie clearAccess = ResponseCookie.from("accessToken", "")
-					.path("/")
-					.maxAge(0)
-					.httpOnly(true)
-					.secure(true)
-					.sameSite("None")
-					.build();
-
-			ResponseCookie clearRefresh = ResponseCookie.from("refreshToken", "")
-					.path("/")
-					.maxAge(0)
-					.httpOnly(true)
-					.secure(true)
-					.sameSite("None")
-					.build();
-
-			HttpHeaders headers = new HttpHeaders();
-			headers.add(HttpHeaders.SET_COOKIE, clearAccess.toString());
-			headers.add(HttpHeaders.SET_COOKIE, clearRefresh.toString());
-
-			return ResponseEntity.noContent().headers(headers).build();
+			String subject = resolveSubjectFromCookies(request);
+			if (subject != null) {
+				redisSession.revokeSession(subject, getCookieValue(request, "refreshToken"));
+			}
+			return ResponseEntity.noContent().headers(clearAuthCookies()).build();
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(
 					new AuthResponse("Error logging out: " + e.getMessage(), null, "internal server error")
@@ -565,5 +665,52 @@ public class UserController {
 			return ResponseEntity.badRequest().body(new AuthResponse("Error sending mail: " + e.getMessage(), null, "internal server error"));
 		}
 	}
+
+	@DeleteMapping("/sessions/current")
+	public ResponseEntity<?> revokeCurrentSession(Authentication authentication, HttpServletRequest request) {
+		String userId = authentication != null ? (String) authentication.getPrincipal() : null;
+		if (userId == null) {
+			return ResponseEntity.status(401).body(new AuthResponse("Unauthorized", null, "Unauthorized"));
+		}
+		try {
+			redisSession.revokeSession(userId, getCookieValue(request, "refreshToken"));
+			return ResponseEntity.ok().headers(clearAuthCookies())
+					.body(new AuthResponse("Session revoked", userId, ""));
+		} catch (Exception e) {
+			return ResponseEntity.badRequest().body(new AuthResponse("Error revoking session", null, e.getMessage()));
+		}
+	}
+
+	@GetMapping("/sessions/get-all")
+	public ResponseEntity<?> getAllSessions(Authentication authentication,
+	                                        HttpServletRequest request) {
+		String userId = (String) authentication.getPrincipal();
+		try {
+
+
+			return ResponseEntity.ok(redisSession.fetchAllSessionsForUser(userId, getCookieValue(request, "refreshToken")));
+		} catch (Exception e) {
+			return ResponseEntity.badRequest().body(new AuthResponse("Error " +
+					"fetching users session", userId, e.getMessage()));
+		}
+	}
+
+	@DeleteMapping("/sessions/id/{id}")
+	public ResponseEntity<?> deleteOtherSessionForUser(@PathVariable String id,
+	                                                   Authentication authentication
+	) {
+		String userId = (String) authentication.getPrincipal();
+		if (userId == null) {
+			return ResponseEntity.status(401).body(new AuthResponse("Unauthorized", null, "Unauthorized"));
+		}
+		try {
+			redisSession.revokeSession(userId, id);
+			return ResponseEntity.ok()
+					.body(new AuthResponse("Session revoked", userId, ""));
+		} catch (Exception e) {
+			return ResponseEntity.badRequest().body(new AuthResponse("Error revoking session", null, e.getMessage()));
+		}
+	}
+
 
 }
