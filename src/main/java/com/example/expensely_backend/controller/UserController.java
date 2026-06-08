@@ -718,5 +718,16 @@ public class UserController {
 		}
 	}
 
+	@GetMapping("/check/email/{email}")
+	public ResponseEntity<?> checkEmail(@PathVariable String email) {
+		try {
+			boolean exists = userService.isUserPresent(email, null);
+			return ResponseEntity.ok(Boolean.toString(exists));
+		} catch (Exception e) {
+			return ResponseEntity.badRequest().body(new AuthResponse("Error " +
+					"checking email existence", null, e.getMessage()));
+		}
+	}
+
 
 }
