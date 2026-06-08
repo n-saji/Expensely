@@ -348,11 +348,16 @@ public class UserController {
 		}
 		try {
 			User existingUser = userService.GetActiveUserById(userId);
+			Boolean emailUpdated = Boolean.FALSE;
 			if (existingUser == null) {
 				return ResponseEntity.status(404).body(new UserRes(null, "User not found"));
 			}
 			// Update fields
-			if (user.getEmail() != null) existingUser.setEmail(user.getEmail());
+			if (user.getEmail() != null) {
+				existingUser.setEmail(user.getEmail());
+				existingUser.setEmailVerified(false); // Mark email as unverified if changed
+				emailUpdated = Boolean.TRUE;
+			}
 			if (user.getPhone() != null) existingUser.setPhone(user.getPhone());
 			if (user.getCurrency() != null)
 				existingUser.setCurrency(user.getCurrency());
@@ -363,6 +368,12 @@ public class UserController {
 			// Add other fields as necessary
 
 			userService.UpdateUser(existingUser);
+			if (emailUpdated) {
+				String otp = emailOtpService.createOrUpdateOtp(user);
+				mailgun.sendSimpleMessage(user.getEmail(), "Verify your email",
+						"Your OTP is " + otp + ". It expires in 10 minutes.");
+				return ResponseEntity.ok(new AuthResponse("Verification OTP sent", user.getId().toString(), ""));
+			}
 			return ResponseEntity.ok(new UserRes(existingUser, null));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(new UserRes(null, e.getMessage()));
