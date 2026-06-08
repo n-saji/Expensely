@@ -46,7 +46,7 @@ public class UserService {
 	}
 
 
-	public void insertUser(User user) {
+	public User insertUser(User user) {
 
 		if (user.getEmail() == null) {
 			throw new IllegalArgumentException("Email must be provided");
@@ -71,7 +71,7 @@ public class UserService {
 			user.setIsActive(true);
 			user.setAlertsEnabled(true);
 			user.setIsAdmin(false);
-			userRepository.save(user);
+			return userRepository.save(user);
 		} catch (Exception e) {
 			throw new IllegalArgumentException("Error saving user: " + e.getMessage());
 		}
