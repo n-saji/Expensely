@@ -128,8 +128,14 @@ public class UserService {
 	}
 
 	public boolean isUserPresent(String email, String phone) {
-		Optional<User> userOpt = userRepository.findUserByEmailOrPhone(email, phone);
-		return userOpt.isPresent();
+		if (email != null && phone != null) {
+			return userRepository.findUserByEmailOrPhone(email, phone).isPresent();
+		} else if (phone != null) {
+			return userRepository.findByPhone(phone).isPresent();
+		} else {
+			return userRepository.findByEmail(email).isPresent();
+		}
+
 	}
 
 	public User UpdateUser(User user) {

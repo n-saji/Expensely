@@ -484,7 +484,7 @@ public class UserController {
 					}
 
 
-					if (userService.isUserPresent(user.getEmail(), user.getPhone())) {
+					if (userService.isUserPresent(user.getEmail(), null)) {
 						User existingUser = userService.GetUserByEmail(user.getEmail());
 						if (!existingUser.isEmailVerified()) {
 							existingUser.setEmailVerified(true);

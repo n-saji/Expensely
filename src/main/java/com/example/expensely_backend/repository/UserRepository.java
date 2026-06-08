@@ -13,15 +13,17 @@ import java.util.UUID;
 
 public interface UserRepository extends JpaRepository<User, UUID> {
 
-    Optional<User> findByEmail(String email);
+	Optional<User> findByEmail(String email);
 
-    Optional<User> findUserByEmailOrPhone(String email, String phone);
+	Optional<User> findByPhone(String phone);
 
-    @Query("SELECT u FROM User u ORDER BY u.createdAt DESC")
-    List<User> findAllOrderByCreatedAtDesc();
+	Optional<User> findUserByEmailOrPhone(String email, String phone);
 
-    @Modifying
-    @Transactional
-    @Query(value = "UPDATE users SET theme_color = 'teal' WHERE theme_color IS NULL", nativeQuery = true)
-    int backfillThemeColorDefaults();
+	@Query("SELECT u FROM User u ORDER BY u.createdAt DESC")
+	List<User> findAllOrderByCreatedAtDesc();
+
+	@Modifying
+	@Transactional
+	@Query(value = "UPDATE users SET theme_color = 'teal' WHERE theme_color IS NULL", nativeQuery = true)
+	int backfillThemeColorDefaults();
 }
