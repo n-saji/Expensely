@@ -392,7 +392,6 @@ public class UserController {
 				existingUser.setIsActive(user.getIsActive());
 			if (user.getIsAdmin() != null)
 				existingUser.setIsAdmin(user.getIsAdmin());
-			System.out.println("hello" + user + " " + existingUser);
 			userService.UpdateUser(existingUser);
 			return ResponseEntity.ok(new UserRes(existingUser, null));
 		} catch (Exception e) {
@@ -706,6 +705,16 @@ public class UserController {
 					.body(new AuthResponse("Session revoked", userId, ""));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(new AuthResponse("Error revoking session", null, e.getMessage()));
+		}
+	}
+
+	@GetMapping("/check/phone/{number}")
+	public ResponseEntity<?> checkPhone(@PathVariable String number) {
+		try {
+			boolean exists = userService.isUserPresent(null, number);
+			return ResponseEntity.ok(Boolean.toString(exists));
+		} catch (Exception e) {
+			return ResponseEntity.badRequest().body(new AuthResponse("Error checking phone existence", null, e.getMessage()));
 		}
 	}
 

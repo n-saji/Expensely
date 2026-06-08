@@ -51,7 +51,8 @@ public class SecurityConfig {
 												"/refresh", "/api/users/verify-otp", "/api/users/resend-otp",
 										"/api/users/request-password-reset", "/api/users/confirm-password-reset",
 										"/users/check-auth",
-										"/ws/**").permitAll() // Allow public
+										"/ws/**", "/api/users/check/").permitAll() // Allow
+								// public
 								.anyRequest().permitAll() // some bug, accept
 						// all
 				)

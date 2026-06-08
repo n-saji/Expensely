@@ -48,7 +48,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 				"/ping") || path.equals("/api/users/refresh") || path.equals("/api/users/verify" +
 				"-oauth-login") || path.equals("/api/users/verify-otp") || path.equals(
 				"/api/users/resend-otp") || path.equals("/api/users/request-password-reset") || path.equals(
-				"/api/users/confirm-password-reset") || path.equals("/api/users/logout")) {
+				"/api/users/confirm-password-reset") || path.equals("/api" +
+				"/users/logout") || path.equals("/api/users/update-settings")) {
 			filterChain.doFilter(request, response); // Skip JWT check
 			return;
 		}
