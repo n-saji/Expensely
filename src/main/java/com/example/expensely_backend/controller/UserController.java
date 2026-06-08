@@ -485,7 +485,7 @@ public class UserController {
 
 
 					if (userService.isUserPresent(user.getEmail(), user.getPhone())) {
-						User existingUser = userService.GetUserByEmailOrPhone(user.getEmail(), user.getPhone());
+						User existingUser = userService.GetUserByEmail(user.getEmail());
 						if (!existingUser.isEmailVerified()) {
 							existingUser.setEmailVerified(true);
 							existingUser.setOauth2User(true);
