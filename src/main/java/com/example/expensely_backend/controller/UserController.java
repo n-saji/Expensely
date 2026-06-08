@@ -353,7 +353,7 @@ public class UserController {
 				return ResponseEntity.status(404).body(new UserRes(null, "User not found"));
 			}
 			// Update fields
-			if (user.getEmail() != null) {
+			if (user.getEmail() != null && !user.getEmail().equals(existingUser.getEmail())) {
 				existingUser.setEmail(user.getEmail());
 				existingUser.setEmailVerified(false); // Mark email as unverified if changed
 				emailUpdated = Boolean.TRUE;
