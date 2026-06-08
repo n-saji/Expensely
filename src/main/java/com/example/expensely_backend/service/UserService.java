@@ -1,7 +1,6 @@
 package com.example.expensely_backend.service;
 
 import com.example.expensely_backend.dto.AlertDtos;
-import com.example.expensely_backend.globals.globals;
 import com.example.expensely_backend.model.Budget;
 import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.repository.*;
@@ -47,7 +46,7 @@ public class UserService {
 	}
 
 
-	public User save(User user) {
+	public void insertUser(User user) {
 
 		if (user.getEmail() == null) {
 			throw new IllegalArgumentException("Email must be provided");
@@ -68,7 +67,11 @@ public class UserService {
 		}
 		ensureThemeColorDefault(user);
 		try {
-			return userRepository.save(user);
+			user.setNotificationsEnabled(true);
+			user.setIsActive(true);
+			user.setAlertsEnabled(true);
+			user.setIsAdmin(false);
+			userRepository.save(user);
 		} catch (Exception e) {
 			throw new IllegalArgumentException("Error saving user: " + e.getMessage());
 		}

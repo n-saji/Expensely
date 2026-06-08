@@ -112,13 +112,8 @@ public class UserController {
 	@PostMapping("/register")
 	public ResponseEntity<?> register(@RequestBody User user) {
 		try {
-			user.setProfileComplete(true);
 			user.setEmailVerified(false);
-			user.setNotificationsEnabled(true);
-			user.setIsActive(true);
-			user.setAlertsEnabled(true);
-			user.setIsAdmin(false);
-			userService.save(user);
+			userService.insertUser(user);
 			String otp = emailOtpService.createOrUpdateOtp(user);
 			mailgun.sendSimpleMessage(user.getEmail(), "Verify your email",
 					"Your OTP is " + otp + ". It expires in 10 minutes.");
@@ -483,6 +478,7 @@ public class UserController {
 						User existingUser = userService.GetUserByEmailOrPhone(user.getEmail(), user.getPhone());
 						if (!existingUser.isEmailVerified()) {
 							existingUser.setEmailVerified(true);
+							existingUser.setOauth2User(true);
 							userService.UpdateUser(existingUser);
 						}
 						user.setOauth2User(true);
@@ -514,7 +510,8 @@ public class UserController {
 						// Register new user
 						user.setOauth2User(true);
 						user.setEmailVerified(true);
-						User res = userService.save(user);
+						user.setProfileComplete(false);
+						User res = userService.insertUser(user);
 
 						Map<String, String> result =
 								jwtUtil.GenerateToken(res.getId().toString());
