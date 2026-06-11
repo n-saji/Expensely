@@ -69,23 +69,18 @@ public class CategoryService {
 				.orElseThrow(() -> new IllegalArgumentException("Category not found"));
 	}
 
-//    retaining category, no need to delete
-//    public void deleteCategoryById(String id) {
-//        try {
-//           check if category referenced by expense / budget
-//            if (categoryRepository.existsById(UUID.fromString(id))) {
-//                if (!expenseService.getExpensesByCategoryId(id).isEmpty()) {
-//                    throw new IllegalArgumentException("Cannot delete category, it is referenced by existing expenses");
-//                }
-//                if (!budgetService.getBudgetByCategoryId(id).isEmpty()) {
-//                    throw new IllegalArgumentException("Cannot delete category, it is referenced by existing budgets");
-//                }
-//            }
-//            categoryRepository.deleteByIdHard(UUID.fromString(id));
-//        } catch (Exception e) {
-//            throw new IllegalArgumentException("Error deleting category: " + e.getMessage());
-//        }
-//    }
+	//    retaining category, no need to delete
+	public void deleteCategoryById(String cId, String uId) {
+		try {
+			expenseRepository.deleteAllByUserId(UUID.fromString(uId));
+			budgetRepository.deleteAllByUserId(UUID.fromString(uId));
+			incomeRepository.deleteAllByUserId(UUID.fromString(uId));
+			recurringExpenseRepository.deleteAllByUserId(UUID.fromString(uId));
+			categoryRepository.deleteById(UUID.fromString(cId));
+		} catch (Exception e) {
+			throw new IllegalArgumentException("Error deleting category: " + e.getMessage());
+		}
+	}
 
 	public Iterable<Category> getAllCategories() {
 		var categories = categoryRepository.findAll();

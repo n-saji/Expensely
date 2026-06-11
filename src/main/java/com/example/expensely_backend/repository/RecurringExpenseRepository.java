@@ -17,4 +17,6 @@ public interface RecurringExpenseRepository extends JpaRepository<RecurringExpen
 	List<RecurringExpense> findByCurrencyIsNullOrCurrencyEquals(String currency);
 
 	List<RecurringExpense> findByCategoryIdAndUserId(UUID cId, UUID uId);
+
+	void deleteAllByUserId(UUID uID);
 }
