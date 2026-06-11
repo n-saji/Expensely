@@ -82,7 +82,7 @@ public class CategoryController {
 		}
 	}
 
-	@GetMapping("find-category-dependencies/{id}")
+	@GetMapping("/find-category-dependencies/{id}")
 	public ResponseEntity<?> getCategoryDependencies(Authentication authentication, @PathVariable String id) {
 		String userId = (String) authentication.getPrincipal();
 		if (userId == null) {
