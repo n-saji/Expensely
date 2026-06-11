@@ -80,4 +80,17 @@ public class CategoryController {
 		}
 	}
 
+	@GetMapping("find-category-dependencies/{id}")
+	public ResponseEntity<?> getCategoryDependencies(Authentication authentication, @PathVariable String id) {
+		String userId = (String) authentication.getPrincipal();
+		if (userId == null) {
+			return ResponseEntity.status(403).body("Error: You are not authorized to access category dependencies for this user");
+		}
+		try {
+			return ResponseEntity.ok(categoryService.getCategoryDependenciesForUser(userId, id));
+		} catch (Exception e) {
+			return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+		}
+	}
+
 }

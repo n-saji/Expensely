@@ -42,4 +42,5 @@ public interface BudgetRepository extends JpaRepository<Budget, UUID> {
 	@Query("SELECT b FROM Budget b WHERE b.currency IS NULL OR b" +
 			".baseCurrencyAmount IS NULL OR b.exchangeRate IS NULL")
 	List<Budget> findBudgetMissingCurrencySnapshot();
+
 }

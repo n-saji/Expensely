@@ -15,4 +15,6 @@ public interface RecurringExpenseRepository extends JpaRepository<RecurringExpen
 	List<RecurringExpense> findByUserIdOrderByCreatedAtDesc(UUID userId);
 
 	List<RecurringExpense> findByCurrencyIsNullOrCurrencyEquals(String currency);
+
+	List<RecurringExpense> findByCategoryIdAndUserId(UUID cId, UUID uId);
 }
