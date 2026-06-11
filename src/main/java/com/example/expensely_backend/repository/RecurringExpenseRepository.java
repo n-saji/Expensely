@@ -2,6 +2,8 @@ package com.example.expensely_backend.repository;
 
 import com.example.expensely_backend.model.RecurringExpense;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
@@ -18,5 +20,9 @@ public interface RecurringExpenseRepository extends JpaRepository<RecurringExpen
 
 	List<RecurringExpense> findByCategoryIdAndUserId(UUID cId, UUID uId);
 
-	void deleteAllByUserId(UUID uID);
+	@Modifying
+	@Query("DELETE FROM RecurringExpense re WHERE re.user.id = :userId AND re.category.id = :categoryId")
+	void deleteByUserIdAndCategoryId(UUID userId, UUID categoryId);
+
+	void deleteAllByUserId(UUID userId);
 }

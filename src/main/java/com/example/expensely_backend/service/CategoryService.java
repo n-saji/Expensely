@@ -7,6 +7,7 @@ import com.example.expensely_backend.model.Category;
 import com.example.expensely_backend.model.Expense;
 import com.example.expensely_backend.model.RecurringExpense;
 import com.example.expensely_backend.repository.*;
+import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -70,12 +71,16 @@ public class CategoryService {
 	}
 
 	//    retaining category, no need to delete
+	@Transactional
 	public void deleteCategoryById(String cId, String uId) {
+
 		try {
-			expenseRepository.deleteAllByUserId(UUID.fromString(uId));
-			budgetRepository.deleteAllByUserId(UUID.fromString(uId));
-			incomeRepository.deleteAllByUserId(UUID.fromString(uId));
-			recurringExpenseRepository.deleteAllByUserId(UUID.fromString(uId));
+			UUID categoryId = UUID.fromString(cId);
+			UUID userId = UUID.fromString(uId);
+			expenseRepository.deleteByUserIdAndCategoryId(userId, categoryId);
+			budgetRepository.deleteByUserIdAndCategoryId(userId, categoryId);
+			incomeRepository.deleteByUserIdAndCategoryId(userId, categoryId);
+			recurringExpenseRepository.deleteByUserIdAndCategoryId(userId, categoryId);
 			categoryRepository.deleteById(UUID.fromString(cId));
 		} catch (Exception e) {
 			throw new IllegalArgumentException("Error deleting category: " + e.getMessage());
@@ -138,6 +143,7 @@ public class CategoryService {
 
 	}
 
+	@Transactional
 	public CategoryDeps getCategoryDependenciesForUser(String userId, String categoryId) {
 		if (userId == null || userId.isEmpty() || categoryId == null || categoryId.isEmpty()) {
 			throw new IllegalArgumentException("User ID and Category ID must not be null or empty");
@@ -150,12 +156,12 @@ public class CategoryService {
 		List<Expense> expenses = expenseRepository.findByCategoryIdAndUserId(UUID.fromString(categoryId), user.getId());
 		List<RecurringExpense> rExpenses =
 				recurringExpenseRepository.findByCategoryIdAndUserId(UUID.fromString(categoryId), user.getId());
-		Budget budgets =
-				budgetRepository.findActiveBudgetByUserIdAndCategoryIdForUpdate(UUID.fromString(categoryId), user.getId());
+		Budget budget =
+				budgetRepository.findActiveBudgetByUserIdAndCategoryIdForUpdate(user.getId(), UUID.fromString(categoryId));
 		return CategoryDeps.builder()
 				.expenseCount(expenses.size())
 				.recurringExpenseCount(rExpenses.size())
-				.budgetCount(budgets == null ? 0 : 1).build();
+				.budgetCount(budget == null ? 0 : 1).build();
 
 	}
 

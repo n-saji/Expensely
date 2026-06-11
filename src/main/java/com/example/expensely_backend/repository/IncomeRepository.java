@@ -3,7 +3,9 @@ package com.example.expensely_backend.repository;
 import com.example.expensely_backend.dto.DailyIncome;
 import com.example.expensely_backend.dto.MonthlyCategoryIncome;
 import com.example.expensely_backend.model.Income;
+import jakarta.transaction.Transactional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -65,12 +67,12 @@ public interface IncomeRepository extends JpaRepository<Income, UUID> {
 	                                                      @Param("endDate") LocalDateTime endDate);
 
 	@Query(value = """
-			SELECT sum(i.base_currency_amount)
-			            from incomes i
-			            where i.user_id = :userId
-			            AND i.income_date >= :startDate
-			            AND i.income_date <= :endDate
-		""", nativeQuery = true)
+				SELECT sum(i.base_currency_amount)
+				            from incomes i
+				            where i.user_id = :userId
+				            AND i.income_date >= :startDate
+				            AND i.income_date <= :endDate
+			""", nativeQuery = true)
 	Double getTotalIncomeByUserId(@Param("userId") UUID userId,
 	                              @Param("startDate") LocalDateTime startDate,
 	                              @Param("endDate") LocalDateTime endDate);
@@ -79,6 +81,10 @@ public interface IncomeRepository extends JpaRepository<Income, UUID> {
 	List<Income> findIncomesMissingCurrencySnapshot();
 
 	Income findFirstByUserIdOrderByIncomeDateAsc(UUID userId);
+
+	@Query("delete from Income i where i.user.id = :userId and i.category.id = :categoryId")
+	@Modifying
+	void deleteByUserIdAndCategoryId(UUID userId, UUID categoryId);
 
 	void deleteAllByUserId(UUID userId);
 }

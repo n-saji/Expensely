@@ -4,6 +4,7 @@ import com.example.expensely_backend.dto.DailyExpense;
 import com.example.expensely_backend.dto.MonthlyCategoryExpense;
 import com.example.expensely_backend.model.Expense;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -66,8 +67,6 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
 	                                                        @Param("startDate") LocalDateTime startDate,
 	                                                        @Param("endDate") LocalDateTime endDate);
 
-	void deleteAllByUserId(UUID id);
-
 	@Query(value = """
 			SELECT sum(e.base_currency_amount)
 			            from expenses e
@@ -80,5 +79,10 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
 	@Query("SELECT e FROM Expense e WHERE e.currency IS NULL OR e.currency = '' OR e.baseCurrencyAmount IS NULL OR e.exchangeRate IS NULL OR e.baseCurrency IS NULL")
 	List<Expense> findExpensesMissingCurrencySnapshot();
 
+	@Modifying
+	@Query("DELETE FROM Expense e WHERE e.user.id = :userId AND e.category.id = :categoryId")
+	void deleteByUserIdAndCategoryId(UUID userId, UUID categoryId);
+
+	void deleteAllByUserId(UUID userId);
 }
 
