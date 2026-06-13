@@ -25,11 +25,12 @@ public class UserService {
 	private final CategoryRepository categoryRepository;
 	private final ExpenseRepository expenseRepository;
 	private final IncomeRepository incomeRepository;
+	private final RecurringExpenseRepository recurringExpenseRepository;
 
 
 	public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, ExpiredTokenRepository expiredTokenRepository,
 	                   BudgetRepository budgetRepository, CategoryRepository categoryRepository, ExpenseRepository expenseRepository,
-	                   IncomeRepository incomeRepository) {
+	                   IncomeRepository incomeRepository, RecurringExpenseRepository recurringExpenseRepository) {
 		this.userRepository = userRepository;
 		this.passwordEncoder = passwordEncoder;
 		this.expiredTokenRepository = expiredTokenRepository;
@@ -37,6 +38,7 @@ public class UserService {
 		this.categoryRepository = categoryRepository;
 		this.expenseRepository = expenseRepository;
 		this.incomeRepository = incomeRepository;
+		this.recurringExpenseRepository = recurringExpenseRepository;
 	}
 
 	@PostConstruct
@@ -180,7 +182,8 @@ public class UserService {
 			budgetRepository.deleteAllByUserId(user.getId());
 			expenseRepository.deleteAllByUserId(user.getId());
 			incomeRepository.deleteAllByUserId(user.getId());
-			categoryRepository.deleteByUserId(user.getId());
+			categoryRepository.deleteAllByUserId(user.getId());
+			recurringExpenseRepository.deleteAllByUserId(user.getId());
 			userRepository.delete(user);
 		} catch (Exception e) {
 			throw new IllegalArgumentException("Error deleting user: " + e.getMessage());

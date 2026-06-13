@@ -5,6 +5,7 @@ import com.example.expensely_backend.model.Expense;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
@@ -36,10 +37,14 @@ public interface BudgetRepository extends JpaRepository<Budget, UUID> {
 			"ELSE COALESCE(b.amountSpent, 0) / b.baseCurrencyAmount END DESC, b.updatedAt DESC")
 	List<Budget> findBudgetByEndDateBeforeAndIsActiveTrue(LocalDate today);
 
-	void deleteAllByUserId(UUID userId);
-
 
 	@Query("SELECT b FROM Budget b WHERE b.currency IS NULL OR b" +
 			".baseCurrencyAmount IS NULL OR b.exchangeRate IS NULL")
 	List<Budget> findBudgetMissingCurrencySnapshot();
+
+	@Modifying
+	@Query("DELETE FROM Budget b WHERE b.user.id = ?1 and b.category.id = ?2")
+	void deleteByUserIdAndCategoryId(UUID userId, UUID categoryId);
+
+	void deleteAllByUserId(UUID userId);
 }
