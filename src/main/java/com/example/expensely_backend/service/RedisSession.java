@@ -3,6 +3,7 @@ package com.example.expensely_backend.service;
 import com.example.expensely_backend.dto.MessageDTO;
 import com.example.expensely_backend.globals.globals;
 import com.example.expensely_backend.handler.AlertHandler;
+import com.example.expensely_backend.model.FunctionLog;
 import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.repository.UserRepository;
 import jakarta.annotation.PreDestroy;
@@ -29,6 +30,9 @@ public class RedisSession {
 
 	@Autowired
 	private AlertHandler alertHandler;
+
+	@Autowired
+	private DbLogService dbLogService;
 
 	public RedisSession(
 			@Value("${redis.host:oriole-alarm-outshining-32200.db.redis.io}") String host,
@@ -79,8 +83,10 @@ public class RedisSession {
 			redis.expire(sessionKey, SESSION_TTL_SECONDS);
 			redis.sadd(userSessionsKey(userId), refreshToken);
 		} catch (Exception e) {
-			e.printStackTrace();
 			System.out.println("Failed to create session");
+			dbLogService.logError("redis-service", getClass().getName(),
+					"createSession",
+					"Failed to create session: " + e.getMessage(), e);
 			return null;
 		}
 		return refreshToken;
@@ -101,7 +107,8 @@ public class RedisSession {
 					MessageDTO.builder().message("User: " + userId + " is booted").type(globals.MessageType.LOGOUT).build());
 
 		} catch (Exception e) {
-			e.printStackTrace();
+			dbLogService.logError("redis-service", getClass().getName(), "revokeSession",
+					"Failed to revoke session: " + e.getMessage(), e);
 			System.out.println("Failed to revoke session");
 			throw new RuntimeException("Failed to revoke session");
 		}
@@ -114,7 +121,8 @@ public class RedisSession {
 			}
 			return redis.exists(sessionKey(sessionId));
 		} catch (Exception e) {
-			e.printStackTrace();
+			dbLogService.logError("redis-service", getClass().getName(), "isSessionActive",
+					"Failed to check session status: " + e.getMessage(), e);
 			System.out.println("Failed to check session status");
 			return false;
 		}
@@ -133,7 +141,8 @@ public class RedisSession {
 			redis.del(setKey);
 
 		} catch (Exception e) {
-			e.printStackTrace();
+			dbLogService.logError("redis-service", getClass().getName(), "revokeAllSessions",
+					"Failed to revoke all sessions with error: " + e.getMessage(), e);
 			System.out.println("Failed to revoke all sessions");
 			throw new RuntimeException("Failed to revoke all sessions");
 		}
@@ -150,7 +159,8 @@ public class RedisSession {
 			}
 			redis.hset(sessionKey, "lastSeen", String.valueOf(System.currentTimeMillis()));
 		} catch (Exception e) {
-			e.printStackTrace();
+			dbLogService.logError("redis-service", getClass().getName(), "updateLastSeen",
+					"Failed to update last seen with error: " + e.getMessage(), e);
 			System.out.println("Failed to update last seen");
 			throw new RuntimeException("Failed to update last seen");
 		}
@@ -165,19 +175,18 @@ public class RedisSession {
 			Set<String> sessions = redis.smembers(setKey);
 			Map<String, Map<String, String>> result = new HashMap<>();
 			for (String session : sessions) {
-				Map<String, String> response = redis.hgetAll(sessionKey(session));
-				if (response != null) {
-					if (session.equals(myRefreshToken)) {
-						response.put("current", "true");
-					} else {
-						response.put("current", "false");
-					}
-					result.put(session, response);
+				Map<String, String> response = new HashMap<>(redis.hgetAll(sessionKey(session)));
+				if (session.equals(myRefreshToken)) {
+					response.put("current", "true");
+				} else {
+					response.put("current", "false");
 				}
+				result.put(session, response);
 			}
 			return result;
 		} catch (Exception e) {
-			e.printStackTrace();
+			dbLogService.logError("redis-service", getClass().getName(), "fetchAllSessionsForUser",
+					"Failed to fetch all sessions with error: " + e.getMessage(), e);
 			System.out.println("Failed to fetch all sessions");
 			throw new RuntimeException(e);
 		}
@@ -204,7 +213,8 @@ public class RedisSession {
 
 			return activeUsers;
 		} catch (Exception e) {
-			e.printStackTrace();
+			dbLogService.logError("redis-service", getClass().getName(), "fetchAllActiveUsers",
+					"Failed to fetch all active users with error: " + e.getMessage(), e);
 			throw new RuntimeException("Failed to fetch all active users", e);
 		}
 	}
