@@ -87,4 +87,13 @@ public interface IncomeRepository extends JpaRepository<Income, UUID> {
 	void deleteByUserIdAndCategoryId(UUID userId, UUID categoryId);
 
 	void deleteAllByUserId(UUID userId);
+
+	@Query(value = "SELECT CAST(EXTRACT(YEAR FROM i.income_date) AS INTEGER) as year_val, " +
+	               "SUM(COALESCE(i.base_currency_amount, i.amount)) as total_val, " +
+	               "COUNT(i.id) as count_val " +
+	               "FROM incomes i " +
+	               "WHERE i.user_id = :userId AND EXTRACT(MONTH FROM i.income_date) = :month " +
+	               "GROUP BY EXTRACT(YEAR FROM i.income_date) " +
+	               "ORDER BY year_val ASC", nativeQuery = true)
+	List<Object[]> findHistoricalMonthlyDataIncome(@Param("userId") UUID userId, @Param("month") int month);
 }

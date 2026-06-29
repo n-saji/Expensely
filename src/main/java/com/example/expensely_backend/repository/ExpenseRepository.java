@@ -84,5 +84,14 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
 	void deleteByUserIdAndCategoryId(UUID userId, UUID categoryId);
 
 	void deleteAllByUserId(UUID userId);
+
+	@Query(value = "SELECT CAST(EXTRACT(YEAR FROM e.expense_date) AS INTEGER) as year_val, " +
+	               "SUM(COALESCE(e.base_currency_amount, e.amount)) as total_val, " +
+	               "COUNT(e.id) as count_val " +
+	               "FROM expenses e " +
+	               "WHERE e.user_id = :userId AND EXTRACT(MONTH FROM e.expense_date) = :month " +
+	               "GROUP BY EXTRACT(YEAR FROM e.expense_date) " +
+	               "ORDER BY year_val ASC", nativeQuery = true)
+	List<Object[]> findHistoricalMonthlyDataExpense(@Param("userId") UUID userId, @Param("month") int month);
 }
 
