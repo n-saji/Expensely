@@ -43,7 +43,9 @@ public class TransactionRepositoryCustomImpl {
 
 		// Mandatory filters
 		predicates.add(cb.equal(transaction.get("user").get("id"), userId));
-		predicates.add(cb.equal(transaction.get("type"), type));
+		if (type != null) {
+			predicates.add(cb.equal(transaction.get("type"), type));
+		}
 		predicates.add(cb.greaterThanOrEqualTo(transaction.get("transactionDate"), startDate));
 		predicates.add(cb.lessThan(transaction.get("transactionDate"), endDate));
 
@@ -103,7 +105,9 @@ public class TransactionRepositoryCustomImpl {
 		List<Predicate> predicates = new ArrayList<>();
 
 		predicates.add(cb.equal(transaction.get("user").get("id"), userId));
-		predicates.add(cb.equal(transaction.get("type"), type));
+		if (type != null) {
+			predicates.add(cb.equal(transaction.get("type"), type));
+		}
 		predicates.add(cb.greaterThanOrEqualTo(transaction.get("transactionDate"), startDate));
 		predicates.add(cb.lessThan(transaction.get("transactionDate"), endDate));
 
