@@ -1,6 +1,6 @@
 package com.example.expensely_backend.dto;
 
-import com.example.expensely_backend.model.Income;
+import com.example.expensely_backend.model.Transaction;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
@@ -32,11 +32,11 @@ public class IncomeResponse {
 	@Getter
 	private final String displayCurrency;
 
-	public IncomeResponse(Income income, String displayCurrency, BigDecimal displayAmount) {
+	public IncomeResponse(Transaction income, String displayCurrency, BigDecimal displayAmount) {
 		this.id = income.getId();
 		this.amount = income.getAmount();
 		this.description = income.getDescription();
-		this.incomeDate = income.getIncomeDate();
+		this.incomeDate = income.getTransactionDate();
 		this.categoryId = income.getCategory().getId().toString();
 		this.categoryName = income.getCategory().getName();
 		this.userId = income.getUser().getId().toString();

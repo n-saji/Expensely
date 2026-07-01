@@ -3,7 +3,7 @@ package com.example.expensely_backend.controller;
 
 import com.example.expensely_backend.dto.*;
 import com.example.expensely_backend.globals.globals;
-import com.example.expensely_backend.model.Expense;
+import com.example.expensely_backend.model.Transaction;
 import com.example.expensely_backend.service.*;
 import com.example.expensely_backend.utils.FormatDate;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -34,13 +34,13 @@ public class ExpenseController {
 	}
 
 	@PostMapping("/create")
-	public ResponseEntity<?> createExpense(@RequestBody Expense expense) {
+	public ResponseEntity<?> createExpense(@RequestBody Transaction expense) {
 		// Logic to create an expense
 		try {
-			if (expense.getExpenseDate() == null) {
-				expense.setExpenseDate(LocalDateTime.now());
+			if (expense.getTransactionDate() == null) {
+				expense.setTransactionDate(LocalDateTime.now());
 			}
-			Expense exp = expenseService.save(expense);
+			Transaction exp = expenseService.save(expense);
 			return ResponseEntity.ok(expenseService.getExpenseResponseById(exp.getId().toString()));
 
 		} catch (Exception e) {
@@ -78,15 +78,15 @@ public class ExpenseController {
 	}
 
 	@PutMapping("/update/{id}")
-	public ResponseEntity<?> updateExpense(@PathVariable String id, @RequestBody Expense updatedExpense) {
+	public ResponseEntity<?> updateExpense(@PathVariable String id, @RequestBody Transaction updatedExpense) {
 		try {
-			Expense existingExpense = expenseService.getExpenseById(id);
+			Transaction existingExpense = expenseService.getExpenseById(id);
 			if (existingExpense == null) {
 				return ResponseEntity.badRequest().body(new AuthResponse("Expense not found!", null, ""));
 			}
 
 			// Save updated expense
-			Expense exp =
+			Transaction exp =
 					expenseService.updateExpense(updatedExpense);
 			return ResponseEntity.ok(new AuthResponse("Expense updated " +
 					"successfully!", exp.getId().toString(), ""));
@@ -159,7 +159,7 @@ public class ExpenseController {
 	}
 
 	@PostMapping("/user/{userId}/bulk-delete")
-	public ResponseEntity<?> bulkDeleteExpensesByUserId(@PathVariable String userId, @RequestBody List<Expense> expenses) {
+	public ResponseEntity<?> bulkDeleteExpensesByUserId(@PathVariable String userId, @RequestBody List<Transaction> expenses) {
 		try {
 			expenseService.deleteBuUserIDAndExpenseIds(userId, expenses);
 			return ResponseEntity.ok(new AuthResponse("Bulk delete expenses successfully!", null, ""));
@@ -192,6 +192,9 @@ public class ExpenseController {
 			if (!customSortBy.equals("amount") && !customSortBy.equals("expenseDate") &&
 					!customSortBy.equals("description") && !customSortBy.equals("category")) {
 				return ResponseEntity.badRequest().body(new UserRes(null, "Error: Invalid sort column"));
+			}
+			if (customSortBy.equals("expenseDate")) {
+				customSortBy = "transactionDate";
 			}
 			if (customSortBy.equals("amount")) {
 				customSortBy = "baseCurrencyAmount";
@@ -304,7 +307,7 @@ public class ExpenseController {
 		String userId = (String) authentication.getPrincipal();
 
 		try {
-			Expense expense = expenseService.getExpenseById(expenseID);
+			Transaction expense = expenseService.getExpenseById(expenseID);
 			if (expense == null) {
 				return ResponseEntity.badRequest().body("Expense not found");
 			}

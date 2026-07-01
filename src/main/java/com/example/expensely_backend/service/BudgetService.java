@@ -5,11 +5,12 @@ import com.example.expensely_backend.globals.globals;
 import com.example.expensely_backend.handler.AlertHandler;
 import com.example.expensely_backend.model.Budget;
 import com.example.expensely_backend.model.Category;
-import com.example.expensely_backend.model.Expense;
+import com.example.expensely_backend.model.Transaction;
+import com.example.expensely_backend.model.TransactionType;
 import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.repository.BudgetRepository;
 import com.example.expensely_backend.repository.CategoryRepository;
-import com.example.expensely_backend.repository.ExpenseRepository;
+import com.example.expensely_backend.repository.TransactionRepository;
 import com.example.expensely_backend.utils.FormatDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,7 +29,7 @@ public class BudgetService {
 
 	private final CategoryRepository categoryRepository;
 	private final UserService userService;
-	private final ExpenseRepository expenseRepository;
+	private final TransactionRepository transactionRepository;
 	private final AlertHandler alertHandler;
 	private final BudgetRepository budgetRepository;
 	private final DbLogService dbLogService;
@@ -157,8 +158,8 @@ public class BudgetService {
 
 //        update budget by fetching all expense for this category and user
 		BigDecimal total_amount = budget.getAmountSpent();
-		List<Expense> expense = expenseRepository.findByUserIdAndTimeFrameAsc(user.getId(), FormatDate.formatStartDate(budget.getStartDate().atStartOfDay(), true), FormatDate.formatEndDate(budget.getEndDate().atStartOfDay()));
-		for (Expense exp : expense) {
+		List<Transaction> expense = transactionRepository.findByUserIdAndTypeAndTimeFrameAsc(user.getId(), TransactionType.EXPENSE, FormatDate.formatStartDate(budget.getStartDate().atStartOfDay(), true), FormatDate.formatEndDate(budget.getEndDate().atStartOfDay()));
+		for (Transaction exp : expense) {
 			if (exp.getCategory().getId().equals(budget.getCategory().getId())) {
 				total_amount = total_amount.add(exp.getBaseCurrencyAmount());
 			}

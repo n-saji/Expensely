@@ -3,7 +3,7 @@ package com.example.expensely_backend.controller;
 import com.example.expensely_backend.dto.AuthResponse;
 import com.example.expensely_backend.dto.UserRes;
 import com.example.expensely_backend.globals.globals;
-import com.example.expensely_backend.model.Income;
+import com.example.expensely_backend.model.Transaction;
 import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.service.IncomeService;
 import com.example.expensely_backend.service.UserService;
@@ -32,18 +32,18 @@ public class IncomeController {
 	}
 
 	@PostMapping("/create")
-	public ResponseEntity<?> createIncome(Authentication authentication, @RequestBody Income income) {
+	public ResponseEntity<?> createIncome(Authentication authentication, @RequestBody Transaction income) {
 		String userId = (String) authentication.getPrincipal();
 		if (userId == null) {
 			return ResponseEntity.status(401).body("Unauthorized");
 		}
 		try {
-			if (income.getIncomeDate() == null) {
-				income.setIncomeDate(LocalDateTime.now());
+			if (income.getTransactionDate() == null) {
+				income.setTransactionDate(LocalDateTime.now());
 			}
 			User user = userService.GetActiveUserById(userId);
 			income.setUser(user);
-			Income savedIncome = incomeService.save(income);
+			Transaction savedIncome = incomeService.save(income);
 			return ResponseEntity.ok(incomeService.getIncomeResponseById(savedIncome.getId().toString()));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(new AuthResponse("Income creation failed!", null, e.getMessage()));
@@ -105,19 +105,19 @@ public class IncomeController {
 	}
 
 	@PutMapping("/update/{id}")
-	public ResponseEntity<?> updateIncome(Authentication authentication, @PathVariable String id, @RequestBody Income updatedIncome) {
+	public ResponseEntity<?> updateIncome(Authentication authentication, @PathVariable String id, @RequestBody Transaction updatedIncome) {
 		String userId = (String) authentication.getPrincipal();
 		if (userId == null) {
 			return ResponseEntity.status(401).body("Unauthorized");
 		}
 		try {
-			Income existingIncome = incomeService.getIncomeByIdForUser(id, userId);
+			Transaction existingIncome = incomeService.getIncomeByIdForUser(id, userId);
 			if (existingIncome == null) {
 				return ResponseEntity.badRequest().body(new AuthResponse("Income not found!", null, ""));
 			}
 			updatedIncome.setId(existingIncome.getId());
 			updatedIncome.setUser(existingIncome.getUser());
-			Income savedIncome = incomeService.updateIncome(updatedIncome);
+			Transaction savedIncome = incomeService.updateIncome(updatedIncome);
 			return ResponseEntity.ok(new AuthResponse("Income updated successfully!", savedIncome.getId().toString(), ""));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(new AuthResponse("Income update failed!", null, e.getMessage()));
@@ -227,6 +227,9 @@ public class IncomeController {
 						!customSortBy.equals("description") && !customSortBy.equals("category")) {
 				return ResponseEntity.badRequest().body(new UserRes(null, "Error: Invalid sort column"));
 			}
+			if (customSortBy.equals("incomeDate")) {
+				customSortBy = "transactionDate";
+			}
 			if (customSortBy.equals("amount")) {
 				customSortBy = "baseCurrencyAmount";
 			}
@@ -240,7 +243,7 @@ public class IncomeController {
 	}
 
 	@PostMapping("/bulk-delete")
-	public ResponseEntity<?> bulkDeleteIncomes(Authentication authentication, @RequestBody List<Income> incomes) {
+	public ResponseEntity<?> bulkDeleteIncomes(Authentication authentication, @RequestBody List<Transaction> incomes) {
 		String userId = (String) authentication.getPrincipal();
 		if (userId == null) {
 			return ResponseEntity.status(401).body("Unauthorized");

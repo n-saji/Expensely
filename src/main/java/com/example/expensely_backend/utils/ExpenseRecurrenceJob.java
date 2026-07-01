@@ -1,8 +1,9 @@
 package com.example.expensely_backend.utils;
 
-import com.example.expensely_backend.model.Expense;
+import com.example.expensely_backend.model.Transaction;
+import com.example.expensely_backend.model.TransactionType;
 import com.example.expensely_backend.model.RecurringExpense;
-import com.example.expensely_backend.repository.ExpenseRepository;
+import com.example.expensely_backend.repository.TransactionRepository;
 import com.example.expensely_backend.repository.RecurringExpenseRepository;
 import com.example.expensely_backend.service.BudgetService;
 import com.example.expensely_backend.service.DbLogService;
@@ -23,14 +24,14 @@ public class ExpenseRecurrenceJob {
 	private static final Logger logger = LoggerFactory.getLogger(ExpenseRecurrenceJob.class);
 
 	private final RecurringExpenseRepository recurringExpenseRepository;
-	private final ExpenseRepository expenseRepository;
+	private final TransactionRepository transactionRepository;
 	private final BudgetService budgetService;
 	private final DbLogService dbLogService;
 	private final ExchangeRateService exchangeRateService;
 
-	public ExpenseRecurrenceJob(RecurringExpenseRepository recurringExpenseRepository, ExpenseRepository expenseRepository, BudgetService budgetService, DbLogService dbLogService, ExchangeRateService exchangeRateService) {
+	public ExpenseRecurrenceJob(RecurringExpenseRepository recurringExpenseRepository, TransactionRepository transactionRepository, BudgetService budgetService, DbLogService dbLogService, ExchangeRateService exchangeRateService) {
 		this.recurringExpenseRepository = recurringExpenseRepository;
-		this.expenseRepository = expenseRepository;
+		this.transactionRepository = transactionRepository;
 		this.budgetService = budgetService;
 		this.dbLogService = dbLogService;
 		this.exchangeRateService = exchangeRateService;
@@ -38,7 +39,7 @@ public class ExpenseRecurrenceJob {
 
 	/**
 	 * Runs every day at 00:00 (midnight) server time.
-	 * Scans active recurring expenses whose nextOccurrence == today, creates Expense rows,
+	 * Scans active recurring expenses whose nextOccurrence == today, creates Transaction rows,
 	 * advances nextOccurrence according to recurrence, and saves changes.
 	 */
 	@Scheduled(cron = "0 0 0 * * *")
@@ -50,13 +51,12 @@ public class ExpenseRecurrenceJob {
 		List<RecurringExpense> recurringExpenses = recurringExpenseRepository.findByActiveTrueAndNextOccurrence(today);
 
 		int createdCount = 0;
-		int skippedCount = 0;
 		for (RecurringExpense rec : recurringExpenses) {
 			if (rec == null) continue;
 
 			try {
-				// Create expense
-				Expense expense = new Expense();
+				// Create transaction of type EXPENSE
+				Transaction expense = new Transaction();
 				expense.setUser(rec.getUser());
 				expense.setCategory(rec.getCategory());
 				expense.setAmount(exchangeRateService.normalizeDisplayAmount(rec.getAmount()));
@@ -69,8 +69,9 @@ public class ExpenseRecurrenceJob {
 				expense.setExchangeRate(exchangeRateService.getUsdToCurrencyRate(currency));
 				expense.setBaseCurrencyAmount(exchangeRateService.convertToUsd(rec.getAmount(), currency));
 				expense.setDescription(rec.getDescription());
-				expense.setExpenseDate(LocalDateTime.now());
-				expenseRepository.save(expense);
+				expense.setTransactionDate(LocalDateTime.now());
+				expense.setType(TransactionType.EXPENSE);
+				transactionRepository.save(expense);
 
 				// Advance nextOccurrence according to recurrence
 				switch (rec.getRecurrence()) {
@@ -83,12 +84,11 @@ public class ExpenseRecurrenceJob {
 				}
 
 				recurringExpenseRepository.save(rec);
-				budgetService.updateBudgetAmountByUserIdAndCategoryId(rec.getUser().getId().toString(), rec.getCategory().getId().toString(), expense.getBaseCurrencyAmount(), expense.getExpenseDate());
+				budgetService.updateBudgetAmountByUserIdAndCategoryId(rec.getUser().getId().toString(), rec.getCategory().getId().toString(), expense.getBaseCurrencyAmount(), expense.getTransactionDate());
 				createdCount++;
 				dbLogService.logMessage("job",
 						getClass().getName(), "ExpenseRecurrenceJob",
-						"Created " +
-								"expense from recurring id=" + rec.getId() + " expenseId=" + expense.getId());
+						"Created transaction from recurring id=" + rec.getId() + " transactionId=" + expense.getId());
 			} catch (Exception e) {
 				dbLogService.logError("job",
 						getClass().getName(), "ExpenseRecurrenceJob",
@@ -102,3 +102,4 @@ public class ExpenseRecurrenceJob {
 	}
 
 }
+

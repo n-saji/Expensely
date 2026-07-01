@@ -1,7 +1,6 @@
 package com.example.expensely_backend.repository;
 
 import com.example.expensely_backend.model.Budget;
-import com.example.expensely_backend.model.Expense;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;

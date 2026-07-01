@@ -21,8 +21,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AnalyticsService {
 
-	private final ExpenseRepository expenseRepository;
-	private final IncomeRepository incomeRepository;
+	private final TransactionRepository transactionRepository;
 	private final BudgetRepository budgetRepository;
 	private final UserService userService;
 	private final ExchangeRateService exchangeRateService;
@@ -59,23 +58,23 @@ public class AnalyticsService {
 
 		// Fetch Selected Month Transactions for selected Type
 		boolean isExpense = globals.TYPE_EXPENSE.equalsIgnoreCase(type);
-		List<Expense> selectedMonthExpenses = expenseRepository.findByUserIdAndTimeFrameAsc(user.getId(), startDateTime, endDateTime);
-		List<Income> selectedMonthIncomes = incomeRepository.findByUserIdAndTimeFrameAsc(user.getId(), startDateTime, endDateTime);
+		List<Transaction> selectedMonthExpenses = transactionRepository.findByUserIdAndTypeAndTimeFrameAsc(user.getId(), TransactionType.EXPENSE, startDateTime, endDateTime);
+		List<Transaction> selectedMonthIncomes = transactionRepository.findByUserIdAndTypeAndTimeFrameAsc(user.getId(), TransactionType.INCOME, startDateTime, endDateTime);
 
 		// All calculations will use the normalized rates
 		MonthlyAnalyticsResponse response = new MonthlyAnalyticsResponse();
 
 		if (isExpense) {
-			List<Expense> prevMonthExpenses = expenseRepository.findByUserIdAndTimeFrameAsc(user.getId(), prevStartDateTime, prevEndDateTime);
-			List<Expense> lastYearExpenses = expenseRepository.findByUserIdAndTimeFrameAsc(user.getId(), lastYearStartDateTime, lastYearEndDateTime);
-			List<Object[]> historicalRaw = expenseRepository.findHistoricalMonthlyDataExpense(user.getId(), month);
+			List<Transaction> prevMonthExpenses = transactionRepository.findByUserIdAndTypeAndTimeFrameAsc(user.getId(), TransactionType.EXPENSE, prevStartDateTime, prevEndDateTime);
+			List<Transaction> lastYearExpenses = transactionRepository.findByUserIdAndTypeAndTimeFrameAsc(user.getId(), TransactionType.EXPENSE, lastYearStartDateTime, lastYearEndDateTime);
+			List<Object[]> historicalRaw = transactionRepository.findHistoricalMonthlyData(user.getId(), month, "EXPENSE");
 
 			calculateExpenseAnalytics(response, selectedMonthExpenses, prevMonthExpenses, lastYearExpenses, historicalRaw,
 					usdToUserRate, displayCurrency, daysInMonth, startOfSelectedMonth, endOfSelectedMonth, user.getId());
 		} else {
-			List<Income> prevMonthIncomes = incomeRepository.findByUserIdAndTimeFrameAsc(user.getId(), prevStartDateTime, prevEndDateTime);
-			List<Income> lastYearIncomes = incomeRepository.findByUserIdAndTimeFrameAsc(user.getId(), lastYearStartDateTime, lastYearEndDateTime);
-			List<Object[]> historicalRaw = incomeRepository.findHistoricalMonthlyDataIncome(user.getId(), month);
+			List<Transaction> prevMonthIncomes = transactionRepository.findByUserIdAndTypeAndTimeFrameAsc(user.getId(), TransactionType.INCOME, prevStartDateTime, prevEndDateTime);
+			List<Transaction> lastYearIncomes = transactionRepository.findByUserIdAndTypeAndTimeFrameAsc(user.getId(), TransactionType.INCOME, lastYearStartDateTime, lastYearEndDateTime);
+			List<Object[]> historicalRaw = transactionRepository.findHistoricalMonthlyData(user.getId(), month, "INCOME");
 
 			calculateIncomeAnalytics(response, selectedMonthIncomes, prevMonthIncomes, lastYearIncomes, historicalRaw,
 					usdToUserRate, displayCurrency, daysInMonth, startOfSelectedMonth, endOfSelectedMonth);
@@ -87,31 +86,21 @@ public class AnalyticsService {
 		return response;
 	}
 
-	private BigDecimal getUsdAmount(Expense e) {
-		if (e.getBaseCurrencyAmount() != null) {
-			return e.getBaseCurrencyAmount();
+	private BigDecimal getUsdAmount(Transaction t) {
+		if (t.getBaseCurrencyAmount() != null) {
+			return t.getBaseCurrencyAmount();
 		}
-		if (e.getCurrency() == null || e.getCurrency().equalsIgnoreCase(globals.BASE_CURRENCY)) {
-			return e.getAmount() != null ? e.getAmount() : BigDecimal.ZERO;
+		if (t.getCurrency() == null || t.getCurrency().equalsIgnoreCase(globals.BASE_CURRENCY)) {
+			return t.getAmount() != null ? t.getAmount() : BigDecimal.ZERO;
 		}
-		return exchangeRateService.convertToUsd(e.getAmount(), e.getCurrency());
-	}
-
-	private BigDecimal getUsdAmount(Income i) {
-		if (i.getBaseCurrencyAmount() != null) {
-			return i.getBaseCurrencyAmount();
-		}
-		if (i.getCurrency() == null || i.getCurrency().equalsIgnoreCase(globals.BASE_CURRENCY)) {
-			return i.getAmount() != null ? i.getAmount() : BigDecimal.ZERO;
-		}
-		return exchangeRateService.convertToUsd(i.getAmount(), i.getCurrency());
+		return exchangeRateService.convertToUsd(t.getAmount(), t.getCurrency());
 	}
 
 	private void calculateExpenseAnalytics(
 			MonthlyAnalyticsResponse response,
-			List<Expense> current,
-			List<Expense> previous,
-			List<Expense> lastYear,
+			List<Transaction> current,
+			List<Transaction> previous,
+			List<Transaction> lastYear,
 			List<Object[]> historicalRaw,
 			BigDecimal rate,
 			String displayCurrency,
@@ -141,7 +130,7 @@ public class AnalyticsService {
 		// Group by day for highest/lowest day
 		Map<LocalDate, BigDecimal> dailySums = current.stream()
 				.collect(Collectors.groupingBy(
-						e -> e.getExpenseDate().toLocalDate(),
+						e -> e.getTransactionDate().toLocalDate(),
 						Collectors.reducing(BigDecimal.ZERO, e -> getUsdAmount(e).multiply(rate), BigDecimal::add)
 				));
 
@@ -198,9 +187,9 @@ public class AnalyticsService {
 		response.setMonthComparisons(comparisons);
 
 		// Category Analytics
-		Map<Category, List<Expense>> currentByCat = current.stream()
+		Map<Category, List<Transaction>> currentByCat = current.stream()
 				.filter(e -> e.getCategory() != null)
-				.collect(Collectors.groupingBy(Expense::getCategory));
+				.collect(Collectors.groupingBy(Transaction::getCategory));
 
 		Map<UUID, BigDecimal> prevByCatId = previous.stream()
 				.filter(e -> e.getCategory() != null)
@@ -217,9 +206,9 @@ public class AnalyticsService {
 				));
 
 		List<MonthlyAnalyticsResponse.CategoryAnalytics> catAnalyticsList = new ArrayList<>();
-		for (Map.Entry<Category, List<Expense>> entry : currentByCat.entrySet()) {
+		for (Map.Entry<Category, List<Transaction>> entry : currentByCat.entrySet()) {
 			Category cat = entry.getKey();
-			List<Expense> catExpenses = entry.getValue();
+			List<Transaction> catExpenses = entry.getValue();
 
 			BigDecimal catTotal = catExpenses.stream()
 					.map(e -> getUsdAmount(e).multiply(rate))
@@ -266,7 +255,7 @@ public class AnalyticsService {
 
 		Map<DayOfWeek, BigDecimal> weekdaySums = current.stream()
 				.collect(Collectors.groupingBy(
-						e -> e.getExpenseDate().getDayOfWeek(),
+						e -> e.getTransactionDate().getDayOfWeek(),
 						Collectors.reducing(BigDecimal.ZERO, e -> getUsdAmount(e).multiply(rate), BigDecimal::add)
 				));
 
@@ -352,15 +341,14 @@ public class AnalyticsService {
 				.count();
 		insights.setNoSpendIncomeDaysCount((int) (daysInMonth - daysWithTransactions));
 
-		// Category increases and decreases (compared to previous month)
+		// Category changes comparison
 		calculateCategoryChanges(insights, currentByCat, previous, rate);
-
 		response.setInsights(insights);
 
-		// Recent Transactions (top 10 descending)
-		List<Expense> sortedCurrent = new ArrayList<>(current);
-		sortedCurrent.sort((e1, e2) -> e2.getExpenseDate().compareTo(e1.getExpenseDate()));
-		List<Expense> recent = sortedCurrent.stream().limit(10).toList();
+		// Recent Transactions
+		List<Transaction> sortedCurrent = new ArrayList<>(current);
+		sortedCurrent.sort((e1, e2) -> e2.getTransactionDate().compareTo(e1.getTransactionDate()));
+		List<Transaction> recent = sortedCurrent.stream().limit(10).toList();
 
 		List<ExpenseResponse> recentResponses = recent.stream()
 				.map(e -> {
@@ -368,21 +356,22 @@ public class AnalyticsService {
 					return new ExpenseResponse(e, displayCurrency, dispAmt);
 				})
 				.toList();
+
 		response.setRecentTransactions(recentResponses);
 	}
 
 	private void calculateIncomeAnalytics(
 			MonthlyAnalyticsResponse response,
-			List<Income> current,
-			List<Income> previous,
-			List<Income> lastYear,
+			List<Transaction> current,
+			List<Transaction> previous,
+			List<Transaction> lastYear,
 			List<Object[]> historicalRaw,
 			BigDecimal rate,
 			String displayCurrency,
 			int daysInMonth,
 			LocalDate startOfMonth,
 			LocalDate endOfMonth
-	) {
+		) {
 		// Summary
 		BigDecimal totalAmount = current.stream()
 				.map(i -> getUsdAmount(i).multiply(rate))
@@ -404,7 +393,7 @@ public class AnalyticsService {
 		// Group by day for highest/lowest day
 		Map<LocalDate, BigDecimal> dailySums = current.stream()
 				.collect(Collectors.groupingBy(
-						i -> i.getIncomeDate().toLocalDate(),
+						i -> i.getTransactionDate().toLocalDate(),
 						Collectors.reducing(BigDecimal.ZERO, i -> getUsdAmount(i).multiply(rate), BigDecimal::add)
 				));
 
@@ -461,9 +450,9 @@ public class AnalyticsService {
 		response.setMonthComparisons(comparisons);
 
 		// Category Analytics
-		Map<Category, List<Income>> currentByCat = current.stream()
+		Map<Category, List<Transaction>> currentByCat = current.stream()
 				.filter(i -> i.getCategory() != null)
-				.collect(Collectors.groupingBy(Income::getCategory));
+				.collect(Collectors.groupingBy(Transaction::getCategory));
 
 		Map<UUID, BigDecimal> prevByCatId = previous.stream()
 				.filter(i -> i.getCategory() != null)
@@ -479,39 +468,40 @@ public class AnalyticsService {
 						Collectors.reducing(BigDecimal.ZERO, i -> getUsdAmount(i).multiply(rate), BigDecimal::add)
 				));
 
-		List<MonthlyAnalyticsResponse.CategoryAnalytics> catAnalyticsList = new ArrayList<>();
-		for (Map.Entry<Category, List<Income>> entry : currentByCat.entrySet()) {
-			Category cat = entry.getKey();
-			List<Income> catIncomes = entry.getValue();
+		List<MonthlyAnalyticsResponse.CategoryAnalytics> catAnalyticsList = currentByCat.entrySet().stream()
+				.map(entry -> {
+					Category cat = entry.getKey();
+					List<Transaction> catIncomes = entry.getValue();
 
-			BigDecimal catTotal = catIncomes.stream()
-					.map(i -> getUsdAmount(i).multiply(rate))
-					.reduce(BigDecimal.ZERO, BigDecimal::add)
-					.setScale(2, RoundingMode.HALF_UP);
+					BigDecimal catTotal = catIncomes.stream()
+							.map(i -> getUsdAmount(i).multiply(rate))
+							.reduce(BigDecimal.ZERO, BigDecimal::add)
+							.setScale(2, RoundingMode.HALF_UP);
 
-			long count = catIncomes.size();
-			BigDecimal catAverage = catTotal.divide(BigDecimal.valueOf(count), 2, RoundingMode.HALF_UP);
-			BigDecimal percentage = totalAmount.compareTo(BigDecimal.ZERO) > 0
-					? catTotal.multiply(BigDecimal.valueOf(100)).divide(totalAmount, 2, RoundingMode.HALF_UP)
-					: BigDecimal.ZERO;
+					long count = catIncomes.size();
+					BigDecimal catAverage = catTotal.divide(BigDecimal.valueOf(count), 2, RoundingMode.HALF_UP);
+					BigDecimal percentage = totalAmount.compareTo(BigDecimal.ZERO) > 0
+							? catTotal.multiply(BigDecimal.valueOf(100)).divide(totalAmount, 2, RoundingMode.HALF_UP)
+							: BigDecimal.ZERO;
 
-			BigDecimal prevCatTotal = prevByCatId.getOrDefault(cat.getId(), BigDecimal.ZERO);
-			BigDecimal lyCatTotal = lastYearByCatId.getOrDefault(cat.getId(), BigDecimal.ZERO);
+					BigDecimal prevCatTotal = prevByCatId.getOrDefault(cat.getId(), BigDecimal.ZERO);
+					BigDecimal lyCatTotal = lastYearByCatId.getOrDefault(cat.getId(), BigDecimal.ZERO);
 
-			MonthlyAnalyticsResponse.CategoryAnalytics catAnalytics = new MonthlyAnalyticsResponse.CategoryAnalytics();
-			catAnalytics.setCategoryId(cat.getId().toString());
-			catAnalytics.setCategoryName(cat.getName());
-			catAnalytics.setCategoryColor(cat.getColor());
-			catAnalytics.setCategoryIcon(cat.getIcon());
-			catAnalytics.setTotalAmount(catTotal);
-			catAnalytics.setPercentageOfTotal(percentage);
-			catAnalytics.setTransactionCount(count);
-			catAnalytics.setAverageTransactionAmount(catAverage);
-			catAnalytics.setPreviousMonthComparison(createComparison(catTotal, prevCatTotal));
-			catAnalytics.setSameMonthLastYearComparison(createComparison(catTotal, lyCatTotal));
+					MonthlyAnalyticsResponse.CategoryAnalytics catAnalytics = new MonthlyAnalyticsResponse.CategoryAnalytics();
+					catAnalytics.setCategoryId(cat.getId().toString());
+					catAnalytics.setCategoryName(cat.getName());
+					catAnalytics.setCategoryColor(cat.getColor());
+					catAnalytics.setCategoryIcon(cat.getIcon());
+					catAnalytics.setTotalAmount(catTotal);
+					catAnalytics.setPercentageOfTotal(percentage);
+					catAnalytics.setTransactionCount(count);
+					catAnalytics.setAverageTransactionAmount(catAverage);
+					catAnalytics.setPreviousMonthComparison(createComparison(catTotal, prevCatTotal));
+					catAnalytics.setSameMonthLastYearComparison(createComparison(catTotal, lyCatTotal));
+					return catAnalytics;
+				})
+				.collect(Collectors.toList());
 
-			catAnalyticsList.add(catAnalytics);
-		}
 		catAnalyticsList.sort((c1, c2) -> c2.getTotalAmount().compareTo(c1.getTotalAmount()));
 		response.setCategoryAnalytics(catAnalyticsList);
 
@@ -529,7 +519,7 @@ public class AnalyticsService {
 
 		Map<DayOfWeek, BigDecimal> weekdaySums = current.stream()
 				.collect(Collectors.groupingBy(
-						i -> i.getIncomeDate().getDayOfWeek(),
+						i -> i.getTransactionDate().getDayOfWeek(),
 						Collectors.reducing(BigDecimal.ZERO, i -> getUsdAmount(i).multiply(rate), BigDecimal::add)
 				));
 
@@ -582,15 +572,14 @@ public class AnalyticsService {
 				.count();
 		insights.setNoSpendIncomeDaysCount((int) (daysInMonth - daysWithTransactions));
 
-		// Category increases and decreases (compared to previous month)
+		// Category changes comparison
 		calculateCategoryChangesIncome(insights, currentByCat, previous, rate);
-
 		response.setInsights(insights);
 
-		// Recent Transactions (top 10 descending)
-		List<Income> sortedCurrent = new ArrayList<>(current);
-		sortedCurrent.sort((i1, i2) -> i2.getIncomeDate().compareTo(i1.getIncomeDate()));
-		List<Income> recent = sortedCurrent.stream().limit(10).toList();
+		// Recent Transactions
+		List<Transaction> sortedCurrent = new ArrayList<>(current);
+		sortedCurrent.sort((i1, i2) -> i2.getTransactionDate().compareTo(i1.getTransactionDate()));
+		List<Transaction> recent = sortedCurrent.stream().limit(10).toList();
 
 		List<IncomeResponse> recentResponses = recent.stream()
 				.map(i -> {
@@ -598,27 +587,25 @@ public class AnalyticsService {
 					return new IncomeResponse(i, displayCurrency, dispAmt);
 				})
 				.toList();
+
 		response.setRecentTransactions(recentResponses);
 	}
 
 	private void calculateIncomeVsExpenseSummary(
 			MonthlyAnalyticsResponse response,
-			List<Expense> selectedMonthExpenses,
-			List<Income> selectedMonthIncomes,
+			List<Transaction> selectedMonthExpenses,
+			List<Transaction> selectedMonthIncomes,
 			BigDecimal rate
 	) {
 		BigDecimal totalIncome = selectedMonthIncomes.stream()
 				.map(i -> getUsdAmount(i).multiply(rate))
-				.reduce(BigDecimal.ZERO, BigDecimal::add)
-				.setScale(2, RoundingMode.HALF_UP);
+				.reduce(BigDecimal.ZERO, BigDecimal::add);
 
 		BigDecimal totalExpense = selectedMonthExpenses.stream()
 				.map(e -> getUsdAmount(e).multiply(rate))
-				.reduce(BigDecimal.ZERO, BigDecimal::add)
-				.setScale(2, RoundingMode.HALF_UP);
+				.reduce(BigDecimal.ZERO, BigDecimal::add);
 
 		BigDecimal netSavings = totalIncome.subtract(totalExpense);
-
 		BigDecimal savingsPercentage = totalIncome.compareTo(BigDecimal.ZERO) > 0
 				? netSavings.multiply(BigDecimal.valueOf(100)).divide(totalIncome, 2, RoundingMode.HALF_UP)
 				: BigDecimal.ZERO;
@@ -650,8 +637,8 @@ public class AnalyticsService {
 
 	private void calculateCategoryChanges(
 			MonthlyAnalyticsResponse.InsightsAnalytics insights,
-			Map<Category, List<Expense>> currentByCat,
-			List<Expense> previous,
+			Map<Category, List<Transaction>> currentByCat,
+			List<Transaction> previous,
 			BigDecimal rate
 	) {
 		Map<String, BigDecimal> currentTotals = currentByCat.entrySet().stream()
@@ -718,8 +705,8 @@ public class AnalyticsService {
 
 	private void calculateCategoryChangesIncome(
 			MonthlyAnalyticsResponse.InsightsAnalytics insights,
-			Map<Category, List<Income>> currentByCat,
-			List<Income> previous,
+			Map<Category, List<Transaction>> currentByCat,
+			List<Transaction> previous,
 			BigDecimal rate
 	) {
 		Map<String, BigDecimal> currentTotals = currentByCat.entrySet().stream()

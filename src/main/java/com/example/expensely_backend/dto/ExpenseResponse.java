@@ -1,6 +1,6 @@
 package com.example.expensely_backend.dto;
 
-import com.example.expensely_backend.model.Expense;
+import com.example.expensely_backend.model.Transaction;
 import lombok.Getter;
 
 import java.math.BigDecimal;
@@ -41,14 +41,14 @@ public class ExpenseResponse {
 	private final String receiptUrl;
 
 	public ExpenseResponse(
-			Expense expense,
+			Transaction expense,
 			String displayCurrency,
 			BigDecimal displayAmount
 	) {
 		this.id = expense.getId();
 		this.amount = expense.getAmount();
 		this.description = expense.getDescription();
-		this.expenseDate = expense.getExpenseDate();
+		this.expenseDate = expense.getTransactionDate();
 		this.categoryId = expense.getCategory().getId().toString();
 		this.categoryName = expense.getCategory().getName();
 		this.userId = expense.getUser().getId().toString();
@@ -58,6 +58,4 @@ public class ExpenseResponse {
 		this.displayCurrency = displayCurrency;
 		this.receiptUrl = expense.getReceiptUrl();
 	}
-
-
 }

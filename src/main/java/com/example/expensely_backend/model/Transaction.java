@@ -10,16 +10,17 @@ import java.util.UUID;
 
 @Entity
 @Table(
-		name = "incomes",
+		name = "transactions",
 		indexes = {
-				@Index(name = "idx_income_date_user_id", columnList = "user_id,income_date")
+				@Index(name = "idx_transaction_date_user_id_type", columnList = "user_id,type,transaction_date")
 		}
 )
-public class Income {
+public class Transaction {
 	@Id
 	@GeneratedValue(strategy = GenerationType.UUID)
 	@Getter
 	@Setter
+	@Column(columnDefinition = "UUID", updatable = false, nullable = false)
 	private UUID id;
 
 	@ManyToOne
@@ -36,15 +37,6 @@ public class Income {
 	@Getter
 	@Setter
 	private BigDecimal amount;
-
-	@Getter
-	@Setter
-	private String description;
-
-	@Column(name = "income_date")
-	@Getter
-	@Setter
-	private LocalDateTime incomeDate;
 
 	@Column(nullable = false, length = 3, columnDefinition = "varchar(3) default 'USD'")
 	@Getter
@@ -65,4 +57,25 @@ public class Income {
 	@Getter
 	@Setter
 	private BigDecimal exchangeRate; // snapshot rate
+
+	@Getter
+	@Setter
+	private String description;
+
+	@Column(name = "transaction_date")
+	@Getter
+	@Setter
+	@com.fasterxml.jackson.annotation.JsonAlias({"expenseDate", "incomeDate", "transactionDate"})
+	private LocalDateTime transactionDate;
+
+	@Column(name = "receipt_url")
+	@Getter
+	@Setter
+	private String receiptUrl; // nullable, only for EXPENSE
+
+	@Enumerated(EnumType.STRING)
+	@Column(nullable = false, length = 10)
+	@Getter
+	@Setter
+	private TransactionType type;
 }

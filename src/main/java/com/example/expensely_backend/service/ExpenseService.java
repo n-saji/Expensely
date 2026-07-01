@@ -28,11 +28,11 @@ import java.util.stream.Collectors;
 @Service
 public class ExpenseService {
 
-	private final ExpenseRepository expenseRepository;
+	private final TransactionRepository transactionRepository;
 	private final CategoryService categoryService;
 	private final UserService userService;
 	private final BudgetService budgetService;
-	private final ExpenseRepositoryCustomImpl expenseRepositoryCustomImpl;
+	private final TransactionRepositoryCustomImpl transactionRepositoryCustomImpl;
 	private final ExpenseFilesRepository expenseFilesRepository;
 	private final UserRepository userRepository;
 	private final ObjectMapper objectMapper;
@@ -45,9 +45,9 @@ public class ExpenseService {
 	@Autowired
 	private S3Service s3Service;
 
-	public ExpenseService(ExpenseRepository expenseRepository, CategoryService categoryService,
+	public ExpenseService(TransactionRepository transactionRepository, CategoryService categoryService,
 	                      UserService userService,
-	                      BudgetService budgetService, ExpenseRepositoryCustomImpl expenseRepositoryCustomImpl
+	                      BudgetService budgetService, TransactionRepositoryCustomImpl transactionRepositoryCustomImpl
 			, ExpenseFilesRepository expenseFilesService, UserRepository userRepository,
 			              ObjectMapper objectMapper,
 			              CategoryRepository categoryRepository,
@@ -55,11 +55,11 @@ public class ExpenseService {
 			              RecurringExpenseService recurringExpenseService,
 			              @Qualifier("expenseExecutor") Executor expenseExecutor,
 			              ExchangeRateService exchangeRateService) {
-		this.expenseRepository = expenseRepository;
+		this.transactionRepository = transactionRepository;
 		this.categoryService = categoryService;
 		this.userService = userService;
 		this.budgetService = budgetService;
-		this.expenseRepositoryCustomImpl = expenseRepositoryCustomImpl;
+		this.transactionRepositoryCustomImpl = transactionRepositoryCustomImpl;
 		this.expenseFilesRepository = expenseFilesService;
 		this.userRepository = userRepository;
 		this.objectMapper = objectMapper;
@@ -79,7 +79,7 @@ public class ExpenseService {
 		return exchangeRateService.getUsdToCurrencyRate(currency);
 	}
 
-	private void applyCurrencySnapshot(Expense expense, String currency) {
+	private void applyCurrencySnapshot(Transaction expense, String currency) {
 		expense.setAmount(normalizeAmount(expense.getAmount()));
 		expense.setCurrency(currency.toUpperCase());
 		expense.setBaseCurrency(globals.BASE_CURRENCY);
@@ -88,7 +88,7 @@ public class ExpenseService {
 		expense.setBaseCurrencyAmount(exchangeRateService.convertToUsd(expense.getAmount(), currency));
 	}
 
-	private List<ExpenseResponse> mapExpensesToResponse(List<Expense> expenses, String displayCurrency) {
+	private List<ExpenseResponse> mapExpensesToResponse(List<Transaction> expenses, String displayCurrency) {
 		BigDecimal displayRate = resolveUsdRate(displayCurrency);
 		return expenses.stream()
 				.map(expense -> {
@@ -100,7 +100,7 @@ public class ExpenseService {
 				.collect(Collectors.toList());
 	}
 
-	private ExpenseResponse mapExpenseToResponse(Expense expense, String displayCurrency) {
+	private ExpenseResponse mapExpenseToResponse(Transaction expense, String displayCurrency) {
 		BigDecimal displayRate = resolveUsdRate(displayCurrency);
 		BigDecimal displayAmount = expense.getBaseCurrencyAmount() == null
 				? normalizeAmount(expense.getAmount())
@@ -113,11 +113,11 @@ public class ExpenseService {
 	}
 
 	private List<ExpenseResponse> getExpenseByUserIdAndStartDateAndEndDate(UUID userId, LocalDateTime startDate, LocalDateTime endDate, String order) {
-		List<Expense> expenses;
+		List<Transaction> expenses;
 		if (order == null || order.equalsIgnoreCase("desc")) {
-			expenses = expenseRepository.findByUserIdAndTimeFrameDesc(userId, startDate, endDate);
+			expenses = transactionRepository.findByUserIdAndTypeAndTimeFrameDesc(userId, TransactionType.EXPENSE, startDate, endDate);
 		} else if (order.equalsIgnoreCase("asc")) {
-			expenses = expenseRepository.findByUserIdAndTimeFrameAsc(userId, startDate, endDate);
+			expenses = transactionRepository.findByUserIdAndTypeAndTimeFrameAsc(userId, TransactionType.EXPENSE, startDate, endDate);
 
 		} else {
 			throw new IllegalArgumentException("Order must be 'asc' or 'desc'");
@@ -129,11 +129,11 @@ public class ExpenseService {
 	}
 
 	private List<MonthlyCategoryExpense> getMonthlyCategoryExpense(UUID userId, LocalDateTime startDate, LocalDateTime endDate) {
-		return expenseRepository.findMonthlyCategoryExpenseByUserId(userId, startDate, endDate);
+		return transactionRepository.findMonthlyCategoryExpenseByUserId(userId, startDate, endDate);
 	}
 
 	private List<DailyExpense> getDailyExpense(UUID userId, LocalDateTime startDate, LocalDateTime endDate) {
-		return expenseRepository.findDailyExpenseByUserIdAndTimeFrame(userId, startDate, endDate);
+		return transactionRepository.findDailyExpenseByUserIdAndTimeFrame(userId, startDate, endDate);
 	}
 
 	private ExpenseResList fetchExpensesWithConditions(UUID userId, LocalDateTime startDate,
@@ -159,9 +159,9 @@ public class ExpenseService {
 			categoryUUID = category.getId();
 		}
 
-		List<Expense> expenses = expenseRepositoryCustomImpl.findExpenses(userId, startDate, endDate,
+		List<Transaction> expenses = transactionRepositoryCustomImpl.findTransactions(userId, TransactionType.EXPENSE, startDate, endDate,
 				categoryUUID, q, offset, limit, customSortBy, customSortOrder, order);
-		long totalElements = expenseRepositoryCustomImpl.countExpenses(userId, startDate, endDate,
+		long totalElements = transactionRepositoryCustomImpl.countTransactions(userId, TransactionType.EXPENSE, startDate, endDate,
 				categoryUUID, q);
 
 		totalPages = (int) Math.ceil((double) totalElements / limit);
@@ -175,7 +175,7 @@ public class ExpenseService {
 		YearMonth reqYm = YearMonth.of(year, month);
 		LocalDateTime endDate = reqYm.atEndOfMonth().atTime(23, 59, 59);
 
-		return expenseRepository.getTotalExpenseByUserId(userId, startDate, endDate);
+		return transactionRepository.getTotalAmountByUserId(userId, "EXPENSE", startDate, endDate);
 	}
 
 	private DateRange resolveDateRange(int count, globals.TimeFrame type) {
@@ -217,7 +217,7 @@ public class ExpenseService {
 		return new DateRange(startDate, endDate);
 	}
 
-	public Expense save(Expense expense) {
+	public Transaction save(Transaction expense) {
 		if (expense.getCategory() == null || expense.getCategory().getId() == null) {
 			throw new IllegalArgumentException("Category must be provided");
 		}
@@ -239,14 +239,15 @@ public class ExpenseService {
 		if (currency == null || currency.isBlank()) {
 			currency = user.getCurrency();
 		}
+		expense.setType(TransactionType.EXPENSE);
 		applyCurrencySnapshot(expense, currency);
-		Expense exp = expenseRepository.save(expense);
+		Transaction exp = transactionRepository.save(expense);
 
 
 		// calculate if budget set
 
 		try {
-			budgetService.updateBudgetAmountByUserIdAndCategoryId(user.getId().toString(), category.getId().toString(), expense.getBaseCurrencyAmount(), expense.getExpenseDate());
+			budgetService.updateBudgetAmountByUserIdAndCategoryId(user.getId().toString(), category.getId().toString(), expense.getBaseCurrencyAmount(), expense.getTransactionDate());
 		} catch (Exception e) {
 			throw new IllegalArgumentException("Error updating budget: " + e.getMessage());
 		}
@@ -255,28 +256,28 @@ public class ExpenseService {
 
 	}
 
-	public Expense getExpenseById(String id) {
-		return expenseRepository.findById(UUID.fromString(id)).orElseThrow(() -> new IllegalArgumentException("Expense not found"));
+	public Transaction getExpenseById(String id) {
+		return transactionRepository.findById(UUID.fromString(id)).orElseThrow(() -> new IllegalArgumentException("Expense not found"));
 	}
 
 	public ExpenseResponse getExpenseResponseById(String id) {
-		Expense expense = getExpenseById(id);
+		Transaction expense = getExpenseById(id);
 		String displayCurrency = expense.getUser() == null ? globals.BASE_CURRENCY : expense.getUser().getCurrency();
 		return mapExpenseToResponse(expense, displayCurrency);
 	}
 
 	public void deleteExpenseById(String id) {
 		try {
-			if (!expenseRepository.existsById(UUID.fromString(id))) {
+			if (!transactionRepository.existsById(UUID.fromString(id))) {
 				throw new IllegalArgumentException("Expense not found");
 			}
 			//budget update
-			Expense expense = getExpenseById(id);
+			Transaction expense = getExpenseById(id);
 
-			expenseRepository.deleteById(UUID.fromString(id));
+			transactionRepository.deleteById(UUID.fromString(id));
 
 			try {
-				budgetService.updateBudgetAmountByUserIdAndCategoryId(expense.getUser().getId().toString(), expense.getCategory().getId().toString(), expense.getBaseCurrencyAmount().negate(), expense.getExpenseDate());
+				budgetService.updateBudgetAmountByUserIdAndCategoryId(expense.getUser().getId().toString(), expense.getCategory().getId().toString(), expense.getBaseCurrencyAmount().negate(), expense.getTransactionDate());
 			} catch (Exception e) {
 				throw new IllegalArgumentException("Error updating budget: " + e.getMessage());
 			}
@@ -290,7 +291,7 @@ public class ExpenseService {
 		if (user == null) {
 			throw new IllegalArgumentException("User not found");
 		}
-		return mapExpensesToResponse(expenseRepository.findByUserId(user.getId()), user.getCurrency());
+		return mapExpensesToResponse(transactionRepository.findByUserIdAndType(user.getId(), TransactionType.EXPENSE), user.getCurrency());
 	}
 
 	public List<ExpenseResponse> getExpensesByCategoryIdAndUserID(String categoryId, String userId) {
@@ -302,12 +303,12 @@ public class ExpenseService {
 		if (user == null) {
 			throw new IllegalArgumentException("User not found");
 		}
-		return mapExpensesToResponse(expenseRepository.findByCategoryIdAndUserId(category.getId(), user.getId()), user.getCurrency());
+		return mapExpensesToResponse(transactionRepository.findByCategoryIdAndUserIdAndType(category.getId(), user.getId(), TransactionType.EXPENSE), user.getCurrency());
 	}
 
-	public Expense updateExpense(Expense expense) {
+	public Transaction updateExpense(Transaction expense) {
 
-		Expense oldExpense = getExpenseById(expense.getId().toString());
+		Transaction oldExpense = getExpenseById(expense.getId().toString());
 		if (oldExpense == null) {
 			throw new IllegalArgumentException("Expense not found");
 		}
@@ -319,7 +320,7 @@ public class ExpenseService {
 			}
 
 			try {
-				budgetService.updateBudgetAmountByUserIdAndCategoryId(oldExpense.getUser().getId().toString(), oldExpense.getCategory().getId().toString(), oldExpense.getBaseCurrencyAmount().negate(), oldExpense.getExpenseDate());
+				budgetService.updateBudgetAmountByUserIdAndCategoryId(oldExpense.getUser().getId().toString(), oldExpense.getCategory().getId().toString(), oldExpense.getBaseCurrencyAmount().negate(), oldExpense.getTransactionDate());
 			} catch (Exception e) {
 				throw new IllegalArgumentException("Error updating budget: " + e.getMessage());
 			}
@@ -350,17 +351,17 @@ public class ExpenseService {
 		if (expense.getDescription() != null && !expense.getDescription().equals(oldExpense.getDescription())) {
 			oldExpense.setDescription(expense.getDescription());
 		}
-		if (expense.getExpenseDate() != null && !expense.getExpenseDate().equals(oldExpense.getExpenseDate())) {
-			oldExpense.setExpenseDate(expense.getExpenseDate());
+		if (expense.getTransactionDate() != null && !expense.getTransactionDate().equals(oldExpense.getTransactionDate())) {
+			oldExpense.setTransactionDate(expense.getTransactionDate());
 		}
 
 
-		Expense exp = expenseRepository.save(oldExpense);
+		Transaction exp = transactionRepository.save(oldExpense);
 
 
 //        update budget
 		try {
-			budgetService.updateBudgetAmountByUserIdAndCategoryId(exp.getUser().getId().toString(), exp.getCategory().getId().toString(), oldExpense.getBaseCurrencyAmount().subtract(previousBaseAmount), exp.getExpenseDate());
+			budgetService.updateBudgetAmountByUserIdAndCategoryId(exp.getUser().getId().toString(), exp.getCategory().getId().toString(), oldExpense.getBaseCurrencyAmount().subtract(previousBaseAmount), exp.getTransactionDate());
 		} catch (Exception e) {
 			throw new IllegalArgumentException("Error updating budget: " + e.getMessage());
 		}
@@ -371,7 +372,7 @@ public class ExpenseService {
 		return getExpenseByUserIdAndStartDateAndEndDate(getActiveUserIdOrThrow(userId), startDate, endDate, order);
 	}
 
-	public void deleteBuUserIDAndExpenseIds(String userId, List<Expense> expenses) {
+	public void deleteBuUserIDAndExpenseIds(String userId, List<Transaction> expenses) {
 		User user = userService.GetActiveUserById(userId);
 		if (user == null) {
 			throw new IllegalArgumentException("User not found");
@@ -384,15 +385,15 @@ public class ExpenseService {
 			expenses.set(i, getExpenseById(expenses.get(i).getId().toString()));
 		}
 
-		for (Expense expense : expenses) {
+		for (Transaction expense : expenses) {
 			if (!expense.getUser().getId().equals(user.getId())) {
 				throw new IllegalArgumentException("Expense does not belong to user");
 			}
 		}
-		expenseRepository.deleteAll(expenses);
-		for (Expense expense : expenses) {
+		transactionRepository.deleteAll(expenses);
+		for (Transaction expense : expenses) {
 			try {
-				budgetService.updateBudgetAmountByUserIdAndCategoryId(expense.getUser().getId().toString(), expense.getCategory().getId().toString(), expense.getBaseCurrencyAmount().negate(), expense.getExpenseDate());
+				budgetService.updateBudgetAmountByUserIdAndCategoryId(expense.getUser().getId().toString(), expense.getCategory().getId().toString(), expense.getBaseCurrencyAmount().negate(), expense.getTransactionDate());
 			} catch (Exception e) {
 				throw new IllegalArgumentException("Error updating budget: " + e.getMessage());
 			}
@@ -410,7 +411,7 @@ public class ExpenseService {
 	public String exportExpensesToCSV(String userId, LocalDateTime startDate, LocalDateTime endDate) throws IOException {
 		UUID userIdUUID = UUID.fromString(userId);
 		User user = userService.GetActiveUserById(userId);
-		List<Expense> expenses = expenseRepository.findByUserIdAndTimeFrameAsc(userIdUUID, startDate, endDate);
+		List<Transaction> expenses = transactionRepository.findByUserIdAndTypeAndTimeFrameAsc(userIdUUID, TransactionType.EXPENSE, startDate, endDate);
 		String displayCurrency = user == null ? globals.BASE_CURRENCY : user.getCurrency();
 		BigDecimal displayRate = resolveUsdRate(displayCurrency);
 
@@ -421,12 +422,12 @@ public class ExpenseService {
 		writer.writeNext(new String[]{"Date", "Description", "Amount (in " + displayCurrency + ")", "Category"});
 
 		// rows
-		for (Expense expense : expenses) {
+		for (Transaction expense : expenses) {
 			BigDecimal displayAmount = expense.getBaseCurrencyAmount() == null
 					? normalizeAmount(expense.getAmount())
 					: expense.getBaseCurrencyAmount().multiply(displayRate).setScale(2, java.math.RoundingMode.HALF_UP);
 			writer.writeNext(new String[]{
-					expense.getExpenseDate().toString(),
+					expense.getTransactionDate().toString(),
 					expense.getDescription(),
 					displayAmount.toString(),
 					expense.getCategory().getName()
@@ -470,17 +471,18 @@ public class ExpenseService {
 		List<Category> cats = categoryRepository.findByUserId(userUUID);
 		LinkedHashMap<String, Category> catsList = new LinkedHashMap<>();
 		cats.forEach(cat -> catsList.put(cat.getName(), cat));
-		List<Expense> expenses = rows.stream().map(dto -> {
-			Expense expense = new Expense();
+		List<Transaction> expenses = rows.stream().map(dto -> {
+			Transaction expense = new Transaction();
 			expense.setAmount(normalizeAmount(BigDecimal.valueOf(dto.getAmount())));
 			expense.setCategory(catsList.get(dto.getCategory()));
-			expense.setExpenseDate(dto.getExpense_date().atStartOfDay());
+			expense.setTransactionDate(dto.getExpense_date().atStartOfDay());
 			expense.setDescription(dto.getDescription());
 			expense.setUser(user);
+			expense.setType(TransactionType.EXPENSE);
 			applyCurrencySnapshot(expense, globals.BASE_CURRENCY);
 			return expense;
 		}).toList();
-		expenseRepository.saveAll(expenses);
+		transactionRepository.saveAll(expenses);
 		expenseFilesRepository.deleteById(fileUUID);
 		return "Expenses inserted successfully";
 	}
@@ -497,7 +499,7 @@ public class ExpenseService {
 		DateRange range = resolveDateRange(count, type);
 
 		LinkedHashMap<String, Double> baseTotals =
-				expenseRepositoryCustomImpl.getMonthlyExpenseFromTillTo(user.getId(),
+				transactionRepositoryCustomImpl.getMonthlyAmountFromTillTo(user.getId(), TransactionType.EXPENSE,
 						range.startDate(),
 						range.endDate());
 		LinkedHashMap<String, Double> displayTotals = new LinkedHashMap<>();
@@ -521,7 +523,7 @@ public class ExpenseService {
 		DateRange range = resolveDateRange(count, type);
 
 		List<MonthlyCategoryExpense> dbRes =
-				expenseRepositoryCustomImpl.getMonthlyCategoryExpenseFromTillTo(user.getId(),
+				transactionRepositoryCustomImpl.getMonthlyCategoryExpenseFromTillTo(user.getId(),
 						range.startDate(),
 						range.endDate());
 
@@ -575,15 +577,15 @@ public class ExpenseService {
 
 		CompletableFuture<List<ExpenseResponse>> f1 =
 				CompletableFuture.supplyAsync(() ->
-						mapExpensesToResponse(expenseRepository.findByUserIdAndTimeFrameDesc(activeUserId, startDate, endDate), displayCurrency), expenseExecutor);
+						mapExpensesToResponse(transactionRepository.findByUserIdAndTypeAndTimeFrameDesc(activeUserId, TransactionType.EXPENSE, startDate, endDate), displayCurrency), expenseExecutor);
 
 		CompletableFuture<List<ExpenseResponse>> f2 =
 				CompletableFuture.supplyAsync(() ->
-						mapExpensesToResponse(expenseRepository.findByUserIdAndTimeFrameDesc(activeUserId, req_start_year, req_end_year), displayCurrency), expenseExecutor);
+						mapExpensesToResponse(transactionRepository.findByUserIdAndTypeAndTimeFrameDesc(activeUserId, TransactionType.EXPENSE, req_start_year, req_end_year), displayCurrency), expenseExecutor);
 
 		CompletableFuture<List<ExpenseResponse>> f3 =
 				CompletableFuture.supplyAsync(() ->
-						mapExpensesToResponse(expenseRepository.findByUserIdAndTimeFrameDesc(activeUserId, req_start, req_end), displayCurrency), expenseExecutor);
+						mapExpensesToResponse(transactionRepository.findByUserIdAndTypeAndTimeFrameDesc(activeUserId, TransactionType.EXPENSE, req_start, req_end), displayCurrency), expenseExecutor);
 
 		CompletableFuture<List<MonthlyCategoryExpense>> monthlyCategory =
 				CompletableFuture.supplyAsync(() ->
@@ -705,9 +707,9 @@ public class ExpenseService {
 	                                    String key) {
 
 		try {
-			Expense expense =
-					expenseRepository.findByUserIdAndId(UUID.fromString(UserID),
-							UUID.fromString(expenseId));
+			Transaction expense =
+					transactionRepository.findByUserIdAndIdAndType(UUID.fromString(UserID),
+							UUID.fromString(expenseId), TransactionType.EXPENSE);
 
 			if (expense == null) {
 				throw new IllegalArgumentException("Expense not found");
@@ -715,7 +717,7 @@ public class ExpenseService {
 
 			expense.setReceiptUrl(key);
 
-			expenseRepository.save(expense);
+			transactionRepository.save(expense);
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
@@ -725,8 +727,8 @@ public class ExpenseService {
 
 	public String GenerateDownloadURLForExpense(String eid) {
 		try {
-			Optional<Expense> expense =
-					expenseRepository.findById(UUID.fromString(eid));
+			Optional<Transaction> expense =
+					transactionRepository.findById(UUID.fromString(eid));
 			if (expense.isEmpty()) {
 				throw new IllegalArgumentException("Expense not found");
 			}
@@ -741,8 +743,8 @@ public class ExpenseService {
 
 	public void DeleteExpenseAttachment(String userId, String expenseId) {
 		try {
-			Expense expense = expenseRepository.findByUserIdAndId(UUID.fromString(userId),
-					UUID.fromString(expenseId));
+			Transaction expense = transactionRepository.findByUserIdAndIdAndType(UUID.fromString(userId),
+					UUID.fromString(expenseId), TransactionType.EXPENSE);
 			if (expense == null) {
 				throw new IllegalArgumentException("Expense not found");
 			}
@@ -752,7 +754,7 @@ public class ExpenseService {
 			}
 			s3Service.deleteObject(receiptUrl);
 			expense.setReceiptUrl(null);
-			expenseRepository.save(expense);
+			transactionRepository.save(expense);
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}

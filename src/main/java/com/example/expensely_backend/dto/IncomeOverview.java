@@ -1,7 +1,7 @@
 package com.example.expensely_backend.dto;
 
 import com.example.expensely_backend.model.Category;
-import com.example.expensely_backend.model.Income;
+import com.example.expensely_backend.model.Transaction;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 
@@ -61,7 +61,7 @@ public class IncomeOverview {
 	                      Iterable<Category> categories,
 	                      List<DailyIncome> dailyIncomes,
 	                      Integer reqMonth,
-	                      Income firstIncome,
+	                      Transaction firstIncome,
 	                      Double lastMonthTotalIncome,
 	                      Double totalBalance) {
 		this.userId = userId;
@@ -87,9 +87,9 @@ public class IncomeOverview {
 				.map(Map.Entry::getKey)
 				.orElse(null);
 
-		if (firstIncome != null && firstIncome.getIncomeDate() != null) {
-			this.earliestStartMonth = firstIncome.getIncomeDate().getMonthValue();
-			this.earliestStartYear = firstIncome.getIncomeDate().getYear();
+		if (firstIncome != null && firstIncome.getTransactionDate() != null) {
+			this.earliestStartMonth = firstIncome.getTransactionDate().getMonthValue();
+			this.earliestStartYear = firstIncome.getTransactionDate().getYear();
 		} else {
 			this.earliestStartMonth = null;
 			this.earliestStartYear = null;

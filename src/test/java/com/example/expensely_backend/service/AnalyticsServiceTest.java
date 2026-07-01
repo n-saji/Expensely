@@ -20,8 +20,7 @@ import static org.mockito.Mockito.*;
 
 class AnalyticsServiceTest {
 
-	private ExpenseRepository expenseRepository;
-	private IncomeRepository incomeRepository;
+	private TransactionRepository transactionRepository;
 	private BudgetRepository budgetRepository;
 	private UserService userService;
 	private ExchangeRateService exchangeRateService;
@@ -32,15 +31,13 @@ class AnalyticsServiceTest {
 
 	@BeforeEach
 	void setUp() {
-		expenseRepository = mock(ExpenseRepository.class);
-		incomeRepository = mock(IncomeRepository.class);
+		transactionRepository = mock(TransactionRepository.class);
 		budgetRepository = mock(BudgetRepository.class);
 		userService = mock(UserService.class);
 		exchangeRateService = mock(ExchangeRateService.class);
 
 		analyticsService = new AnalyticsService(
-				expenseRepository,
-				incomeRepository,
+				transactionRepository,
 				budgetRepository,
 				userService,
 				exchangeRateService
@@ -69,27 +66,29 @@ class AnalyticsServiceTest {
 		catFood.setColor("#FF5733");
 		catFood.setIcon("FastFood");
 
-		// Setup current month expenses
-		Expense e1 = new Expense();
+		// Setup current month transactions (type EXPENSE)
+		Transaction e1 = new Transaction();
 		e1.setId(UUID.randomUUID());
 		e1.setUser(testUser);
 		e1.setCategory(catFood);
 		e1.setAmount(BigDecimal.valueOf(100));
 		e1.setCurrency("USD");
 		e1.setBaseCurrencyAmount(BigDecimal.valueOf(100)); // USD
-		e1.setExpenseDate(LocalDateTime.of(2026, 6, 15, 12, 0));
+		e1.setTransactionDate(LocalDateTime.of(2026, 6, 15, 12, 0));
+		e1.setType(TransactionType.EXPENSE);
 
-		Expense e2 = new Expense();
+		Transaction e2 = new Transaction();
 		e2.setId(UUID.randomUUID());
 		e2.setUser(testUser);
 		e2.setCategory(catFood);
 		e2.setAmount(BigDecimal.valueOf(50));
 		e2.setCurrency("USD");
 		e2.setBaseCurrencyAmount(BigDecimal.valueOf(50)); // USD
-		e2.setExpenseDate(LocalDateTime.of(2026, 6, 16, 15, 0));
+		e2.setTransactionDate(LocalDateTime.of(2026, 6, 16, 15, 0));
+		e2.setType(TransactionType.EXPENSE);
 
-		List<Expense> currentExpenses = Arrays.asList(e1, e2);
-		when(expenseRepository.findByUserIdAndTimeFrameAsc(eq(testUserId), any(), any()))
+		List<Transaction> currentExpenses = Arrays.asList(e1, e2);
+		when(transactionRepository.findByUserIdAndTypeAndTimeFrameAsc(eq(testUserId), eq(TransactionType.EXPENSE), any(), any()))
 				.thenReturn(currentExpenses) // For current month
 				.thenReturn(Collections.emptyList()) // For prev month
 				.thenReturn(Collections.emptyList()); // For last year
@@ -98,7 +97,7 @@ class AnalyticsServiceTest {
 		List<Object[]> histRaw = new ArrayList<>();
 		histRaw.add(new Object[]{2025, 200.0, 3L});
 		histRaw.add(new Object[]{2026, 150.0, 2L});
-		when(expenseRepository.findHistoricalMonthlyDataExpense(testUserId, 6)).thenReturn(histRaw);
+		when(transactionRepository.findHistoricalMonthlyData(testUserId, 6, "EXPENSE")).thenReturn(histRaw);
 
 		// Setup budget data
 		Budget budget = new Budget();

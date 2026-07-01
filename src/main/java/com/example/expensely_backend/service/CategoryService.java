@@ -4,7 +4,8 @@ import com.example.expensely_backend.dto.CategoryDeps;
 import com.example.expensely_backend.globals.globals;
 import com.example.expensely_backend.model.Budget;
 import com.example.expensely_backend.model.Category;
-import com.example.expensely_backend.model.Expense;
+import com.example.expensely_backend.model.Transaction;
+import com.example.expensely_backend.model.TransactionType;
 import com.example.expensely_backend.model.RecurringExpense;
 import com.example.expensely_backend.repository.*;
 import jakarta.transaction.Transactional;
@@ -24,9 +25,7 @@ public class CategoryService {
 	private final UserService userService;
 
 	@Autowired
-	private ExpenseRepository expenseRepository;
-	@Autowired
-	private IncomeRepository incomeRepository;
+	private TransactionRepository transactionRepository;
 	@Autowired
 	private RecurringExpenseRepository recurringExpenseRepository;
 	@Autowired
@@ -77,9 +76,9 @@ public class CategoryService {
 		try {
 			UUID categoryId = UUID.fromString(cId);
 			UUID userId = UUID.fromString(uId);
-			expenseRepository.deleteByUserIdAndCategoryId(userId, categoryId);
+			transactionRepository.deleteByUserIdAndCategoryIdAndType(userId, categoryId, TransactionType.EXPENSE);
 			budgetRepository.deleteByUserIdAndCategoryId(userId, categoryId);
-			incomeRepository.deleteByUserIdAndCategoryId(userId, categoryId);
+			transactionRepository.deleteByUserIdAndCategoryIdAndType(userId, categoryId, TransactionType.INCOME);
 			recurringExpenseRepository.deleteByUserIdAndCategoryId(userId, categoryId);
 			categoryRepository.deleteById(UUID.fromString(cId));
 		} catch (Exception e) {
@@ -153,7 +152,7 @@ public class CategoryService {
 			throw new IllegalArgumentException("User not found");
 		}
 
-		List<Expense> expenses = expenseRepository.findByCategoryIdAndUserId(UUID.fromString(categoryId), user.getId());
+		List<Transaction> expenses = transactionRepository.findByCategoryIdAndUserIdAndType(UUID.fromString(categoryId), user.getId(), TransactionType.EXPENSE);
 		List<RecurringExpense> rExpenses =
 				recurringExpenseRepository.findByCategoryIdAndUserId(UUID.fromString(categoryId), user.getId());
 		Budget budget =
@@ -164,6 +163,5 @@ public class CategoryService {
 				.budgetCount(budget == null ? 0 : 1).build();
 
 	}
-
 
 }

@@ -2,11 +2,12 @@ package com.example.expensely_backend.service;
 
 import com.example.expensely_backend.dto.RecurringExpenseDTO;
 import com.example.expensely_backend.model.Category;
-import com.example.expensely_backend.model.Expense;
+import com.example.expensely_backend.model.Transaction;
+import com.example.expensely_backend.model.TransactionType;
 import com.example.expensely_backend.model.RecurringExpense;
 import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.repository.CategoryRepository;
-import com.example.expensely_backend.repository.ExpenseRepository;
+import com.example.expensely_backend.repository.TransactionRepository;
 import com.example.expensely_backend.repository.RecurringExpenseRepository;
 import com.example.expensely_backend.repository.UserRepository;
 import org.springframework.stereotype.Service;
@@ -22,14 +23,14 @@ public class RecurringExpenseService {
 	private final RecurringExpenseRepository recurringExpenseRepository;
 	private final UserRepository userRepository;
 	private final CategoryRepository categoryRepository;
-	private final ExpenseRepository expenseRepository;
+	private final TransactionRepository transactionRepository;
 	private final ExchangeRateService exchangeRateService;
 
-	public RecurringExpenseService(RecurringExpenseRepository recurringExpenseRepository, UserRepository userRepository, CategoryRepository categoryRepository, ExpenseRepository expenseRepository, ExchangeRateService exchangeRateService) {
+	public RecurringExpenseService(RecurringExpenseRepository recurringExpenseRepository, UserRepository userRepository, CategoryRepository categoryRepository, TransactionRepository transactionRepository, ExchangeRateService exchangeRateService) {
 		this.userRepository = userRepository;
 		this.categoryRepository = categoryRepository;
 		this.recurringExpenseRepository = recurringExpenseRepository;
-		this.expenseRepository = expenseRepository;
+		this.transactionRepository = transactionRepository;
 		this.exchangeRateService = exchangeRateService;
 	}
 
@@ -69,7 +70,7 @@ public class RecurringExpenseService {
 
 		if (recurringExpense.getDate().isEqual(LocalDate.now())) {
 			try {
-				Expense expense = new Expense();
+				Transaction expense = new Transaction();
 				expense.setUser(usr);
 				expense.setCategory(category);
 				expense.setAmount(exchangeRateService.normalizeDisplayAmount(recExpenseDTO.getAmount()));
@@ -78,8 +79,9 @@ public class RecurringExpenseService {
 				expense.setExchangeRate(exchangeRateService.getUsdToCurrencyRate(recurringExpense.getCurrency()));
 				expense.setBaseCurrencyAmount(exchangeRateService.convertToUsd(recExpenseDTO.getAmount(), recurringExpense.getCurrency()));
 				expense.setDescription(recExpenseDTO.getDescription());
-				expense.setExpenseDate(LocalDateTime.now());
-				expenseRepository.save(expense);
+				expense.setTransactionDate(LocalDateTime.now());
+				expense.setType(TransactionType.EXPENSE);
+				transactionRepository.save(expense);
 			} catch (Exception e) {
 				throw new RuntimeException("Failed to create initial expense for recurring expense: " + e.getMessage());
 			}
@@ -160,7 +162,7 @@ public class RecurringExpenseService {
 
 			if (existingExpense.getDate().isEqual(LocalDate.now())) {
 				try {
-					Expense expense = new Expense();
+					Transaction expense = new Transaction();
 					expense.setUser(existingExpense.getUser());
 					expense.setCategory(existingExpense.getCategory());
 					expense.setAmount(exchangeRateService.normalizeDisplayAmount(existingExpense.getAmount()));
@@ -169,8 +171,9 @@ public class RecurringExpenseService {
 					expense.setExchangeRate(exchangeRateService.getUsdToCurrencyRate(existingExpense.getCurrency()));
 					expense.setBaseCurrencyAmount(exchangeRateService.convertToUsd(existingExpense.getAmount(), existingExpense.getCurrency()));
 					expense.setDescription(existingExpense.getDescription());
-					expense.setExpenseDate(LocalDateTime.now());
-					expenseRepository.save(expense);
+					expense.setTransactionDate(LocalDateTime.now());
+					expense.setType(TransactionType.EXPENSE);
+					transactionRepository.save(expense);
 				} catch (Exception e) {
 					throw new RuntimeException("Failed to create initial expense for recurring expense: " + e.getMessage());
 				}
@@ -240,3 +243,4 @@ public class RecurringExpenseService {
 		)).toList();
 	}
 }
+

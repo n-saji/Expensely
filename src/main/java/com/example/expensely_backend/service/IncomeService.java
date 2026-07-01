@@ -7,12 +7,12 @@ import com.example.expensely_backend.dto.IncomeResponse;
 import com.example.expensely_backend.dto.MonthlyCategoryIncome;
 import com.example.expensely_backend.globals.globals;
 import com.example.expensely_backend.model.Category;
-import com.example.expensely_backend.model.Income;
+import com.example.expensely_backend.model.Transaction;
+import com.example.expensely_backend.model.TransactionType;
 import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.repository.CategoryRepository;
-import com.example.expensely_backend.repository.ExpenseRepository;
-import com.example.expensely_backend.repository.IncomeRepository;
-import com.example.expensely_backend.repository.IncomeRepositoryCustomImpl;
+import com.example.expensely_backend.repository.TransactionRepository;
+import com.example.expensely_backend.repository.TransactionRepositoryCustomImpl;
 import com.example.expensely_backend.utils.FormatDate;
 import com.opencsv.CSVWriter;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -39,29 +39,26 @@ public class IncomeService {
 
 	private static final String BASE_CURRENCY = "USD";
 
-	private final IncomeRepository incomeRepository;
+	private final TransactionRepository transactionRepository;
 	private final CategoryService categoryService;
 	private final UserService userService;
-	private final IncomeRepositoryCustomImpl incomeRepositoryCustomImpl;
+	private final TransactionRepositoryCustomImpl transactionRepositoryCustomImpl;
 	private final CategoryRepository categoryRepository;
-	private final ExpenseRepository expenseRepository;
 	private final Executor expenseExecutor;
 	private final ExchangeRateService exchangeRateService;
 
-	public IncomeService(IncomeRepository incomeRepository,
+	public IncomeService(TransactionRepository transactionRepository,
 	                     CategoryService categoryService,
 	                     UserService userService,
-	                     IncomeRepositoryCustomImpl incomeRepositoryCustomImpl,
+	                     TransactionRepositoryCustomImpl transactionRepositoryCustomImpl,
 	                     CategoryRepository categoryRepository,
-	                     ExpenseRepository expenseRepository,
 	                     @Qualifier("expenseExecutor") Executor expenseExecutor,
 	                     ExchangeRateService exchangeRateService) {
-		this.incomeRepository = incomeRepository;
+		this.transactionRepository = transactionRepository;
 		this.categoryService = categoryService;
 		this.userService = userService;
-		this.incomeRepositoryCustomImpl = incomeRepositoryCustomImpl;
+		this.transactionRepositoryCustomImpl = transactionRepositoryCustomImpl;
 		this.categoryRepository = categoryRepository;
-		this.expenseRepository = expenseRepository;
 		this.expenseExecutor = expenseExecutor;
 		this.exchangeRateService = exchangeRateService;
 	}
@@ -74,7 +71,7 @@ public class IncomeService {
 		return exchangeRateService.getUsdToCurrencyRate(currency);
 	}
 
-	private void applyCurrencySnapshot(Income income, String currency) {
+	private void applyCurrencySnapshot(Transaction income, String currency) {
 		income.setAmount(normalizeAmount(income.getAmount()));
 		income.setCurrency(currency.toUpperCase());
 		income.setBaseCurrency(BASE_CURRENCY);
@@ -83,7 +80,7 @@ public class IncomeService {
 		income.setBaseCurrencyAmount(exchangeRateService.convertToUsd(income.getAmount(), currency));
 	}
 
-	private List<IncomeResponse> mapIncomesToResponse(List<Income> incomes, String displayCurrency) {
+	private List<IncomeResponse> mapIncomesToResponse(List<Transaction> incomes, String displayCurrency) {
 		BigDecimal displayRate = resolveUsdRate(displayCurrency);
 		return incomes.stream()
 				.map(income -> {
@@ -95,7 +92,7 @@ public class IncomeService {
 				.collect(Collectors.toList());
 	}
 
-	private IncomeResponse mapIncomeToResponse(Income income, String displayCurrency) {
+	private IncomeResponse mapIncomeToResponse(Transaction income, String displayCurrency) {
 		BigDecimal displayRate = resolveUsdRate(displayCurrency);
 		BigDecimal displayAmount = income.getBaseCurrencyAmount() == null
 				? normalizeAmount(income.getAmount())
@@ -108,11 +105,11 @@ public class IncomeService {
 	}
 
 	private List<IncomeResponse> getIncomeByUserIdAndStartDateAndEndDate(UUID userId, LocalDateTime startDate, LocalDateTime endDate, String order) {
-		List<Income> incomes;
+		List<Transaction> incomes;
 		if (order == null || order.equalsIgnoreCase("desc")) {
-			incomes = incomeRepository.findByUserIdAndTimeFrameDesc(userId, startDate, endDate);
+			incomes = transactionRepository.findByUserIdAndTypeAndTimeFrameDesc(userId, TransactionType.INCOME, startDate, endDate);
 		} else if (order.equalsIgnoreCase("asc")) {
-			incomes = incomeRepository.findByUserIdAndTimeFrameAsc(userId, startDate, endDate);
+			incomes = transactionRepository.findByUserIdAndTypeAndTimeFrameAsc(userId, TransactionType.INCOME, startDate, endDate);
 		} else {
 			throw new IllegalArgumentException("Order must be 'asc' or 'desc'");
 		}
@@ -123,11 +120,11 @@ public class IncomeService {
 	}
 
 	private List<MonthlyCategoryIncome> getMonthlyCategoryIncome(UUID userId, LocalDateTime startDate, LocalDateTime endDate) {
-		return incomeRepository.findMonthlyCategoryIncomeByUserId(userId, startDate, endDate);
+		return transactionRepository.findMonthlyCategoryIncomeByUserId(userId, startDate, endDate);
 	}
 
 	private List<DailyIncome> getDailyIncome(UUID userId, LocalDateTime startDate, LocalDateTime endDate) {
-		return incomeRepository.findDailyIncomeByUserIdAndTimeFrame(userId, startDate, endDate);
+		return transactionRepository.findDailyIncomeByUserIdAndTimeFrame(userId, startDate, endDate);
 	}
 
 	private record DateRange(LocalDateTime startDate, LocalDateTime endDate) {
@@ -211,9 +208,9 @@ public class IncomeService {
 				CompletableFuture.supplyAsync(() ->
 						getDailyIncome(activeUserId, reqStart, reqEnd), expenseExecutor);
 
-		CompletableFuture<Income> firstIncome =
+		CompletableFuture<Transaction> firstIncome =
 				CompletableFuture.supplyAsync(() ->
-						incomeRepository.findFirstByUserIdOrderByIncomeDateAsc(activeUserId), expenseExecutor);
+						transactionRepository.findFirstByUserIdAndTypeOrderByTransactionDateAsc(activeUserId, TransactionType.INCOME), expenseExecutor);
 
 		CompletableFuture<Double> prevMonthTotal =
 				CompletableFuture.supplyAsync(() ->
@@ -224,8 +221,9 @@ public class IncomeService {
 
 		CompletableFuture<Double> totalIncomeAllTime =
 				CompletableFuture.supplyAsync(() -> {
-					Double total = incomeRepository.getTotalIncomeByUserId(
+					Double total = transactionRepository.getTotalAmountByUserId(
 							activeUserId,
+							"INCOME",
 							LocalDateTime.of(1970, 1, 1, 0, 0),
 							LocalDateTime.now());
 					return total == null ? 0.0 : total;
@@ -233,8 +231,9 @@ public class IncomeService {
 
 		CompletableFuture<Double> totalExpenseAllTime =
 				CompletableFuture.supplyAsync(() -> {
-					Double total = expenseRepository.getTotalExpenseByUserId(
+					Double total = transactionRepository.getTotalAmountByUserId(
 							activeUserId,
+							"EXPENSE",
 							LocalDateTime.of(1970, 1, 1, 0, 0),
 							LocalDateTime.now());
 					return total == null ? 0.0 : total;
@@ -314,7 +313,7 @@ public class IncomeService {
 				totalIncomeDisplay - totalExpenseDisplay);
 	}
 
-	public Income save(Income income) {
+	public Transaction save(Transaction income) {
 		if (income.getCategory() == null || income.getCategory().getId() == null) {
 			throw new IllegalArgumentException("Category must be provided");
 		}
@@ -330,32 +329,33 @@ public class IncomeService {
 		User user = userService.GetActiveUserById(income.getUser().getId().toString());
 		income.setUser(user);
 
-		if (income.getIncomeDate() == null) {
-			income.setIncomeDate(LocalDateTime.now());
+		if (income.getTransactionDate() == null) {
+			income.setTransactionDate(LocalDateTime.now());
 		}
 
 		String currency = income.getCurrency();
 		if (currency == null || currency.isBlank()) {
 			currency = user.getCurrency();
 		}
+		income.setType(TransactionType.INCOME);
 		applyCurrencySnapshot(income, currency);
 
-		return incomeRepository.save(income);
+		return transactionRepository.save(income);
 	}
 
 	public IncomeResponse getIncomeResponseById(String id) {
-		Income income = getIncomeById(id);
+		Transaction income = getIncomeById(id);
 		String displayCurrency = income.getUser() == null ? BASE_CURRENCY : income.getUser().getCurrency();
 		return mapIncomeToResponse(income, displayCurrency);
 	}
 
-	public Income getIncomeById(String id) {
-		return incomeRepository.findById(UUID.fromString(id))
+	public Transaction getIncomeById(String id) {
+		return transactionRepository.findById(UUID.fromString(id))
 				.orElseThrow(() -> new IllegalArgumentException("Income not found"));
 	}
 
-	public Income getIncomeByIdForUser(String id, String userId) {
-		Income income = getIncomeById(id);
+	public Transaction getIncomeByIdForUser(String id, String userId) {
+		Transaction income = getIncomeById(id);
 		User user = userService.GetActiveUserById(userId);
 		if (!income.getUser().getId().equals(user.getId())) {
 			throw new IllegalArgumentException("Income does not belong to user");
@@ -365,25 +365,25 @@ public class IncomeService {
 
 	public void deleteIncomeById(String id) {
 		try {
-			if (!incomeRepository.existsById(UUID.fromString(id))) {
+			if (!transactionRepository.existsById(UUID.fromString(id))) {
 				throw new IllegalArgumentException("Income not found");
 			}
-			incomeRepository.deleteById(UUID.fromString(id));
+			transactionRepository.deleteById(UUID.fromString(id));
 		} catch (Exception e) {
 			throw new IllegalArgumentException("Error deleting income: " + e.getMessage());
 		}
 	}
 
 	public void deleteIncomeByIdForUser(String id, String userId) {
-		Income income = getIncomeByIdForUser(id, userId);
+		Transaction income = getIncomeByIdForUser(id, userId);
 		try {
-			incomeRepository.deleteById(income.getId());
+			transactionRepository.deleteById(income.getId());
 		} catch (Exception e) {
 			throw new IllegalArgumentException("Error deleting income: " + e.getMessage());
 		}
 	}
 
-	public void deleteByUserIDAndIncomeIds(String userId, List<Income> incomes) {
+	public void deleteByUserIDAndIncomeIds(String userId, List<Transaction> incomes) {
 		User user = userService.GetActiveUserById(userId);
 		if (user == null) {
 			throw new IllegalArgumentException("User not found");
@@ -396,13 +396,13 @@ public class IncomeService {
 			incomes.set(i, getIncomeById(incomes.get(i).getId().toString()));
 		}
 
-		for (Income income : incomes) {
+		for (Transaction income : incomes) {
 			if (!income.getUser().getId().equals(user.getId())) {
 				throw new IllegalArgumentException("Income does not belong to user");
 			}
 		}
 
-		incomeRepository.deleteAll(incomes);
+		transactionRepository.deleteAll(incomes);
 	}
 
 	public List<IncomeResponse> getIncomesByUserId(String userId) {
@@ -410,7 +410,7 @@ public class IncomeService {
 		if (user == null) {
 			throw new IllegalArgumentException("User not found");
 		}
-		return mapIncomesToResponse(incomeRepository.findByUserId(user.getId()), user.getCurrency());
+		return mapIncomesToResponse(transactionRepository.findByUserIdAndType(user.getId(), TransactionType.INCOME), user.getCurrency());
 	}
 
 	public List<IncomeResponse> getIncomesByCategoryIdAndUserID(String categoryId, String userId) {
@@ -422,14 +422,14 @@ public class IncomeService {
 		if (user == null) {
 			throw new IllegalArgumentException("User not found");
 		}
-		return mapIncomesToResponse(incomeRepository.findByCategoryIdAndUserId(category.getId(), user.getId()), user.getCurrency());
+		return mapIncomesToResponse(transactionRepository.findByCategoryIdAndUserIdAndType(category.getId(), user.getId(), TransactionType.INCOME), user.getCurrency());
 	}
 
-	public Income updateIncome(Income income) {
+	public Transaction updateIncome(Transaction income) {
 		if (income.getId() == null) {
 			throw new IllegalArgumentException("Income ID must be provided");
 		}
-		Income oldIncome = getIncomeById(income.getId().toString());
+		Transaction oldIncome = getIncomeById(income.getId().toString());
 
 		if (income.getCategory() != null && income.getCategory().getId() != null
 				&& !income.getCategory().getId().equals(oldIncome.getCategory().getId())) {
@@ -458,11 +458,11 @@ public class IncomeService {
 		if (income.getDescription() != null && !income.getDescription().equals(oldIncome.getDescription())) {
 			oldIncome.setDescription(income.getDescription());
 		}
-		if (income.getIncomeDate() != null && !income.getIncomeDate().equals(oldIncome.getIncomeDate())) {
-			oldIncome.setIncomeDate(income.getIncomeDate());
+		if (income.getTransactionDate() != null && !income.getTransactionDate().equals(oldIncome.getTransactionDate())) {
+			oldIncome.setTransactionDate(income.getTransactionDate());
 		}
 
-		return incomeRepository.save(oldIncome);
+		return transactionRepository.save(oldIncome);
 	}
 
 	public List<IncomeResponse> getIncomeByUserIdAndStartDateAndEndDate(String userId, LocalDateTime startDate, LocalDateTime endDate, String order) {
@@ -536,7 +536,7 @@ public class IncomeService {
 		DateRange range = resolveDateRange(count, type);
 
 		LinkedHashMap<String, Double> baseTotals =
-				incomeRepositoryCustomImpl.getMonthlyIncomeFromTillTo(user.getId(), range.startDate(), range.endDate());
+				transactionRepositoryCustomImpl.getMonthlyAmountFromTillTo(user.getId(), TransactionType.INCOME, range.startDate(), range.endDate());
 		LinkedHashMap<String, Double> displayTotals = new LinkedHashMap<>();
 		for (Map.Entry<String, Double> entry : baseTotals.entrySet()) {
 			BigDecimal converted = BigDecimal.valueOf(entry.getValue())
@@ -558,7 +558,7 @@ public class IncomeService {
 		DateRange range = resolveDateRange(count, type);
 
 		List<MonthlyCategoryIncome> dbRes =
-				incomeRepositoryCustomImpl.getMonthlyCategoryIncomeFromTillTo(user.getId(), range.startDate(), range.endDate());
+				transactionRepositoryCustomImpl.getMonthlyCategoryIncomeFromTillTo(user.getId(), range.startDate(), range.endDate());
 
 		java.util.Map<String, java.util.Map<String, Double>> monthlyCategoryIncome = new LinkedHashMap<>();
 
@@ -594,7 +594,7 @@ public class IncomeService {
 		LocalDateTime startDate = FormatDate.formatStartDate(LocalDateTime.of(year, month, 1, 0, 0), false);
 		YearMonth req_ym = YearMonth.of(year, month);
 		LocalDateTime endDate = req_ym.atEndOfMonth().atTime(23, 59, 59);
-		Double total = incomeRepository.getTotalIncomeByUserId(userIdUUID, startDate, endDate);
+		Double total = transactionRepository.getTotalAmountByUserId(userIdUUID, "INCOME", startDate, endDate);
 		return total == null ? 0.0 : total;
 	}
 
@@ -602,16 +602,16 @@ public class IncomeService {
 		UUID userIdUUID = UUID.fromString(userId);
 		LocalDateTime startDate = LocalDateTime.of(year, 1, 1, 0, 0);
 		LocalDateTime endDate = LocalDateTime.of(year, 12, 31, 23, 59, 59);
-		Double total = incomeRepository.getTotalIncomeByUserId(userIdUUID, startDate, endDate);
+		Double total = transactionRepository.getTotalAmountByUserId(userIdUUID, "INCOME", startDate, endDate);
 		return total == null ? 0.0 : total;
 	}
 
-	public Income getFirstIncome(String userId) {
+	public Transaction getFirstIncome(String userId) {
 		User user = userService.GetActiveUserById(userId);
 		if (user == null) {
 			throw new IllegalArgumentException("User not found");
 		}
-		return incomeRepository.findFirstByUserIdOrderByIncomeDateAsc(user.getId());
+		return transactionRepository.findFirstByUserIdAndTypeOrderByTransactionDateAsc(user.getId(), TransactionType.INCOME);
 	}
 
 	public IncomeResList fetchIncomesWithConditions(String userId, LocalDateTime startDate,
@@ -628,7 +628,7 @@ public class IncomeService {
 		}
 		int offset = (page - 1) * limit;
 
-		List<Income> incomes;
+		List<Transaction> incomes;
 		UUID categoryUUID = null;
 		if (q == null) q = "";
 		if (order == null) order = "desc";
@@ -642,9 +642,9 @@ public class IncomeService {
 			categoryUUID = category.getId();
 		}
 
-		incomes = incomeRepositoryCustomImpl.findIncomes(user.getId(), startDate, endDate,
+		incomes = transactionRepositoryCustomImpl.findTransactions(user.getId(), TransactionType.INCOME, startDate, endDate,
 				categoryUUID, q, offset, limit, customSortBy, customSortOrder, order);
-		totalElements = incomeRepositoryCustomImpl.countIncomes(user.getId(), startDate, endDate,
+		totalElements = transactionRepositoryCustomImpl.countTransactions(user.getId(), TransactionType.INCOME, startDate, endDate,
 				categoryUUID, q);
 
 		totalPages = (int) Math.ceil((double) totalElements / limit);
@@ -656,7 +656,7 @@ public class IncomeService {
 	public String exportIncomesToCSV(String userId, LocalDateTime startDate, LocalDateTime endDate) throws IOException {
 		UUID userIdUUID = UUID.fromString(userId);
 		User user = userService.GetActiveUserById(userId);
-		List<Income> incomes = incomeRepository.findByUserIdAndTimeFrameAsc(userIdUUID, startDate, endDate);
+		List<Transaction> incomes = transactionRepository.findByUserIdAndTypeAndTimeFrameAsc(userIdUUID, TransactionType.INCOME, startDate, endDate);
 		String displayCurrency = user == null ? BASE_CURRENCY : user.getCurrency();
 		BigDecimal displayRate = resolveUsdRate(displayCurrency);
 
@@ -665,12 +665,12 @@ public class IncomeService {
 
 		writer.writeNext(new String[]{"Date", "Description", "Amount (in " + displayCurrency + ")", "Category"});
 
-		for (Income income : incomes) {
+		for (Transaction income : incomes) {
 			BigDecimal displayAmount = income.getBaseCurrencyAmount() == null
 					? normalizeAmount(income.getAmount())
 					: income.getBaseCurrencyAmount().multiply(displayRate).setScale(2, RoundingMode.HALF_UP);
 			writer.writeNext(new String[]{
-					income.getIncomeDate().toString(),
+					income.getTransactionDate().toString(),
 					income.getDescription(),
 					displayAmount.toString(),
 					income.getCategory().getName()

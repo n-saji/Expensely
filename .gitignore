@@ -6,6 +6,7 @@ HELP.md
 .env
 .DS_Store
 /k8
+/scratch_files/
 
 ### STS ###
 .apt_generated

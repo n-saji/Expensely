@@ -23,21 +23,19 @@ public class UserService {
 	private final ExpiredTokenRepository expiredTokenRepository;
 	private final BudgetRepository budgetRepository;
 	private final CategoryRepository categoryRepository;
-	private final ExpenseRepository expenseRepository;
-	private final IncomeRepository incomeRepository;
+	private final TransactionRepository transactionRepository;
 	private final RecurringExpenseRepository recurringExpenseRepository;
 
 
 	public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, ExpiredTokenRepository expiredTokenRepository,
-	                   BudgetRepository budgetRepository, CategoryRepository categoryRepository, ExpenseRepository expenseRepository,
-	                   IncomeRepository incomeRepository, RecurringExpenseRepository recurringExpenseRepository) {
+	                   BudgetRepository budgetRepository, CategoryRepository categoryRepository, TransactionRepository transactionRepository,
+	                   RecurringExpenseRepository recurringExpenseRepository) {
 		this.userRepository = userRepository;
 		this.passwordEncoder = passwordEncoder;
 		this.expiredTokenRepository = expiredTokenRepository;
 		this.budgetRepository = budgetRepository;
 		this.categoryRepository = categoryRepository;
-		this.expenseRepository = expenseRepository;
-		this.incomeRepository = incomeRepository;
+		this.transactionRepository = transactionRepository;
 		this.recurringExpenseRepository = recurringExpenseRepository;
 	}
 
@@ -180,8 +178,7 @@ public class UserService {
 		try {
 			expiredTokenRepository.deleteAllByUserId(user.getId());
 			budgetRepository.deleteAllByUserId(user.getId());
-			expenseRepository.deleteAllByUserId(user.getId());
-			incomeRepository.deleteAllByUserId(user.getId());
+			transactionRepository.deleteAllByUserId(user.getId());
 			categoryRepository.deleteAllByUserId(user.getId());
 			recurringExpenseRepository.deleteAllByUserId(user.getId());
 			userRepository.delete(user);

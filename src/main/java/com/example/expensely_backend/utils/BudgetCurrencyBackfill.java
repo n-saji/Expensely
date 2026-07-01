@@ -19,7 +19,7 @@ import java.util.List;
 
 @Component
 public class BudgetCurrencyBackfill {
-	private static final Logger logger = LoggerFactory.getLogger(ExpenseCurrencyBackfill.class);
+	private static final Logger logger = LoggerFactory.getLogger(BudgetCurrencyBackfill.class);
 	private static final String BASE_CURRENCY = "USD";
 
 	private final BudgetRepository budgetRepository;
