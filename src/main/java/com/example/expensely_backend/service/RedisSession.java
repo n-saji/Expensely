@@ -175,13 +175,18 @@ public class RedisSession {
 			Set<String> sessions = redis.smembers(setKey);
 			Map<String, Map<String, String>> result = new HashMap<>();
 			for (String session : sessions) {
-				Map<String, String> response = new HashMap<>(redis.hgetAll(sessionKey(session)));
-				if (session.equals(myRefreshToken)) {
-					response.put("current", "true");
+				Map<String, String> response = redis.hgetAll(sessionKey(session));
+				if (response == null || response.isEmpty()) {
+					redis.srem(setKey, session);
 				} else {
-					response.put("current", "false");
+					Map<String, String> responseCopy = new HashMap<>(response);
+					if (session.equals(myRefreshToken)) {
+						responseCopy.put("current", "true");
+					} else {
+						responseCopy.put("current", "false");
+					}
+					result.put(session, responseCopy);
 				}
-				result.put(session, response);
 			}
 			return result;
 		} catch (Exception e) {
@@ -203,11 +208,21 @@ public class RedisSession {
 				for (String key : result.getResult()) {
 					// key is "user:sessions:{userId}", strip the prefix to get userId
 					String userId = key.substring(USER_SESSIONS_PREFIX.length());
-					userRepository.findById(UUID.fromString(userId)).ifPresent(u -> {
-						u.setPassword(null);
-						activeUsers.add(u);
-					});
-
+					Set<String> sessions = redis.smembers(key);
+					boolean hasActiveSession = false;
+					for (String session : sessions) {
+						if (!redis.exists(sessionKey(session))) {
+							redis.srem(key, session);
+						} else {
+							hasActiveSession = true;
+						}
+					}
+					if (hasActiveSession) {
+						userRepository.findById(UUID.fromString(userId)).ifPresent(u -> {
+							u.setPassword(null);
+							activeUsers.add(u);
+						});
+					}
 				}
 			} while (!cursor.equals("0"));
 
