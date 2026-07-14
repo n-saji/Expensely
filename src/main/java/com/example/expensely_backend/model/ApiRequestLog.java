@@ -26,22 +26,24 @@ public class ApiRequestLog {
     private String path;
     private String queryString;
     private String ipAddress;
+
+    @Column(columnDefinition = "TEXT")
     private String userAgent;
+
     private Integer statusCode;
     private Long durationMs;
 
-    @Lob
+    @Column(columnDefinition = "TEXT")
     private String requestHeaders;
 
-    @Lob
+    @Column(columnDefinition = "TEXT")
     private String responseHeaders;
 
-    @Lob
+    @Column(columnDefinition = "TEXT")
     private String requestBody;
 
-    @Lob
+    @Column(columnDefinition = "TEXT")
     private String responseBody;
 
     private LocalDateTime createdAt = LocalDateTime.now();
 }
-

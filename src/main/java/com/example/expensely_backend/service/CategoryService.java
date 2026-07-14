@@ -7,6 +7,7 @@ import com.example.expensely_backend.model.Category;
 import com.example.expensely_backend.model.Transaction;
 import com.example.expensely_backend.model.TransactionType;
 import com.example.expensely_backend.model.RecurringExpense;
+import com.example.expensely_backend.model.Reminder;
 import com.example.expensely_backend.repository.*;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +31,8 @@ public class CategoryService {
 	private RecurringExpenseRepository recurringExpenseRepository;
 	@Autowired
 	private BudgetRepository budgetRepository;
+	@Autowired
+	private ReminderRepository reminderRepository;
 
 
 	public CategoryService(CategoryRepository categoryRepository, UserService userService
@@ -80,6 +83,8 @@ public class CategoryService {
 			budgetRepository.deleteByUserIdAndCategoryId(userId, categoryId);
 			transactionRepository.deleteByUserIdAndCategoryIdAndType(userId, categoryId, TransactionType.INCOME);
 			recurringExpenseRepository.deleteByUserIdAndCategoryId(userId, categoryId);
+			List<Reminder> reminders = reminderRepository.findByCategoryIdAndUserIdAndDeletedAtIsNull(categoryId, userId);
+			reminderRepository.deleteAll(reminders);
 			categoryRepository.deleteById(UUID.fromString(cId));
 		} catch (Exception e) {
 			throw new IllegalArgumentException("Error deleting category: " + e.getMessage());
@@ -157,10 +162,13 @@ public class CategoryService {
 				recurringExpenseRepository.findByCategoryIdAndUserId(UUID.fromString(categoryId), user.getId());
 		Budget budget =
 				budgetRepository.findActiveBudgetByUserIdAndCategoryIdForUpdate(user.getId(), UUID.fromString(categoryId));
+		long reminderCount = reminderRepository.countByCategoryIdAndUserIdAndDeletedAtIsNull(UUID.fromString(categoryId), user.getId());
 		return CategoryDeps.builder()
 				.expenseCount(expenses.size())
 				.recurringExpenseCount(rExpenses.size())
-				.budgetCount(budget == null ? 0 : 1).build();
+				.budgetCount(budget == null ? 0 : 1)
+				.reminderCount((int) reminderCount)
+				.build();
 
 	}
 

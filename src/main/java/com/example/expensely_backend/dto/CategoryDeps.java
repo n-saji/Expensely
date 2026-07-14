@@ -14,4 +14,5 @@ public class CategoryDeps {
 	private int expenseCount;
 	private int incomeCount;
 	private int recurringExpenseCount;
+	private int reminderCount;
 }

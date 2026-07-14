@@ -19,6 +19,7 @@ public class Messages {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
     private UUID userId;
+    @Column(columnDefinition = "TEXT")
     private String message;
     private globals.MessageType type;
     private boolean isDelivered = false;

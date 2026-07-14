@@ -79,6 +79,64 @@ public class Mailgun {
 
     }
 
+    public void sendHtmlMessage(String to, String subject, String htmlContent) {
+        String apiKey = System.getenv("MAILGUN_API_KEY");
+        String domain = "expensely.store";
+        String from = "Expensely <notifications@" + domain + ">";
+
+        if (apiKey == null || apiKey.isEmpty()) {
+            throw new IllegalStateException("Mailgun API key is not set in environment variables.");
+        }
+        if (to == null || to.isEmpty()) {
+            throw new IllegalArgumentException("Recipient email address is required.");
+        }
+        if (subject == null) {
+            throw new IllegalArgumentException("Email subject is required.");
+        }
+        if (htmlContent == null) {
+            throw new IllegalArgumentException("Email HTML content is required.");
+        }
+
+        try {
+            URL url = new URL("https://api.mailgun.net/v3/" + domain + "/messages");
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setDoOutput(true);
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+
+            String auth = "api:" + apiKey;
+            String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes());
+            conn.setRequestProperty("Authorization", "Basic " + encodedAuth);
+
+            String data = "from=" + urlEncode(from) +
+                    "&to=" + urlEncode(to) +
+                    "&subject=" + urlEncode(subject) +
+                    "&html=" + urlEncode(htmlContent) +
+                    "&text=" + urlEncode("Please view this email in an HTML-compatible client.");
+
+            OutputStream os = conn.getOutputStream();
+            os.write(data.getBytes());
+            os.flush();
+            os.close();
+
+            int responseCode = conn.getResponseCode();
+
+            if (responseCode == 200) {
+                dbLogService.logMessage("utils", getClass().getName(), "sendHtmlMessage",
+                        "HTML Email sent successfully!");
+            } else {
+                dbLogService.logError("utils", getClass().getName(), "sendHtmlMessage",
+                        "Failed to send HTML email. Response Message: " + conn.getResponseMessage(), null);
+                throw new RuntimeException("Failed to send HTML email. Response Code: " + responseCode);
+            }
+
+        } catch (Exception e) {
+            dbLogService.logError("utils", getClass().getName(), "sendHtmlMessage",
+                    "Error sending HTML email: " + e.getMessage(), e);
+            throw new RuntimeException("Error sending HTML email: " + e.getMessage(), e);
+        }
+    }
+
     private String urlEncode(String value) {
         try {
             return java.net.URLEncoder.encode(value, java.nio.charset.StandardCharsets.UTF_8);

@@ -30,17 +30,17 @@ public class FunctionLog {
     private Long durationMs;
     private String threadName;
 
-    @Lob
+    @Column(columnDefinition = "TEXT")
     private String arguments;
 
-    @Lob
+    @Column(columnDefinition = "TEXT")
     private String result;
 
+    @Column(columnDefinition = "TEXT")
     private String errorMessage;
 
-    @Lob
+    @Column(columnDefinition = "TEXT")
     private String stackTrace;
 
     private LocalDateTime createdAt = LocalDateTime.now();
 }
-
