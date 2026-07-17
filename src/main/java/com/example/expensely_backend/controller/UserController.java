@@ -90,9 +90,18 @@ public class UserController {
 				.sameSite("None")
 				.build();
 
+		ResponseCookie clearAdminRefresh = ResponseCookie.from("adminRefreshToken", "")
+				.path("/")
+				.maxAge(0)
+				.httpOnly(true)
+				.secure(true)
+				.sameSite("None")
+				.build();
+
 		HttpHeaders headers = new HttpHeaders();
 		headers.add(HttpHeaders.SET_COOKIE, clearAccess.toString());
 		headers.add(HttpHeaders.SET_COOKIE, clearRefresh.toString());
+		headers.add(HttpHeaders.SET_COOKIE, clearAdminRefresh.toString());
 		return headers;
 	}
 
@@ -323,19 +332,28 @@ public class UserController {
 
 
 	@GetMapping("/me")
-	public ResponseEntity<?> getUserById(Authentication authentication) {
+	public ResponseEntity<?> getUserById(Authentication authentication, HttpServletRequest request) {
 		String userId = (String) authentication.getPrincipal();
 		if (userId == null) {
-			return ResponseEntity.status(401).body(new UserRes(null, "Unauthorized"));
+			return ResponseEntity.status(401).body(new UserRes(null, "Unauthorized", false));
 		}
 		try {
 			User user = userService.GetActiveUserById(userId);
 			if (user == null) {
-				return ResponseEntity.status(404).body(new UserRes(null, "User not found"));
+				return ResponseEntity.status(404).body(new UserRes(null, "User not found", false));
 			}
-			return ResponseEntity.ok(new UserRes(user, null));
+			boolean isImpersonated = false;
+			if (request.getCookies() != null) {
+				for (var cookie : request.getCookies()) {
+					if (cookie.getName().equals("adminRefreshToken")) {
+						isImpersonated = true;
+						break;
+					}
+				}
+			}
+			return ResponseEntity.ok(new UserRes(user, null, isImpersonated));
 		} catch (Exception e) {
-			return ResponseEntity.badRequest().body(new UserRes(null, e.getMessage()));
+			return ResponseEntity.badRequest().body(new UserRes(null, e.getMessage(), false));
 		}
 	}
 
