@@ -33,12 +33,13 @@ public class UserController {
 	private final DbLogService dbLogService;
 	private final RedisSession redisSession;
 	private final S3Service s3Service;
+	private final OAuthService oAuthService;
 
 	public UserController(UserService userService, JwtUtil jwtUtil,
 	                      ExpiredTokenService expiredTokenService, Environment environment, Mailgun mailgun,
 	                      EmailOtpService emailOtpService,
 	                      DbLogService dbLogService, RedisSession redisSession,
-	                      S3Service s3Service) {
+	                      S3Service s3Service, OAuthService oAuthService) {
 		this.userService = userService;
 		this.jwtUtil = jwtUtil;
 		this.expiredTokenService = expiredTokenService;
@@ -48,6 +49,7 @@ public class UserController {
 		this.dbLogService = dbLogService;
 		this.redisSession = redisSession;
 		this.s3Service = s3Service;
+		this.oAuthService = oAuthService;
 	}
 
 	private String getCookieValue(HttpServletRequest request, String name) {
@@ -519,104 +521,125 @@ public class UserController {
 
 	@PostMapping("/verify-oauth-login")
 	public ResponseEntity<?> verifyOAuthLogin(HttpServletRequest request,
-	                                          @RequestHeader("Authorization") String authHeader, @RequestBody User user) {
-		String token = authHeader.replace("Bearer ", "");
+	                                          @RequestHeader(value = "Authorization", required = false) String authHeader,
+	                                          @RequestBody OAuthLoginRequest oAuthRequest) {
 		try {
-			GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
-					new NetHttpTransport(),
-					JacksonFactory.getDefaultInstance()
-			)
-					.setAudience(Collections.singletonList(environment.getProperty(
-							"GOOGLE_CLIENT_ID"
-					)))
-					.build();
+			String provider = oAuthRequest.getProvider() != null ? oAuthRequest.getProvider() : "google";
+			String providerUserId = oAuthRequest.getProviderUserId();
+			String email = oAuthRequest.getEmail();
+			String name = oAuthRequest.getName();
 
-			GoogleIdToken idToken = verifier.verify(token);
-			if (idToken != null) {
-				GoogleIdToken.Payload payload = idToken.getPayload();
+			if (authHeader != null && authHeader.startsWith("Bearer ") && provider.equalsIgnoreCase("google")) {
+				String token = authHeader.replace("Bearer ", "");
 				try {
-					if (user.getEmail() == null && user.getPhone() == null) {
-						return ResponseEntity.badRequest().body(new AuthResponse("Email or Phone is required!", null, "email or phone is required"));
+					GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
+							new NetHttpTransport(),
+							JacksonFactory.getDefaultInstance()
+					)
+							.setAudience(Collections.singletonList(environment.getProperty("GOOGLE_CLIENT_ID")))
+							.build();
+					GoogleIdToken idToken = verifier.verify(token);
+					if (idToken != null) {
+						GoogleIdToken.Payload payload = idToken.getPayload();
+						if (email == null || email.isBlank()) email = payload.getEmail();
+						if (name == null || name.isBlank()) name = (String) payload.get("name");
+						if (providerUserId == null || providerUserId.isBlank()) providerUserId = payload.getSubject();
 					}
-
-
-					if (userService.isUserPresent(user.getEmail(), null)) {
-						User existingUser = userService.GetUserByEmail(user.getEmail());
-						if (!existingUser.isEmailVerified()) {
-							existingUser.setEmailVerified(true);
-							existingUser.setOauth2User(true);
-							userService.UpdateUser(existingUser);
-						}
-						user.setOauth2User(true);
-						Map<String, String> result =
-								jwtUtil.GenerateToken(existingUser.getId().toString());
-						String accessToken = result.get("accessToken");
-						String refreshToken = result.get("refreshToken");
-						ResponseCookie accessCookie = ResponseCookie.from("accessToken", accessToken)
-								.httpOnly(true)
-								.secure(true)
-								.path("/")
-								.sameSite("None")
-								.maxAge(15 * 60)  // 15 mins
-								.build();
-
-						ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", refreshToken)
-								.httpOnly(true)
-								.secure(true)
-								.path("/")
-								.sameSite("None")
-								.maxAge(7 * 24 * 60 * 60) // 7 days
-								.build();
-
-						redisSession.createSession(existingUser.getId().toString(), request.getHeader("User-Agent"), refreshToken, request.getHeader("X-Forwarded-For").split(",")[0]);
-						return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, accessCookie.toString()).header(
-								HttpHeaders.SET_COOKIE, refreshCookie.toString()).body(new AuthResponse("User authenticated " +
-								"successfully!", existingUser.getId().toString(), ""));
-					} else {
-						// Register new user
-						user.setOauth2User(true);
-						user.setEmailVerified(true);
-						user.setProfileComplete(false);
-						User res = userService.insertUser(user);
-
-						Map<String, String> result =
-								jwtUtil.GenerateToken(res.getId().toString());
-						String accessToken = result.get("accessToken");
-						String refreshToken = result.get("refreshToken");
-						ResponseCookie accessCookie = ResponseCookie.from("accessToken", accessToken)
-								.httpOnly(true)
-								.secure(true)
-								.path("/")
-								.sameSite("None")
-								.maxAge(15 * 60)  // 15 mins
-								.build();
-
-						ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", refreshToken)
-								.httpOnly(true)
-								.secure(true)
-								.path("/")
-								.sameSite("None")
-								.maxAge(7 * 24 * 60 * 60) // 7 days
-								.build();
-
-						redisSession.createSession(res.getId().toString(),
-								request.getHeader("User-Agent"), refreshToken
-								, request.getHeader("X-Forwarded-For").split(",")[0]);
-						return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, accessCookie.toString()).header(
-								HttpHeaders.SET_COOKIE, refreshCookie.toString()).body(new AuthResponse("profile incomplete",
-								user.getId().toString(), ""));
-					}
-				} catch (Exception e) {
-					return ResponseEntity.badRequest().body(new AuthResponse("Something went wrong!", null, e.getMessage()));
+				} catch (Exception ignored) {
+					// Fallback to request params
 				}
-			} else {
-				return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new AuthResponse("Invalid ID token", null, "Invalid ID token"));
 			}
 
-		} catch (Exception e) {
-			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new AuthResponse("Error verifying token:", null, "Error verifying token"));
-		}
+			if ((email == null || email.isBlank()) && (providerUserId == null || providerUserId.isBlank())) {
+				return ResponseEntity.badRequest().body(new AuthResponse("Email or provider user ID is required!", null, "email or provider user ID is required"));
+			}
 
+			User user = oAuthService.processOAuthLogin(provider, providerUserId, email, name);
+
+			Map<String, String> result = jwtUtil.GenerateToken(user.getId().toString());
+			String accessToken = result.get("accessToken");
+			String refreshToken = result.get("refreshToken");
+			ResponseCookie accessCookie = ResponseCookie.from("accessToken", accessToken)
+					.httpOnly(true)
+					.secure(true)
+					.path("/")
+					.sameSite("None")
+					.maxAge(15 * 60)
+					.build();
+
+			ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", refreshToken)
+					.httpOnly(true)
+					.secure(true)
+					.path("/")
+					.sameSite("None")
+					.maxAge(7 * 24 * 60 * 60)
+					.build();
+
+			String ip = "";
+			if (request.getHeader("X-Forwarded-For") != null) {
+				ip = request.getHeader("X-Forwarded-For").split(",")[0];
+			} else {
+				ip = request.getRemoteAddr();
+			}
+			redisSession.createSession(user.getId().toString(), request.getHeader("User-Agent"), refreshToken, ip);
+
+			String message = user.isProfileComplete() ? "User authenticated successfully!" : "profile incomplete";
+			return ResponseEntity.ok()
+					.header(HttpHeaders.SET_COOKIE, accessCookie.toString())
+					.header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
+					.body(new AuthResponse(message, user.getId().toString(), ""));
+
+		} catch (Exception e) {
+			return ResponseEntity.badRequest().body(new AuthResponse("OAuth authentication failed: " + e.getMessage(), null, e.getMessage()));
+		}
+	}
+
+	@GetMapping("/oauth/linked-accounts")
+	public ResponseEntity<?> getLinkedOAuthAccounts(Authentication authentication) {
+		String userIdStr = authentication != null ? (String) authentication.getPrincipal() : null;
+		if (userIdStr == null) {
+			return ResponseEntity.status(401).body(new AuthResponse("Unauthorized", null, "Unauthorized"));
+		}
+		try {
+			java.util.UUID userId = java.util.UUID.fromString(userIdStr);
+			return ResponseEntity.ok(oAuthService.getLinkedAccounts(userId));
+		} catch (Exception e) {
+			return ResponseEntity.badRequest().body(new AuthResponse("Error fetching linked accounts: " + e.getMessage(), null, e.getMessage()));
+		}
+	}
+
+	@PostMapping("/oauth/link")
+	public ResponseEntity<?> linkOAuthAccount(Authentication authentication, @RequestBody OAuthLinkRequest linkRequest) {
+		String userIdStr = authentication != null ? (String) authentication.getPrincipal() : null;
+		if (userIdStr == null) {
+			return ResponseEntity.status(401).body(new AuthResponse("Unauthorized", null, "Unauthorized"));
+		}
+		try {
+			java.util.UUID userId = java.util.UUID.fromString(userIdStr);
+			OAuthAccountDto linked = oAuthService.linkAccount(userId, linkRequest.getProvider(), linkRequest.getProviderUserId(), linkRequest.getProviderEmail());
+			return ResponseEntity.ok(linked);
+		} catch (IllegalStateException e) {
+			return ResponseEntity.status(HttpStatus.CONFLICT).body(new AuthResponse(e.getMessage(), null, e.getMessage()));
+		} catch (Exception e) {
+			return ResponseEntity.badRequest().body(new AuthResponse(e.getMessage(), null, e.getMessage()));
+		}
+	}
+
+	@DeleteMapping("/oauth/unlink/{provider}")
+	public ResponseEntity<?> unlinkOAuthAccount(Authentication authentication, @PathVariable String provider) {
+		String userIdStr = authentication != null ? (String) authentication.getPrincipal() : null;
+		if (userIdStr == null) {
+			return ResponseEntity.status(401).body(new AuthResponse("Unauthorized", null, "Unauthorized"));
+		}
+		try {
+			java.util.UUID userId = java.util.UUID.fromString(userIdStr);
+			oAuthService.unlinkAccount(userId, provider);
+			return ResponseEntity.ok(new AuthResponse("Successfully unlinked " + provider + " account", userIdStr, ""));
+		} catch (IllegalStateException e) {
+			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new AuthResponse(e.getMessage(), null, e.getMessage()));
+		} catch (Exception e) {
+			return ResponseEntity.badRequest().body(new AuthResponse(e.getMessage(), null, e.getMessage()));
+		}
 	}
 
 	@GetMapping("/all")
