@@ -71,6 +71,9 @@ public class UserService {
 			user.setIsActive(true);
 			user.setAlertsEnabled(true);
 			user.setIsAdmin(false);
+			if (!user.isOauth2User()) {
+				user.setProfileComplete(true);
+			}
 			return userRepository.save(user);
 		} catch (Exception e) {
 			throw new IllegalArgumentException("Error saving user: " + e.getMessage());

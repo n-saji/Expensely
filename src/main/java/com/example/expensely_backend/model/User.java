@@ -122,7 +122,7 @@ public class User {
 	@Column(columnDefinition = "boolean default true")
 	@Getter
 	@Setter
-	private boolean isProfileComplete;
+	private boolean isProfileComplete = true;
 
 	@Column(columnDefinition = "boolean default false")
 	@Getter
