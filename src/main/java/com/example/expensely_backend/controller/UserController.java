@@ -556,6 +556,34 @@ public class UserController {
 
 			User user = oAuthService.processOAuthLogin(provider, providerUserId, email, name);
 
+			String existingRefreshToken = null;
+			if (request.getCookies() != null) {
+				for (Cookie cookie : request.getCookies()) {
+					if (cookie.getName().equals("refreshToken")) {
+						existingRefreshToken = cookie.getValue();
+					}
+				}
+			}
+
+			if (existingRefreshToken != null && redisSession.isSessionActive(existingRefreshToken)) {
+				String subject = jwtUtil.GetStringFromToken(existingRefreshToken);
+				if (subject != null && subject.equals(user.getId().toString())) {
+					Map<String, String> tokens = jwtUtil.GenerateToken(user.getId().toString());
+					ResponseCookie accessCookie = ResponseCookie.from("accessToken", tokens.get("accessToken"))
+							.httpOnly(true)
+							.secure(true)
+							.path("/")
+							.sameSite("None")
+							.maxAge(15 * 60)
+							.build();
+					redisSession.updateLastSeen(existingRefreshToken);
+					String message = user.isProfileComplete() ? "User authenticated successfully!" : "profile incomplete";
+					return ResponseEntity.ok()
+							.header(HttpHeaders.SET_COOKIE, accessCookie.toString())
+							.body(new AuthResponse(message, user.getId().toString(), ""));
+				}
+			}
+
 			Map<String, String> result = jwtUtil.GenerateToken(user.getId().toString());
 			String accessToken = result.get("accessToken");
 			String refreshToken = result.get("refreshToken");
