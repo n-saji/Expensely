@@ -75,10 +75,50 @@ public class User {
 	@Setter
 	private Boolean isAdmin;
 
-	@Column(nullable = false, columnDefinition = "boolean default true")
-	@Getter
-	@Setter
-	private Boolean NotificationsEnabled;
+	@Column(name = "email_notifications_enabled", nullable = false, columnDefinition = "boolean default true")
+	@JsonProperty("emailNotificationsEnabled")
+	@JsonAlias({"email_notifications_enabled", "emailNotificationsEnabled"})
+	private Boolean emailNotificationsEnabled = true;
+
+	@Column(name = "in_app_notifications_enabled", nullable = false, columnDefinition = "boolean default true")
+	@JsonProperty("inAppNotificationsEnabled")
+	@JsonAlias({"in_app_notifications_enabled", "inAppNotificationsEnabled"})
+	private Boolean inAppNotificationsEnabled = true;
+
+	@Column(name = "notifications_enabled", nullable = false, columnDefinition = "boolean default true")
+	@JsonProperty("notificationsEnabled")
+	private Boolean NotificationsEnabled = true;
+
+	public Boolean getEmailNotificationsEnabled() {
+		return emailNotificationsEnabled == null ? true : emailNotificationsEnabled;
+	}
+
+	public void setEmailNotificationsEnabled(Boolean emailNotificationsEnabled) {
+		this.emailNotificationsEnabled = emailNotificationsEnabled;
+	}
+
+	public Boolean getInAppNotificationsEnabled() {
+		if (inAppNotificationsEnabled != null) {
+			return inAppNotificationsEnabled;
+		}
+		return NotificationsEnabled == null ? true : NotificationsEnabled;
+	}
+
+	public void setInAppNotificationsEnabled(Boolean inAppNotificationsEnabled) {
+		this.inAppNotificationsEnabled = inAppNotificationsEnabled;
+		this.NotificationsEnabled = inAppNotificationsEnabled;
+	}
+
+	public Boolean getNotificationsEnabled() {
+		return getInAppNotificationsEnabled();
+	}
+
+	public void setNotificationsEnabled(Boolean notificationsEnabled) {
+		this.NotificationsEnabled = notificationsEnabled;
+		if (notificationsEnabled != null) {
+			this.inAppNotificationsEnabled = notificationsEnabled;
+		}
+	}
 
 	@Column(nullable = false, columnDefinition = "boolean default true")
 	@Getter

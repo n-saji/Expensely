@@ -137,8 +137,9 @@ public class ReminderSchedulerService {
         NotificationDeliveryType deliveryType = notifications.isEmpty() ? 
                 NotificationDeliveryType.IN_APP : notifications.get(0).getDeliveryType();
 
-        // 1. Send WebSocket / In-App
-        if (deliveryType == NotificationDeliveryType.IN_APP || deliveryType == NotificationDeliveryType.BOTH) {
+        // 1. Send WebSocket / In-App if enabled
+        if ((deliveryType == NotificationDeliveryType.IN_APP || deliveryType == NotificationDeliveryType.BOTH) &&
+            Boolean.TRUE.equals(reminder.getUser().getInAppNotificationsEnabled())) {
             Map<String, Object> reminderPayload = new HashMap<>();
             reminderPayload.put("reminderId", reminder.getId().toString());
             reminderPayload.put("title", "Snoozed Reminder: " + reminder.getTitle());
@@ -168,8 +169,9 @@ public class ReminderSchedulerService {
             webSocketService.sendAlerts(reminder.getUser(), messageDTO);
         }
 
-        // 2. Send Email
-        if (deliveryType == NotificationDeliveryType.EMAIL || deliveryType == NotificationDeliveryType.BOTH) {
+        // 2. Send Email if enabled
+        if ((deliveryType == NotificationDeliveryType.EMAIL || deliveryType == NotificationDeliveryType.BOTH) &&
+            Boolean.TRUE.equals(reminder.getUser().getEmailNotificationsEnabled())) {
             String to = reminder.getUser().getEmail();
             String subject = "Snoozed Reminder Due: " + reminder.getTitle();
             String htmlBody = buildSnoozeElapsedHtmlEmail(reminder, snoozedUntil);

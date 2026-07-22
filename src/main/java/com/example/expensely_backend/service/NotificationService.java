@@ -31,9 +31,10 @@ public class NotificationService {
     public void sendReminderAlert(ReminderNotification notification) {
         Reminder reminder = notification.getReminder();
 
-        // 1. Send WebSocket / In-App if delivery type is IN_APP or BOTH
-        if (notification.getDeliveryType() == com.example.expensely_backend.model.NotificationDeliveryType.IN_APP ||
-            notification.getDeliveryType() == com.example.expensely_backend.model.NotificationDeliveryType.BOTH) {
+        // 1. Send WebSocket / In-App if delivery type is IN_APP or BOTH and user has in-app notifications enabled
+        if ((notification.getDeliveryType() == com.example.expensely_backend.model.NotificationDeliveryType.IN_APP ||
+             notification.getDeliveryType() == com.example.expensely_backend.model.NotificationDeliveryType.BOTH) &&
+            Boolean.TRUE.equals(reminder.getUser().getInAppNotificationsEnabled())) {
             try {
                 // Serialize details as JSON so the frontend notification component can parse it
                 Map<String, Object> reminderPayload = new HashMap<>();
@@ -71,9 +72,10 @@ public class NotificationService {
             }
         }
 
-        // 2. Send Email if delivery type is EMAIL or BOTH
-        if (notification.getDeliveryType() == com.example.expensely_backend.model.NotificationDeliveryType.EMAIL ||
-            notification.getDeliveryType() == com.example.expensely_backend.model.NotificationDeliveryType.BOTH) {
+        // 2. Send Email if delivery type is EMAIL or BOTH and user has email notifications enabled
+        if ((notification.getDeliveryType() == com.example.expensely_backend.model.NotificationDeliveryType.EMAIL ||
+             notification.getDeliveryType() == com.example.expensely_backend.model.NotificationDeliveryType.BOTH) &&
+            Boolean.TRUE.equals(reminder.getUser().getEmailNotificationsEnabled())) {
             try {
                 String to = reminder.getUser().getEmail();
                 String subject = "Upcoming Financial Reminder: " + reminder.getTitle();

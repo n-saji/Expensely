@@ -84,7 +84,7 @@ public class BudgetService {
 			type = globals.MessageType.ERROR;
 		}
 
-		if (text.isEmpty()) {
+		if (text.isEmpty() || !Boolean.TRUE.equals(budget.getUser().getInAppNotificationsEnabled())) {
 			return;
 		}
 

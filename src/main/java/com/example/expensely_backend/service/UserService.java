@@ -68,6 +68,8 @@ public class UserService {
 		ensureThemeColorDefault(user);
 		try {
 			user.setNotificationsEnabled(true);
+			user.setEmailNotificationsEnabled(true);
+			user.setInAppNotificationsEnabled(true);
 			user.setIsActive(true);
 			user.setAlertsEnabled(true);
 			user.setIsAdmin(false);

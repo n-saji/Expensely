@@ -411,6 +411,10 @@ public class UserController {
 			if (existingUser == null) {
 				return ResponseEntity.status(404).body(new UserRes(null, "User not found"));
 			}
+			if (user.getEmailNotificationsEnabled() != null)
+				existingUser.setEmailNotificationsEnabled(user.getEmailNotificationsEnabled());
+			if (user.getInAppNotificationsEnabled() != null)
+				existingUser.setInAppNotificationsEnabled(user.getInAppNotificationsEnabled());
 			if (user.getNotificationsEnabled() != null)
 				existingUser.setNotificationsEnabled(user.getNotificationsEnabled());
 			if (user.getAlertsEnabled() != null)

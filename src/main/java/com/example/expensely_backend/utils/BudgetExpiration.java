@@ -39,12 +39,16 @@ public class BudgetExpiration {
 
 		for (var budget : budgetsToExpire) {
 			budget.setActive(false);
-			String userMail = budget.getUser().getEmail();
-			expiredBudgetsByUser.putIfAbsent(userMail, new java.util.ArrayList<>());
-			expiredBudgetsByUser.get(userMail).add(budget.getCategory().getName());
+			if (Boolean.TRUE.equals(budget.getUser().getEmailNotificationsEnabled())) {
+				String userMail = budget.getUser().getEmail();
+				expiredBudgetsByUser.putIfAbsent(userMail, new java.util.ArrayList<>());
+				expiredBudgetsByUser.get(userMail).add(budget.getCategory().getName());
+			}
 
-			alertHandler.sendAlert(budget.getUser().getId(), MessageDTO.builder().message("Your budget " +
-					"for category " + budget.getCategory().getName() + " has expired.").type(globals.MessageType.ALERT).sender(globals.SERVER_SENDER).build());
+			if (Boolean.TRUE.equals(budget.getUser().getInAppNotificationsEnabled())) {
+				alertHandler.sendAlert(budget.getUser().getId(), MessageDTO.builder().message("Your budget " +
+						"for category " + budget.getCategory().getName() + " has expired.").type(globals.MessageType.ALERT).sender(globals.SERVER_SENDER).build());
+			}
 		}
 
 		for (var entry : expiredBudgetsByUser.entrySet()) {
