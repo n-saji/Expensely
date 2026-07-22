@@ -254,5 +254,20 @@ public class UserService {
 		}
 	}
 
+	@Transactional
+	public void markUserHasTransactions(UUID userId) {
+		if (userId != null) {
+			userRepository.markHasTransactions(userId);
+		}
+	}
 
+	@Transactional
+	public void markUserHasTransactions(String userIdStr) {
+		if (userIdStr != null && !userIdStr.isBlank()) {
+			try {
+				markUserHasTransactions(UUID.fromString(userIdStr));
+			} catch (Exception ignored) {
+			}
+		}
+	}
 }

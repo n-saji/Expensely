@@ -242,6 +242,7 @@ public class ExpenseService {
 		expense.setType(TransactionType.EXPENSE);
 		applyCurrencySnapshot(expense, currency);
 		Transaction exp = transactionRepository.save(expense);
+		userRepository.markHasTransactions(user.getId());
 
 
 		// calculate if budget set
@@ -483,6 +484,7 @@ public class ExpenseService {
 			return expense;
 		}).toList();
 		transactionRepository.saveAll(expenses);
+		userRepository.markHasTransactions(user.getId());
 		expenseFilesRepository.deleteById(fileUUID);
 		return "Expenses inserted successfully";
 	}

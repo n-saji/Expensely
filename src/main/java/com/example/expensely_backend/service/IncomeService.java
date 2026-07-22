@@ -340,7 +340,9 @@ public class IncomeService {
 		income.setType(TransactionType.INCOME);
 		applyCurrencySnapshot(income, currency);
 
-		return transactionRepository.save(income);
+		Transaction saved = transactionRepository.save(income);
+		userService.markUserHasTransactions(user.getId());
+		return saved;
 	}
 
 	public IncomeResponse getIncomeResponseById(String id) {

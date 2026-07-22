@@ -111,6 +111,7 @@ public class TransactionService {
 		applyCurrencySnapshot(transaction, user.getCurrency() != null ? user.getCurrency() : globals.BASE_CURRENCY);
 
 		Transaction saved = transactionRepository.save(transaction);
+		userRepository.markHasTransactions(user.getId());
 
 		if (saved.getType() == TransactionType.EXPENSE) {
 			try {
