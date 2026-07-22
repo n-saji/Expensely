@@ -1,6 +1,5 @@
 package com.example.expensely_backend.utils;
 
-import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -17,10 +16,15 @@ import java.time.Duration;
 
 @Component
 public class S3Service {
-	String AWS_REGION = System.getenv("AWS_REGION");
+	String AWS_REGION = System.getenv("AWS_REGION") != null ? System.getenv("AWS_REGION") : "us-east-1";
 	Region region = Region.of(AWS_REGION);
 
 	String BUCKET_NAME = System.getenv("AWS_BUCKET_NAME");
+	String PROFILE_BUCKET_NAME = System.getenv("AWS_PROFILE_BUCKET_NAME") != null ? System.getenv("AWS_PROFILE_BUCKET_NAME") : "expensely-profiles";
+
+	public String getProfileBucketName() {
+		return PROFILE_BUCKET_NAME;
+	}
 
 	public String generatePresignedURL(String key,
 	                                   String contentType) {
@@ -34,6 +38,19 @@ public class S3Service {
 
 			return ppor.url().toString();
 
+		}
+	}
+
+	public String generateProfilePresignedURL(String key, String contentType) {
+		try (S3Presigner presigner = S3Presigner.builder().region(region).build()) {
+			PutObjectRequest putObjectRequest =
+					PutObjectRequest.builder().bucket(PROFILE_BUCKET_NAME).key(key).contentType(contentType).build();
+			PutObjectPresignRequest putObjectPresignRequest =
+					PutObjectPresignRequest.builder().signatureDuration(Duration.ofMinutes(10)).putObjectRequest(putObjectRequest).build();
+			PresignedPutObjectRequest ppor =
+					presigner.presignPutObject(putObjectPresignRequest);
+
+			return ppor.url().toString();
 		}
 	}
 
@@ -60,6 +77,16 @@ public class S3Service {
 		try (S3Client s3Client = S3Client.builder().region(region).build()) {
 			DeleteObjectRequest deleteObjectRequest = DeleteObjectRequest.builder()
 					.bucket(BUCKET_NAME)
+					.key(key)
+					.build();
+			s3Client.deleteObject(deleteObjectRequest);
+		}
+	}
+
+	public void deleteProfileObject(String key) {
+		try (S3Client s3Client = S3Client.builder().region(region).build()) {
+			DeleteObjectRequest deleteObjectRequest = DeleteObjectRequest.builder()
+					.bucket(PROFILE_BUCKET_NAME)
 					.key(key)
 					.build();
 			s3Client.deleteObject(deleteObjectRequest);

@@ -5,6 +5,7 @@ import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.service.*;
 import com.example.expensely_backend.utils.JwtUtil;
 import com.example.expensely_backend.utils.Mailgun;
+import com.example.expensely_backend.utils.S3Service;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.http.javanet.NetHttpTransport;
@@ -31,11 +32,13 @@ public class UserController {
 	private final EmailOtpService emailOtpService;
 	private final DbLogService dbLogService;
 	private final RedisSession redisSession;
+	private final S3Service s3Service;
 
 	public UserController(UserService userService, JwtUtil jwtUtil,
 	                      ExpiredTokenService expiredTokenService, Environment environment, Mailgun mailgun,
 	                      EmailOtpService emailOtpService,
-	                      DbLogService dbLogService, RedisSession redisSession) {
+	                      DbLogService dbLogService, RedisSession redisSession,
+	                      S3Service s3Service) {
 		this.userService = userService;
 		this.jwtUtil = jwtUtil;
 		this.expiredTokenService = expiredTokenService;
@@ -44,6 +47,7 @@ public class UserController {
 		this.emailOtpService = emailOtpService;
 		this.dbLogService = dbLogService;
 		this.redisSession = redisSession;
+		this.s3Service = s3Service;
 	}
 
 	private String getCookieValue(HttpServletRequest request, String name) {
@@ -464,12 +468,46 @@ public class UserController {
 		}
 	}
 
+	@GetMapping("/get-profile-presigned-url")
+	public ResponseEntity<?> getProfilePresignedUrl(
+			Authentication authentication,
+			@RequestParam(value = "fileName", required = false) String fileName,
+			@RequestParam(value = "contentType", required = false, defaultValue = "image/jpeg") String contentType
+	) {
+		String userId = (String) authentication.getPrincipal();
+		if (userId == null) {
+			return ResponseEntity.status(401).body(new UserRes(null, "Unauthorized"));
+		}
+		try {
+			String ext = "jpg";
+			if (fileName != null && fileName.contains(".")) {
+				ext = fileName.substring(fileName.lastIndexOf(".") + 1);
+			} else if (contentType != null && contentType.contains("/")) {
+				ext = contentType.substring(contentType.lastIndexOf("/") + 1);
+				if (ext.equals("jpeg")) ext = "jpg";
+			}
+			String key = "users/" + userId + "/profile_" + System.currentTimeMillis() + "." + ext;
+			String presignedUrl = s3Service.generateProfilePresignedURL(key, contentType);
+			return ResponseEntity.ok(new S3Resp(presignedUrl, key));
+		} catch (Exception e) {
+			return ResponseEntity.badRequest().body(new UserRes(null, "Error generating presigned URL: " + e.getMessage()));
+		}
+	}
+
 	@PatchMapping("/{id}/update-profile-picture")
-	public ResponseEntity<?> updateProfilePicture(@PathVariable String id, @RequestParam("filepath") String filePath) {
+	public ResponseEntity<?> updateProfilePicture(@PathVariable String id, @RequestParam(value = "filepath", required = false, defaultValue = "") String filePath) {
 		try {
 			User user = userService.GetActiveUserById(id);
 			if (user == null) {
 				return ResponseEntity.status(404).body(new UserRes(null, "User not found"));
+			}
+			String oldFilePath = user.getProfilePicFilePath();
+			if (oldFilePath != null && !oldFilePath.isBlank() && !oldFilePath.equals(filePath)) {
+				try {
+					s3Service.deleteProfileObject(oldFilePath);
+				} catch (Exception ex) {
+					// Log error deleting old profile picture from S3
+				}
 			}
 			user.setProfilePicFilePath(filePath);
 			userService.UpdateUser(user);

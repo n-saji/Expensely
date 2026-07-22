@@ -87,5 +87,3 @@ public class SecurityConfig {
 		};
 	}
 }
-
-// export $(cat .env | xargs) && ./gradlew bootRun

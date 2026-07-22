@@ -92,6 +92,26 @@ public class User {
 	@Setter
 	private String profilePicFilePath;
 
+	@Transient
+	@JsonProperty("profilePictureUrl")
+	public String getProfilePictureUrl() {
+		if (profilePicFilePath == null || profilePicFilePath.isBlank()) {
+			return null;
+		}
+		if (profilePicFilePath.startsWith("http://") || profilePicFilePath.startsWith("https://")) {
+			return profilePicFilePath;
+		}
+		String bucket = System.getenv("AWS_PROFILE_BUCKET_NAME");
+		if (bucket == null || bucket.isBlank()) {
+			bucket = "expensely-profiles";
+		}
+		String region = System.getenv("AWS_REGION");
+		if (region != null && !region.isBlank()) {
+			return "https://" + bucket + ".s3." + region + ".amazonaws.com/" + profilePicFilePath;
+		}
+		return "https://" + bucket + ".s3.amazonaws.com/" + profilePicFilePath;
+	}
+
 	@Column(columnDefinition = "boolean default false")
 	@Getter
 	@Setter
