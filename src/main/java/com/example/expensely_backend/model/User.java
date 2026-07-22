@@ -130,9 +130,13 @@ public class User {
 	private boolean isEmailVerified;
 
 	@Column(name = "has_transactions", nullable = false, columnDefinition = "boolean default false")
-	@Getter
 	@Setter
 	@JsonProperty("hasTransactions")
 	@JsonAlias("has_transactions")
 	private boolean hasTransactions = false;
+
+	@JsonProperty("hasTransactions")
+	public boolean getHasTransactions() {
+		return hasTransactions;
+	}
 }
