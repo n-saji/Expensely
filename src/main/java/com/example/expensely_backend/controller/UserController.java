@@ -452,6 +452,32 @@ public class UserController {
 		}
 	}
 
+	@PostMapping("/confirm-password")
+	public ResponseEntity<?> confirmPassword(
+			Authentication authentication,
+			@RequestBody Map<String, String> payload) {
+		try {
+			String userId = (authentication != null && authentication.getPrincipal() != null)
+					? authentication.getPrincipal().toString()
+					: (payload != null ? payload.get("userId") : null);
+			if (userId == null || userId.isEmpty()) {
+				return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("valid", false, "message", "User identity required"));
+			}
+			String password = payload != null ? payload.get("password") : null;
+			if (password == null || password.isEmpty()) {
+				return ResponseEntity.badRequest().body(Map.of("valid", false, "message", "Password is required"));
+			}
+			boolean isValid = userService.verifyPassword(userId, password);
+			if (isValid) {
+				return ResponseEntity.ok(Map.of("valid", true, "message", "Password verified successfully"));
+			} else {
+				return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("valid", false, "message", "Incorrect password"));
+			}
+		} catch (Exception e) {
+			return ResponseEntity.badRequest().body(Map.of("valid", false, "message", e.getMessage()));
+		}
+	}
+
 	@DeleteMapping("/delete-account/{id}")
 	public ResponseEntity<?> deleteUser(
 			@PathVariable String id) {

@@ -91,6 +91,17 @@ public class UserService {
 
 	}
 
+	public boolean verifyPassword(String userId, String rawPassword) {
+		if (rawPassword == null || rawPassword.isEmpty()) {
+			return false;
+		}
+		User user = GetUserById(userId);
+		if (user == null || user.getPassword() == null || user.getPassword().isEmpty()) {
+			return false;
+		}
+		return passwordEncoder.matches(rawPassword, user.getPassword());
+	}
+
 	public User GetActiveUserById(String id) {
 		UUID uuid = UUID.fromString(id);
 		User user = userRepository.findById(uuid).orElseThrow(() -> new IllegalArgumentException("User not found"));
