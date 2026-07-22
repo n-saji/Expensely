@@ -115,6 +115,8 @@ public class User {
 	@Column(columnDefinition = "boolean default false")
 	@Getter
 	@Setter
+	@JsonProperty("isOauth2User")
+	@JsonAlias("is_oauth2_user")
 	private boolean isOauth2User;
 
 	@Column(columnDefinition = "boolean default true")
