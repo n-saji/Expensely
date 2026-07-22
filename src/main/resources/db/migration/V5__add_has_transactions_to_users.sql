@@ -1,6 +1,6 @@
 -- V5: Add has_transactions column to users table
 
-ALTER TABLE users ADD COLUMN has_transactions BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS has_transactions BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- Backfill existing users who already have transactions in transactions table
 UPDATE users

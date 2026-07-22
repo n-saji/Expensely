@@ -31,6 +31,6 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
 	@Modifying
 	@Transactional
-	@Query(value = "UPDATE users SET has_transactions = true WHERE id = :userId AND (has_transactions IS FALSE OR has_transactions IS NULL)", nativeQuery = true)
+	@Query("UPDATE User u SET u.hasTransactions = true WHERE u.id = :userId AND u.hasTransactions = false")
 	int markHasTransactions(@Param("userId") UUID userId);
 }
