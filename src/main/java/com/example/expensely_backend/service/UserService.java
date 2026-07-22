@@ -62,7 +62,7 @@ public class UserService {
 			throw new IllegalArgumentException("Email or phone already exists");
 		}
 
-		if (user.getPassword() != null) {
+		if (user.getPassword() != null && !user.getPassword().isEmpty()) {
 			user.setPassword(passwordEncoder.encode(user.getPassword()));
 		}
 		ensureThemeColorDefault(user);
