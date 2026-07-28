@@ -178,6 +178,8 @@ public class TransactionService {
 		}
 
 		BigDecimal previousBaseAmount = oldT.getBaseCurrencyAmount();
+		boolean categoryChanged = false;
+		boolean dateChanged = false;
 
 		if (transaction.getCategory() != null && transaction.getCategory().getId() != null && !transaction.getCategory().getId().equals(oldT.getCategory().getId())) {
 			Category category = categoryService.getCategoryById(transaction.getCategory().getId().toString());
@@ -193,6 +195,7 @@ public class TransactionService {
 				}
 			}
 			oldT.setCategory(category);
+			categoryChanged = true;
 		}
 
 		if (transaction.getCurrency() != null && !transaction.getCurrency().equalsIgnoreCase(oldT.getCurrency())) {
@@ -219,13 +222,21 @@ public class TransactionService {
 			oldT.setDescription(transaction.getDescription());
 		}
 		if (transaction.getTransactionDate() != null && !transaction.getTransactionDate().equals(oldT.getTransactionDate())) {
+			if (!categoryChanged && oldT.getType() == TransactionType.EXPENSE) {
+				try {
+					budgetService.updateBudgetAmountByUserIdAndCategoryId(oldT.getUser().getId().toString(), oldT.getCategory().getId().toString(), oldT.getBaseCurrencyAmount().negate(), oldT.getTransactionDate());
+				} catch (Exception e) {
+					dbLogService.logError("service", getClass().getName(), "updateTransaction", "Old budget update failed: " + e.getMessage(), e);
+				}
+			}
 			oldT.setTransactionDate(transaction.getTransactionDate());
+			dateChanged = true;
 		}
 
 		Transaction updated = transactionRepository.save(oldT);
 
 		if (updated.getType() == TransactionType.EXPENSE) {
-			BigDecimal diff = updated.getBaseCurrencyAmount().subtract(previousBaseAmount);
+			BigDecimal diff = (categoryChanged || dateChanged) ? updated.getBaseCurrencyAmount() : updated.getBaseCurrencyAmount().subtract(previousBaseAmount);
 			try {
 				budgetService.updateBudgetAmountByUserIdAndCategoryId(updated.getUser().getId().toString(), updated.getCategory().getId().toString(), diff, updated.getTransactionDate());
 			} catch (Exception e) {

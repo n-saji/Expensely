@@ -314,6 +314,9 @@ public class ExpenseService {
 			throw new IllegalArgumentException("Expense not found");
 		}
 		BigDecimal previousBaseAmount = oldExpense.getBaseCurrencyAmount();
+		boolean categoryChanged = false;
+		boolean dateChanged = false;
+
 		if (expense.getCategory() != null && expense.getCategory().getId() != null && !expense.getCategory().getId().equals(oldExpense.getCategory().getId())) {
 			Category category = categoryService.getCategoryById(expense.getCategory().getId().toString());
 			if (category == null) {
@@ -326,6 +329,7 @@ public class ExpenseService {
 				throw new IllegalArgumentException("Error updating budget: " + e.getMessage());
 			}
 			oldExpense.setCategory(category);
+			categoryChanged = true;
 		}
 
 
@@ -353,7 +357,15 @@ public class ExpenseService {
 			oldExpense.setDescription(expense.getDescription());
 		}
 		if (expense.getTransactionDate() != null && !expense.getTransactionDate().equals(oldExpense.getTransactionDate())) {
+			if (!categoryChanged) {
+				try {
+					budgetService.updateBudgetAmountByUserIdAndCategoryId(oldExpense.getUser().getId().toString(), oldExpense.getCategory().getId().toString(), oldExpense.getBaseCurrencyAmount().negate(), oldExpense.getTransactionDate());
+				} catch (Exception e) {
+					throw new IllegalArgumentException("Error updating budget: " + e.getMessage());
+				}
+			}
 			oldExpense.setTransactionDate(expense.getTransactionDate());
+			dateChanged = true;
 		}
 
 
@@ -362,7 +374,8 @@ public class ExpenseService {
 
 //        update budget
 		try {
-			budgetService.updateBudgetAmountByUserIdAndCategoryId(exp.getUser().getId().toString(), exp.getCategory().getId().toString(), oldExpense.getBaseCurrencyAmount().subtract(previousBaseAmount), exp.getTransactionDate());
+			BigDecimal diff = (categoryChanged || dateChanged) ? exp.getBaseCurrencyAmount() : exp.getBaseCurrencyAmount().subtract(previousBaseAmount);
+			budgetService.updateBudgetAmountByUserIdAndCategoryId(exp.getUser().getId().toString(), exp.getCategory().getId().toString(), diff, exp.getTransactionDate());
 		} catch (Exception e) {
 			throw new IllegalArgumentException("Error updating budget: " + e.getMessage());
 		}
