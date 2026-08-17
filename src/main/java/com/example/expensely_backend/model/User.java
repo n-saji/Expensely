@@ -58,7 +58,7 @@ public class User {
 	@Setter
 	@JsonProperty("theme_color")
 	@JsonAlias("themeColor")
-	private String themeColor;
+	private String themeColor = "teal";
 
 	@Column(nullable = false, columnDefinition = "varchar(255) default 'en'")
 	@Getter
@@ -68,12 +68,12 @@ public class User {
 	@Column(nullable = false, columnDefinition = "boolean default true")
 	@Getter
 	@Setter
-	private Boolean isActive; // Default active status set to true
+	private Boolean isActive = true;
 
 	@Column(nullable = false, columnDefinition = "boolean default false")
 	@Getter
 	@Setter
-	private Boolean isAdmin;
+	private Boolean isAdmin = false;
 
 	@Column(name = "email_notifications_enabled", nullable = false, columnDefinition = "boolean default true")
 	@JsonProperty("emailNotificationsEnabled")
@@ -125,7 +125,7 @@ public class User {
 	@Setter
 	@JsonProperty("alerts_enabled")
 	@JsonAlias("alertsEnabled")
-	private Boolean alertsEnabled;
+	private Boolean alertsEnabled = true;
 
 	@Column(columnDefinition = "varchar(1000)")
 	@Getter
