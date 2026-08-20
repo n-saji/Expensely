@@ -1,6 +1,7 @@
 package com.example.expensely_backend.controller;
 
 import com.example.expensely_backend.dto.ExchangeRateConversionResponse;
+import com.example.expensely_backend.dto.ExchangeRateHistoryResponse;
 import com.example.expensely_backend.dto.ExchangeRateListItem;
 import com.example.expensely_backend.dto.CurrencyListResponse;
 import com.example.expensely_backend.globals.globals;
@@ -73,6 +74,23 @@ public class ExchangeRateController {
 			return ResponseEntity.ok(
 					new CurrencyListResponse(exchangeRateService.getAvailableCurrencies())
 			);
+		} catch (Exception e) {
+			return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+		}
+	}
+
+	@GetMapping("/history")
+	public ResponseEntity<?> getRateHistory(
+			@RequestParam(name = "baseCurrency", required = false) String baseCurrency,
+			@RequestParam(name = "targetCurrency") String targetCurrency,
+			@RequestParam(name = "range", required = false, defaultValue = "30d") String range
+	) {
+		try {
+			String resolvedBase = normalizeCurrencyOrDefault(baseCurrency);
+			String resolvedTarget = normalizeCurrencyOrThrow(targetCurrency);
+			ExchangeRateHistoryResponse response =
+					exchangeRateService.getRateHistoryResponse(resolvedBase, resolvedTarget, range);
+			return ResponseEntity.ok(response);
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body("Error: " + e.getMessage());
 		}

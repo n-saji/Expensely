@@ -1,8 +1,12 @@
 package com.example.expensely_backend.service;
 
 import com.example.expensely_backend.dto.ExchangeRateApiResponse;
+import com.example.expensely_backend.dto.ExchangeRateHistoryPoint;
+import com.example.expensely_backend.dto.ExchangeRateHistoryResponse;
 import com.example.expensely_backend.globals.globals;
 import com.example.expensely_backend.model.ExchangeRate;
+import com.example.expensely_backend.model.ExchangeRateHistory;
+import com.example.expensely_backend.repository.ExchangeRateHistoryRepository;
 import com.example.expensely_backend.repository.ExchangeRateRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -30,15 +34,22 @@ public class ExchangeRateService {
 	private final ExchangeRateRepository
 			exchangeRateRepository;
 
+	private final ExchangeRateHistoryRepository
+			exchangeRateHistoryRepository;
+
 	private final ObjectMapper objectMapper;
 
 	public ExchangeRateService(
 			ExchangeRateRepository
 					exchangeRateRepository,
+			ExchangeRateHistoryRepository
+					exchangeRateHistoryRepository,
 			ObjectMapper objectMapper
 	) {
 		this.exchangeRateRepository =
 				exchangeRateRepository;
+		this.exchangeRateHistoryRepository =
+				exchangeRateHistoryRepository;
 		this.objectMapper =
 				objectMapper;
 	}
@@ -103,6 +114,14 @@ public class ExchangeRateService {
 					exchangeRates =
 					new ArrayList<>();
 
+			List<ExchangeRateHistory>
+					historyRows =
+					new ArrayList<>();
+
+			LocalDateTime
+					fetchedAt =
+					LocalDateTime.now();
+
 			for (
 					ExchangeRateApiResponse
 							apiRate
@@ -140,17 +159,50 @@ public class ExchangeRateService {
 
 				exchangeRate
 						.setUpdatedAt(
-								LocalDateTime.now()
+								fetchedAt
 						);
 
 				exchangeRates.add(
 						exchangeRate
+				);
+
+				ExchangeRateHistory
+						historyRow =
+						new ExchangeRateHistory();
+
+				historyRow
+						.setBaseCurrency(
+								apiRate.getSource()
+						);
+
+				historyRow
+						.setTargetCurrency(
+								apiRate.getTarget()
+						);
+
+				historyRow
+						.setRate(
+								BigDecimal.valueOf(apiRate.getRate())
+						);
+
+				historyRow
+						.setRecordedAt(
+								fetchedAt
+						);
+
+				historyRows.add(
+						historyRow
 				);
 			}
 
 			exchangeRateRepository
 					.saveAll(
 							exchangeRates
+					);
+
+			exchangeRateHistoryRepository
+					.saveAll(
+							historyRows
 					);
 
 			System.out.println(
@@ -273,5 +325,77 @@ public class ExchangeRateService {
 		}
 		currencies.sort(String.CASE_INSENSITIVE_ORDER);
 		return currencies;
+	}
+
+	public ExchangeRateHistoryResponse getRateHistoryResponse(String baseCurrency, String targetCurrency, String range) {
+		String base = normalizeCurrencyOrDefault(baseCurrency);
+		String target = normalizeCurrencyOrThrow(targetCurrency);
+		String resolvedRange = range == null ? "all" : range.trim().toLowerCase();
+
+		List<ExchangeRateHistory> history;
+		Optional<LocalDateTime> since = resolveSince(resolvedRange);
+		if (since.isPresent()) {
+			history = exchangeRateHistoryRepository
+					.findByBaseCurrencyIgnoreCaseAndTargetCurrencyIgnoreCaseAndRecordedAtGreaterThanEqualOrderByRecordedAtAsc(
+							base, target, since.get());
+		} else {
+			resolvedRange = "all";
+			history = exchangeRateHistoryRepository
+					.findByBaseCurrencyIgnoreCaseAndTargetCurrencyIgnoreCaseOrderByRecordedAtAsc(base, target);
+		}
+
+		List<ExchangeRateHistoryPoint> points = history.stream()
+				.map(ExchangeRateHistoryPoint::new)
+				.toList();
+
+		BigDecimal currentRate;
+		BigDecimal high = null;
+		BigDecimal low = null;
+		BigDecimal periodChangeAbsolute = null;
+		BigDecimal periodChangePercent = null;
+
+		if (!history.isEmpty()) {
+			BigDecimal firstRate = history.get(0).getRate();
+			BigDecimal lastRate = history.get(history.size() - 1).getRate();
+			currentRate = lastRate;
+
+			high = history.stream().map(ExchangeRateHistory::getRate).max(BigDecimal::compareTo).orElse(null);
+			low = history.stream().map(ExchangeRateHistory::getRate).min(BigDecimal::compareTo).orElse(null);
+
+			if (history.size() > 1) {
+				periodChangeAbsolute = lastRate.subtract(firstRate).setScale(RATE_SCALE, RoundingMode.HALF_UP);
+				if (firstRate.compareTo(BigDecimal.ZERO) != 0) {
+					periodChangePercent = lastRate.subtract(firstRate)
+							.divide(firstRate, RATE_SCALE, RoundingMode.HALF_UP)
+							.multiply(BigDecimal.valueOf(100))
+							.setScale(DISPLAY_SCALE, RoundingMode.HALF_UP);
+				}
+			}
+		} else {
+			currentRate = getCrossRate(base, target);
+		}
+
+		return new ExchangeRateHistoryResponse(
+				base,
+				target,
+				resolvedRange,
+				currentRate,
+				periodChangeAbsolute,
+				periodChangePercent,
+				high,
+				low,
+				points
+		);
+	}
+
+	private Optional<LocalDateTime> resolveSince(String range) {
+		LocalDateTime now = LocalDateTime.now();
+		return switch (range) {
+			case "7d" -> Optional.of(now.minusDays(7));
+			case "30d" -> Optional.of(now.minusDays(30));
+			case "90d" -> Optional.of(now.minusDays(90));
+			case "1y" -> Optional.of(now.minusYears(1));
+			default -> Optional.empty();
+		};
 	}
 }
