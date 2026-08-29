@@ -24,7 +24,7 @@ import java.util.UUID;
 public interface ApiRequestLogRepository extends JpaRepository<ApiRequestLog, UUID> {
 
     @Query(value = """
-            SELECT date_trunc(:bucket::text, created_at) AS bucketTime, COUNT(*) AS requestCount
+            SELECT date_trunc(CAST(:bucket AS text), created_at) AS bucketTime, COUNT(*) AS requestCount
             FROM api_request_logs
             WHERE created_at >= :startDate AND created_at < :endDate
             GROUP BY bucketTime
@@ -35,7 +35,7 @@ public interface ApiRequestLogRepository extends JpaRepository<ApiRequestLog, UU
                                               @Param("bucket") String bucket);
 
     @Query(value = """
-            SELECT date_trunc(:bucket::text, created_at) AS bucketTime,
+            SELECT date_trunc(CAST(:bucket AS text), created_at) AS bucketTime,
                    AVG(duration_ms) AS avgDurationMs,
                    percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95DurationMs
             FROM api_request_logs
@@ -48,7 +48,7 @@ public interface ApiRequestLogRepository extends JpaRepository<ApiRequestLog, UU
                                                  @Param("bucket") String bucket);
 
     @Query(value = """
-            SELECT date_trunc(:bucket::text, created_at) AS bucketTime,
+            SELECT date_trunc(CAST(:bucket AS text), created_at) AS bucketTime,
                    COUNT(*) AS totalCount,
                    COUNT(*) FILTER (WHERE status_code >= 400) AS errorCount
             FROM api_request_logs
