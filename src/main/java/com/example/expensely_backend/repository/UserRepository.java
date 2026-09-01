@@ -26,7 +26,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
 	@Modifying
 	@Transactional
-	@Query(value = "UPDATE users SET theme_color = 'teal' WHERE theme_color IS NULL", nativeQuery = true)
+	@Query(value = "UPDATE users SET theme_color = 'supabase' WHERE theme_color IS NULL", nativeQuery = true)
 	int backfillThemeColorDefaults();
 
 	@Modifying

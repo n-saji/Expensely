@@ -53,12 +53,12 @@ public class User {
 	@Setter
 	private String theme = "light";
 
-	@Column(name = "theme_color", nullable = false, columnDefinition = "varchar(255) default 'teal'")
+	@Column(name = "theme_color", nullable = false, columnDefinition = "varchar(255) default 'supabase'")
 	@Getter
 	@Setter
 	@JsonProperty("theme_color")
 	@JsonAlias("themeColor")
-	private String themeColor = "teal";
+	private String themeColor = ThemeColor.DEFAULT_ID;
 
 	@Column(nullable = false, columnDefinition = "varchar(255) default 'en'")
 	@Getter

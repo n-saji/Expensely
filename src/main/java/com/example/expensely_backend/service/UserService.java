@@ -2,6 +2,7 @@ package com.example.expensely_backend.service;
 
 import com.example.expensely_backend.dto.AlertDtos;
 import com.example.expensely_backend.model.Budget;
+import com.example.expensely_backend.model.ThemeColor;
 import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.repository.*;
 import jakarta.annotation.PostConstruct;
@@ -265,9 +266,7 @@ public class UserService {
 	}
 
 	private void ensureThemeColorDefault(User user) {
-		if (user.getThemeColor() == null) {
-			user.setThemeColor("teal");
-		}
+		user.setThemeColor(ThemeColor.normalize(user.getThemeColor()));
 	}
 
 	@Transactional

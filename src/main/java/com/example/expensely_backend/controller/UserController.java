@@ -1,6 +1,7 @@
 package com.example.expensely_backend.controller;
 
 import com.example.expensely_backend.dto.*;
+import com.example.expensely_backend.model.ThemeColor;
 import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.service.*;
 import com.example.expensely_backend.utils.JwtUtil;
@@ -424,7 +425,7 @@ public class UserController {
 			if (user.getTheme() != null && !user.getTheme().equals(existingUser.getTheme()))
 				existingUser.setTheme(user.getTheme());
 			if (user.getThemeColor() != null)
-				existingUser.setThemeColor(user.getThemeColor());
+				existingUser.setThemeColor(ThemeColor.normalize(user.getThemeColor()));
 			if (user.getCurrency() != null)
 				existingUser.setCurrency(user.getCurrency());
 			if (user.getIsActive() != null)
