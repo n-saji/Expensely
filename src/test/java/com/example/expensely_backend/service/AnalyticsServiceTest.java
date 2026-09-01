@@ -95,7 +95,7 @@ class AnalyticsServiceTest {
 
 		// Setup historical data mocked response
 		List<Object[]> histRaw = new ArrayList<>();
-		histRaw.add(new Object[]{2025, 200.0, 3L});
+		histRaw.add(new Object[]{2024, 200.0, 3L});
 		histRaw.add(new Object[]{2026, 150.0, 2L});
 		when(transactionRepository.findHistoricalMonthlyData(testUserId, 6, "EXPENSE")).thenReturn(histRaw);
 
@@ -146,10 +146,13 @@ class AnalyticsServiceTest {
 
 		// Historical data verification
 		assertNotNull(response.getMonthComparisons().getHistoricalData());
-		assertEquals(2, response.getMonthComparisons().getHistoricalData().size());
-		assertEquals(2025, response.getMonthComparisons().getHistoricalData().get(0).getYear());
+		assertEquals(3, response.getMonthComparisons().getHistoricalData().size());
+		assertEquals(2024, response.getMonthComparisons().getHistoricalData().get(0).getYear());
 		// 200 USD * 0.9 = 180 EUR
 		assertEquals(BigDecimal.valueOf(180.0).setScale(2), response.getMonthComparisons().getHistoricalData().get(0).getTotalAmount());
+		assertEquals(2025, response.getMonthComparisons().getHistoricalData().get(1).getYear());
+		assertEquals(BigDecimal.ZERO.setScale(2), response.getMonthComparisons().getHistoricalData().get(1).getTotalAmount());
+		assertEquals(0L, response.getMonthComparisons().getHistoricalData().get(1).getTransactionCount());
 	}
 
 	@Test

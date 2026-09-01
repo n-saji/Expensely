@@ -69,14 +69,14 @@ public class AnalyticsService {
 			List<Transaction> lastYearExpenses = transactionRepository.findByUserIdAndTypeAndTimeFrameAsc(user.getId(), TransactionType.EXPENSE, lastYearStartDateTime, lastYearEndDateTime);
 			List<Object[]> historicalRaw = transactionRepository.findHistoricalMonthlyData(user.getId(), month, "EXPENSE");
 
-			calculateExpenseAnalytics(response, selectedMonthExpenses, prevMonthExpenses, lastYearExpenses, historicalRaw,
+			calculateExpenseAnalytics(response, selectedMonthExpenses, prevMonthExpenses, lastYearExpenses, historicalRaw, year,
 					usdToUserRate, displayCurrency, daysInMonth, startOfSelectedMonth, endOfSelectedMonth, user.getId());
 		} else {
 			List<Transaction> prevMonthIncomes = transactionRepository.findByUserIdAndTypeAndTimeFrameAsc(user.getId(), TransactionType.INCOME, prevStartDateTime, prevEndDateTime);
 			List<Transaction> lastYearIncomes = transactionRepository.findByUserIdAndTypeAndTimeFrameAsc(user.getId(), TransactionType.INCOME, lastYearStartDateTime, lastYearEndDateTime);
 			List<Object[]> historicalRaw = transactionRepository.findHistoricalMonthlyData(user.getId(), month, "INCOME");
 
-			calculateIncomeAnalytics(response, selectedMonthIncomes, prevMonthIncomes, lastYearIncomes, historicalRaw,
+			calculateIncomeAnalytics(response, selectedMonthIncomes, prevMonthIncomes, lastYearIncomes, historicalRaw, year,
 					usdToUserRate, displayCurrency, daysInMonth, startOfSelectedMonth, endOfSelectedMonth);
 		}
 
@@ -102,6 +102,7 @@ public class AnalyticsService {
 			List<Transaction> previous,
 			List<Transaction> lastYear,
 			List<Object[]> historicalRaw,
+			int selectedYear,
 			BigDecimal rate,
 			String displayCurrency,
 			int daysInMonth,
@@ -171,18 +172,8 @@ public class AnalyticsService {
 		comparisons.setPreviousMonth(createComparison(totalAmount, prevTotal));
 		comparisons.setSameMonthLastYear(createComparison(totalAmount, lastYearTotal));
 
-		List<MonthlyAnalyticsResponse.HistoricalYearData> historical = new ArrayList<>();
-		for (Object[] row : historicalRaw) {
-			int y = ((Number) row[0]).intValue();
-			BigDecimal tot = new BigDecimal(row[1].toString()).multiply(rate).setScale(2, RoundingMode.HALF_UP);
-			long cnt = ((Number) row[2]).longValue();
-
-			MonthlyAnalyticsResponse.HistoricalYearData histData = new MonthlyAnalyticsResponse.HistoricalYearData();
-			histData.setYear(y);
-			histData.setTotalAmount(tot);
-			histData.setTransactionCount(cnt);
-			historical.add(histData);
-		}
+		List<MonthlyAnalyticsResponse.HistoricalYearData> historical =
+				buildHistoricalData(historicalRaw, rate, selectedYear);
 		comparisons.setHistoricalData(historical);
 		response.setMonthComparisons(comparisons);
 
@@ -366,6 +357,7 @@ public class AnalyticsService {
 			List<Transaction> previous,
 			List<Transaction> lastYear,
 			List<Object[]> historicalRaw,
+			int selectedYear,
 			BigDecimal rate,
 			String displayCurrency,
 			int daysInMonth,
@@ -434,18 +426,8 @@ public class AnalyticsService {
 		comparisons.setPreviousMonth(createComparison(totalAmount, prevTotal));
 		comparisons.setSameMonthLastYear(createComparison(totalAmount, lastYearTotal));
 
-		List<MonthlyAnalyticsResponse.HistoricalYearData> historical = new ArrayList<>();
-		for (Object[] row : historicalRaw) {
-			int y = ((Number) row[0]).intValue();
-			BigDecimal tot = new BigDecimal(row[1].toString()).multiply(rate).setScale(2, RoundingMode.HALF_UP);
-			long cnt = ((Number) row[2]).longValue();
-
-			MonthlyAnalyticsResponse.HistoricalYearData histData = new MonthlyAnalyticsResponse.HistoricalYearData();
-			histData.setYear(y);
-			histData.setTotalAmount(tot);
-			histData.setTransactionCount(cnt);
-			historical.add(histData);
-		}
+		List<MonthlyAnalyticsResponse.HistoricalYearData> historical =
+				buildHistoricalData(historicalRaw, rate, selectedYear);
 		comparisons.setHistoricalData(historical);
 		response.setMonthComparisons(comparisons);
 
@@ -617,6 +599,43 @@ public class AnalyticsService {
 		ive.setSavingsPercentage(savingsPercentage);
 
 		response.setIncomeVsExpenseSummary(ive);
+	}
+
+	private List<MonthlyAnalyticsResponse.HistoricalYearData> buildHistoricalData(
+			List<Object[]> historicalRaw,
+			BigDecimal rate,
+			int selectedYear) {
+		TreeMap<Integer, MonthlyAnalyticsResponse.HistoricalYearData> valuesByYear = new TreeMap<>();
+		for (Object[] row : historicalRaw) {
+			int year = ((Number) row[0]).intValue();
+			MonthlyAnalyticsResponse.HistoricalYearData value = new MonthlyAnalyticsResponse.HistoricalYearData();
+			value.setYear(year);
+			value.setTotalAmount(new BigDecimal(row[1].toString())
+					.multiply(rate)
+					.setScale(2, RoundingMode.HALF_UP));
+			value.setTransactionCount(((Number) row[2]).longValue());
+			valuesByYear.put(year, value);
+		}
+
+		int firstYear = valuesByYear.isEmpty()
+				? selectedYear
+				: Math.min(selectedYear, valuesByYear.keySet().iterator().next());
+		int lastYear = valuesByYear.isEmpty()
+				? selectedYear
+				: Math.max(selectedYear, valuesByYear.lastKey());
+
+		List<MonthlyAnalyticsResponse.HistoricalYearData> result = new ArrayList<>();
+		for (int year = firstYear; year <= lastYear; year++) {
+			MonthlyAnalyticsResponse.HistoricalYearData value = valuesByYear.get(year);
+			if (value == null) {
+				value = new MonthlyAnalyticsResponse.HistoricalYearData();
+				value.setYear(year);
+				value.setTotalAmount(BigDecimal.ZERO.setScale(2));
+				value.setTransactionCount(0L);
+			}
+			result.add(value);
+		}
+		return result;
 	}
 
 	private MonthlyAnalyticsResponse.ComparisonDetail createComparison(BigDecimal currentVal, BigDecimal prevVal) {

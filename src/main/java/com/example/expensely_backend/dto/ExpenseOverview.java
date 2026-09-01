@@ -6,6 +6,7 @@ import lombok.Getter;
 
 import java.time.LocalDate;
 import java.time.Month;
+import java.time.YearMonth;
 import java.time.format.TextStyle;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -64,6 +65,7 @@ public class ExpenseOverview {
 	                       String userId, List<MonthlyCategoryExpense> monthlyCategoryExpenses,
 	                       Iterable<Category> categories, List<DailyExpense> dailyExpenses,
 	                       ExpenseResList FirstExpense, Integer reqMonth,
+	                       Integer reqMonthYear,
 	                       List<Budget> budgetServiceMap,
 	                       Double LastMonthTotalExpense,
 	                       List<RecurringExpenseDTO> recurringExpenses) {
@@ -112,8 +114,11 @@ public class ExpenseOverview {
 
 		// Requested Yearly view
 		Map<Month, Double> monthMapReq = req_expenses_range.stream().collect(Collectors.groupingBy(expense -> expense.getExpenseDate().getMonth(), TreeMap::new, Collectors.summingDouble(e -> e.getDisplayAmount().doubleValue())));
-		this.amountByMonth = monthMapReq.entrySet().stream().
-				collect(Collectors.toMap(entry -> entry.getKey().getDisplayName(TextStyle.FULL, Locale.ENGLISH), entry -> round(entry.getValue() * 100.0) / 100.0, (a, b) -> a, LinkedHashMap::new));
+		this.amountByMonth = new LinkedHashMap<>();
+		for (Month requestedMonth : Month.values()) {
+			String monthName = requestedMonth.getDisplayName(TextStyle.FULL, Locale.ENGLISH);
+			this.amountByMonth.put(monthName, round(monthMapReq.getOrDefault(requestedMonth, 0.0) * 100.0) / 100.0);
+		}
 
 		Map<String, Double> rawSums = req_expenses_range.stream()
 				.collect(Collectors.groupingBy(
@@ -125,20 +130,26 @@ public class ExpenseOverview {
 						Map.Entry::getKey,
 						entry -> round(entry.getValue() * 100.0) / 100.0
 				));
+		List<String> categoryNames = new ArrayList<>();
+		for (Category category : categories) {
+			categoryNames.add(category.getName());
+		}
+
 		this.monthlyCategoryExpense = new LinkedHashMap<>();
+		for (Month requestedMonth : Month.values()) {
+			Map<String, Double> categoryMap = new LinkedHashMap<>();
+			for (String categoryName : categoryNames) {
+				categoryMap.put(categoryName, 0.0);
+			}
+			this.monthlyCategoryExpense.put(
+					requestedMonth.getDisplayName(TextStyle.FULL, Locale.ENGLISH),
+					categoryMap);
+		}
 		monthlyCategoryExpenses.sort(Comparator.comparingInt(dto ->
 				Month.valueOf(dto.getMonth().toUpperCase()).getValue()
 		));
 		for (MonthlyCategoryExpense dto : monthlyCategoryExpenses) {
 			String month = dto.getMonth().trim();
-
-			monthlyCategoryExpense.computeIfAbsent(month, k -> {
-				Map<String, Double> categoryMap = new LinkedHashMap<>();
-				for (Category cat : categories) {
-					categoryMap.put(cat.getName(), 0.0);
-				}
-				return categoryMap;
-			});
 
 			String category = dto.getCategoryName();
 			Double amount = dto.getTotalAmount();
@@ -157,6 +168,10 @@ public class ExpenseOverview {
 				.collect(Collectors.toMap(ExpenseResponse::getDescription, e -> e.getDisplayAmount().doubleValue(), (a, b) -> a, LinkedHashMap::new));
 
 		this.overTheDaysThisMonth = new LinkedHashMap<>();
+		int daysInRequestedMonth = YearMonth.of(reqMonthYear, reqMonth).lengthOfMonth();
+		for (int day = 1; day <= daysInRequestedMonth; day++) {
+			this.overTheDaysThisMonth.put(String.valueOf(day), 0.0);
+		}
 		for (DailyExpense dailyExpense : dailyExpenses) {
 			double amount = dailyExpense.getTotalAmount() != null ? dailyExpense.getTotalAmount() : 0.0;
 

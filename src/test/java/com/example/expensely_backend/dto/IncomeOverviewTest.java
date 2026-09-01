@@ -27,6 +27,7 @@ class IncomeOverviewTest {
 				Collections.emptyList(),
 				List.of(),
 				1,
+				2026,
 				null,
 				0.0,
 				123.456
@@ -37,7 +38,9 @@ class IncomeOverviewTest {
 		assertTrue(json.has("total_balance"));
 		assertFalse(json.has("totalBalance"));
 		assertEquals(123.46, json.get("total_balance").asDouble(), 0.001);
+		assertEquals(12, overview.getAmountByMonth().size());
+		assertEquals(31, overview.getOverTheDaysThisMonth().size());
+		assertEquals(0.0, overview.getAmountByMonth().get("August"));
 	}
 }
-
 

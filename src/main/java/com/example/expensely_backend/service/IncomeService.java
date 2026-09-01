@@ -14,6 +14,7 @@ import com.example.expensely_backend.repository.CategoryRepository;
 import com.example.expensely_backend.repository.TransactionRepository;
 import com.example.expensely_backend.repository.TransactionRepositoryCustomImpl;
 import com.example.expensely_backend.utils.FormatDate;
+import com.example.expensely_backend.utils.TimeSeriesUtils;
 import com.opencsv.CSVWriter;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
@@ -308,6 +309,7 @@ public class IncomeService {
 				categories.join(),
 				convertedDaily,
 				reqMonth,
+				reqStart.getYear(),
 				firstIncome.join(),
 				prevMonthDisplay,
 				totalIncomeDisplay - totalExpenseDisplay);
@@ -546,7 +548,7 @@ public class IncomeService {
 					.setScale(2, RoundingMode.HALF_UP);
 			displayTotals.put(entry.getKey(), converted.doubleValue());
 		}
-		return displayTotals;
+		return TimeSeriesUtils.fillMonthlyTotals(displayTotals, range.startDate(), range.endDate());
 	}
 
 	public LinkedHashMap<String, java.util.Map<String, Double>> getMonthlyCategoryIncomeFromTillTo(String userId, int count,
@@ -588,7 +590,11 @@ public class IncomeService {
 			}
 		}
 
-		return new LinkedHashMap<>(monthlyCategoryIncome);
+		return TimeSeriesUtils.fillMonthlyCategories(
+				monthlyCategoryIncome,
+				categories.stream().map(Category::getName).toList(),
+				range.startDate(),
+				range.endDate());
 	}
 
 	public Double getTotalIncomeForMonth(int year, int month, String userId) {

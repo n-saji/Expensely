@@ -7,6 +7,7 @@ import lombok.Getter;
 
 import java.time.LocalDate;
 import java.time.Month;
+import java.time.YearMonth;
 import java.time.format.TextStyle;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -61,6 +62,7 @@ public class IncomeOverview {
 	                      Iterable<Category> categories,
 	                      List<DailyIncome> dailyIncomes,
 	                      Integer reqMonth,
+	                      Integer reqMonthYear,
 	                      Transaction firstIncome,
 	                      Double lastMonthTotalIncome,
 	                      Double totalBalance) {
@@ -112,9 +114,11 @@ public class IncomeOverview {
 		Map<Month, Double> monthMapReq = reqIncomeRange.stream()
 				.collect(Collectors.groupingBy(income -> income.getIncomeDate().getMonth(), TreeMap::new,
 						Collectors.summingDouble(income -> income.getDisplayAmount().doubleValue())));
-		this.amountByMonth = monthMapReq.entrySet().stream()
-				.collect(Collectors.toMap(entry -> entry.getKey().getDisplayName(TextStyle.FULL, Locale.ENGLISH),
-						entry -> round(entry.getValue() * 100.0) / 100.0, (a, b) -> a, LinkedHashMap::new));
+		this.amountByMonth = new LinkedHashMap<>();
+		for (Month requestedMonth : Month.values()) {
+			String monthName = requestedMonth.getDisplayName(TextStyle.FULL, Locale.ENGLISH);
+			this.amountByMonth.put(monthName, round(monthMapReq.getOrDefault(requestedMonth, 0.0) * 100.0) / 100.0);
+		}
 
 		Map<String, Double> rawSums = reqIncomeRange.stream()
 				.collect(Collectors.groupingBy(
@@ -127,20 +131,26 @@ public class IncomeOverview {
 						entry -> round(entry.getValue() * 100.0) / 100.0
 				));
 
+		List<String> categoryNames = new ArrayList<>();
+		for (Category category : categories) {
+			categoryNames.add(category.getName());
+		}
+
 		this.monthlyCategoryIncome = new LinkedHashMap<>();
+		for (Month requestedMonth : Month.values()) {
+			Map<String, Double> categoryMap = new LinkedHashMap<>();
+			for (String categoryName : categoryNames) {
+				categoryMap.put(categoryName, 0.0);
+			}
+			this.monthlyCategoryIncome.put(
+					requestedMonth.getDisplayName(TextStyle.FULL, Locale.ENGLISH),
+					categoryMap);
+		}
 		monthlyCategoryIncome.sort(Comparator.comparingInt(dto ->
 				Month.valueOf(dto.getMonth().toUpperCase()).getValue()
 		));
 		for (MonthlyCategoryIncome dto : monthlyCategoryIncome) {
 			String month = dto.getMonth().trim();
-
-			this.monthlyCategoryIncome.computeIfAbsent(month, k -> {
-				Map<String, Double> categoryMap = new LinkedHashMap<>();
-				for (Category cat : categories) {
-					categoryMap.put(cat.getName(), 0.0);
-				}
-				return categoryMap;
-			});
 
 			String category = dto.getCategoryName();
 			Double amount = dto.getTotalAmount();
@@ -158,6 +168,10 @@ public class IncomeOverview {
 						LinkedHashMap::new));
 
 		this.overTheDaysThisMonth = new LinkedHashMap<>();
+		int daysInRequestedMonth = YearMonth.of(reqMonthYear, reqMonth).lengthOfMonth();
+		for (int day = 1; day <= daysInRequestedMonth; day++) {
+			this.overTheDaysThisMonth.put(String.valueOf(day), 0.0);
+		}
 		for (DailyIncome dailyIncome : dailyIncomes) {
 			double amount = dailyIncome.getTotalAmount() != null ? dailyIncome.getTotalAmount() : 0.0;
 

@@ -7,6 +7,7 @@ import com.example.expensely_backend.model.*;
 import com.example.expensely_backend.repository.*;
 import com.example.expensely_backend.utils.FormatDate;
 import com.example.expensely_backend.utils.S3Service;
+import com.example.expensely_backend.utils.TimeSeriesUtils;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencsv.CSVWriter;
@@ -524,7 +525,7 @@ public class ExpenseService {
 					.setScale(2, java.math.RoundingMode.HALF_UP);
 			displayTotals.put(entry.getKey(), converted.doubleValue());
 		}
-		return displayTotals;
+		return TimeSeriesUtils.fillMonthlyTotals(displayTotals, range.startDate(), range.endDate());
 	}
 
 	public Map<String, Map<String, Double>> getMonthlyCategoryExpenseFromTillTo(String userId, int count,
@@ -569,7 +570,11 @@ public class ExpenseService {
 			}
 		}
 
-		return monthlyCategoryExpense;
+		return TimeSeriesUtils.fillMonthlyCategories(
+				monthlyCategoryExpense,
+				categories.stream().map(Category::getName).toList(),
+				range.startDate(),
+				range.endDate());
 	}
 
 	public ExpenseOverview getExpensesOverviewByUserIdAndTimeFrame(
@@ -697,6 +702,7 @@ public class ExpenseService {
 				convertedDaily,
 				recentExpenses.join(),
 				req_month,
+				req_start.getYear(),
 				budgets.join(),
 				prevMonthDisplay,
 				recurring.join()

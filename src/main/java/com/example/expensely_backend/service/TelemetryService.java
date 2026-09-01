@@ -20,8 +20,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
@@ -81,9 +84,118 @@ public class TelemetryService {
         long errorCount = summary.getErrorCount() != null ? summary.getErrorCount() : 0L;
         double errorRatePercent = totalRequests > 0 ? (errorCount * 100.0) / totalRequests : 0.0;
 
-        return new TelemetryOverviewResponse(start, end, normalizedBucket, totalRequests, avgDurationMs,
-                p95DurationMs, errorRatePercent, volumeFuture.join(), latencyFuture.join(), errorRateFuture.join());
-    }
+		return new TelemetryOverviewResponse(start, end, normalizedBucket, totalRequests, avgDurationMs,
+				p95DurationMs, errorRatePercent,
+				fillVolumeBuckets(volumeFuture.join(), start, end, normalizedBucket),
+				fillLatencyBuckets(latencyFuture.join(), start, end, normalizedBucket),
+				fillErrorRateBuckets(errorRateFuture.join(), start, end, normalizedBucket));
+	}
+
+	private List<TimeBucketCount> fillVolumeBuckets(
+			List<TimeBucketCount> values,
+			LocalDateTime start,
+			LocalDateTime end,
+			String bucket) {
+		Map<LocalDateTime, TimeBucketCount> valuesByBucket = new HashMap<>();
+		values.forEach(value -> valuesByBucket.put(value.getBucketTime(), value));
+		List<TimeBucketCount> result = new ArrayList<>();
+		for (LocalDateTime bucketTime : bucketTimes(start, end, bucket)) {
+			result.add(valuesByBucket.getOrDefault(bucketTime, new TimeBucketCountValue(bucketTime, 0L)));
+		}
+		return result;
+	}
+
+	private List<TimeBucketLatency> fillLatencyBuckets(
+			List<TimeBucketLatency> values,
+			LocalDateTime start,
+			LocalDateTime end,
+			String bucket) {
+		Map<LocalDateTime, TimeBucketLatency> valuesByBucket = new HashMap<>();
+		values.forEach(value -> valuesByBucket.put(value.getBucketTime(), value));
+		List<TimeBucketLatency> result = new ArrayList<>();
+		for (LocalDateTime bucketTime : bucketTimes(start, end, bucket)) {
+			result.add(valuesByBucket.getOrDefault(bucketTime, new TimeBucketLatencyValue(bucketTime, 0.0, 0.0)));
+		}
+		return result;
+	}
+
+	private List<TimeBucketErrorRate> fillErrorRateBuckets(
+			List<TimeBucketErrorRate> values,
+			LocalDateTime start,
+			LocalDateTime end,
+			String bucket) {
+		Map<LocalDateTime, TimeBucketErrorRate> valuesByBucket = new HashMap<>();
+		values.forEach(value -> valuesByBucket.put(value.getBucketTime(), value));
+		List<TimeBucketErrorRate> result = new ArrayList<>();
+		for (LocalDateTime bucketTime : bucketTimes(start, end, bucket)) {
+			result.add(valuesByBucket.getOrDefault(bucketTime, new TimeBucketErrorRateValue(bucketTime, 0L, 0L)));
+		}
+		return result;
+	}
+
+	private List<LocalDateTime> bucketTimes(
+			LocalDateTime start,
+			LocalDateTime end,
+			String bucket) {
+		LocalDateTime current = "day".equals(bucket)
+				? start.toLocalDate().atStartOfDay()
+				: start.withMinute(0).withSecond(0).withNano(0);
+		List<LocalDateTime> result = new ArrayList<>();
+		while (current.isBefore(end)) {
+			result.add(current);
+			current = "day".equals(bucket) ? current.plusDays(1) : current.plusHours(1);
+		}
+		return result;
+	}
+
+	private record TimeBucketCountValue(LocalDateTime bucketTime, Long requestCount)
+			implements TimeBucketCount {
+		@Override
+		public LocalDateTime getBucketTime() {
+			return bucketTime;
+		}
+
+		@Override
+		public Long getRequestCount() {
+			return requestCount;
+		}
+	}
+
+	private record TimeBucketLatencyValue(LocalDateTime bucketTime, Double avgDurationMs, Double p95DurationMs)
+			implements TimeBucketLatency {
+		@Override
+		public LocalDateTime getBucketTime() {
+			return bucketTime;
+		}
+
+		@Override
+		public Double getAvgDurationMs() {
+			return avgDurationMs;
+		}
+
+		@Override
+		public Double getP95DurationMs() {
+			return p95DurationMs;
+		}
+	}
+
+	private record TimeBucketErrorRateValue(LocalDateTime bucketTime, Long totalCount, Long errorCount)
+			implements TimeBucketErrorRate {
+		@Override
+		public LocalDateTime getBucketTime() {
+			return bucketTime;
+		}
+
+		@Override
+		public Long getTotalCount() {
+			return totalCount;
+		}
+
+		@Override
+		public Long getErrorCount() {
+			return errorCount;
+		}
+	}
 
     public List<EndpointBreakdownRow> getEndpointBreakdown(LocalDateTime startDate, LocalDateTime endDate,
                                                              String sortBy, Integer limit) {
