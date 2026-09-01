@@ -179,7 +179,7 @@ public class ExpenseService {
 		return transactionRepository.getTotalAmountByUserId(userId, "EXPENSE", startDate, endDate);
 	}
 
-	private DateRange resolveDateRange(int count, globals.TimeFrame type) {
+	private DateRange resolveDateRange(int count, globals.TimeFrame type, UUID userId) {
 		if (type == null) {
 			throw new IllegalArgumentException("Type not allowed to be null");
 		}
@@ -195,13 +195,14 @@ public class ExpenseService {
 		switch (type) {
 			case YEAR ->
 					startDate = LocalDateTime.of(date.getYear() - count, date.getMonth(), 1, 0, 0, 0);
-			case ALL_TIME -> startDate = date.minusYears(count - 1)
-					.withMonth(1)
-					.withDayOfMonth(1)
-					.withHour(0)
-					.withMinute(0)
-					.withSecond(0)
-					.withNano(0);
+			case ALL_TIME -> {
+				Transaction firstExpense = transactionRepository
+						.findFirstByUserIdAndTypeOrderByTransactionDateAsc(userId, TransactionType.EXPENSE);
+				startDate = firstExpense == null || firstExpense.getTransactionDate() == null
+						? date.withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0).withNano(0)
+						: firstExpense.getTransactionDate().withDayOfMonth(1)
+								.withHour(0).withMinute(0).withSecond(0).withNano(0);
+			}
 			case MONTH -> startDate = date.minusMonths(count - 1)
 					.withDayOfMonth(1)
 					.withHour(0)
@@ -512,7 +513,7 @@ public class ExpenseService {
 		String displayCurrency = user.getCurrency();
 		BigDecimal rate = resolveUsdRate(displayCurrency);
 
-		DateRange range = resolveDateRange(count, type);
+		DateRange range = resolveDateRange(count, type, user.getId());
 
 		LinkedHashMap<String, Double> baseTotals =
 				transactionRepositoryCustomImpl.getMonthlyAmountFromTillTo(user.getId(), TransactionType.EXPENSE,
@@ -536,7 +537,7 @@ public class ExpenseService {
 		}
 		BigDecimal rate = resolveUsdRate(user.getCurrency());
 
-		DateRange range = resolveDateRange(count, type);
+		DateRange range = resolveDateRange(count, type, user.getId());
 
 		List<MonthlyCategoryExpense> dbRes =
 				transactionRepositoryCustomImpl.getMonthlyCategoryExpenseFromTillTo(user.getId(),

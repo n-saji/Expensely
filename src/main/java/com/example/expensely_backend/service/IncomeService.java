@@ -131,7 +131,7 @@ public class IncomeService {
 	private record DateRange(LocalDateTime startDate, LocalDateTime endDate) {
 	}
 
-	private DateRange resolveDateRange(int count, globals.TimeFrame type) {
+	private DateRange resolveDateRange(int count, globals.TimeFrame type, UUID userId) {
 		if (type == null) {
 			throw new IllegalArgumentException("Type not allowed to be null");
 		}
@@ -146,13 +146,14 @@ public class IncomeService {
 		LocalDateTime startDate;
 		switch (type) {
 			case YEAR -> startDate = LocalDateTime.of(date.getYear() - count, date.getMonth(), 1, 0, 0, 0);
-			case ALL_TIME -> startDate = date.minusYears(count - 1)
-					.withMonth(1)
-					.withDayOfMonth(1)
-					.withHour(0)
-					.withMinute(0)
-					.withSecond(0)
-					.withNano(0);
+			case ALL_TIME -> {
+				Transaction firstIncome = transactionRepository
+						.findFirstByUserIdAndTypeOrderByTransactionDateAsc(userId, TransactionType.INCOME);
+				startDate = firstIncome == null || firstIncome.getTransactionDate() == null
+						? date.withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0).withNano(0)
+						: firstIncome.getTransactionDate().withDayOfMonth(1)
+								.withHour(0).withMinute(0).withSecond(0).withNano(0);
+			}
 			case MONTH -> startDate = date.minusMonths(count - 1)
 					.withDayOfMonth(1)
 					.withHour(0)
@@ -537,7 +538,7 @@ public class IncomeService {
 		String displayCurrency = user.getCurrency();
 		BigDecimal rate = resolveUsdRate(displayCurrency);
 
-		DateRange range = resolveDateRange(count, type);
+		DateRange range = resolveDateRange(count, type, user.getId());
 
 		LinkedHashMap<String, Double> baseTotals =
 				transactionRepositoryCustomImpl.getMonthlyAmountFromTillTo(user.getId(), TransactionType.INCOME, range.startDate(), range.endDate());
@@ -559,7 +560,7 @@ public class IncomeService {
 		}
 		BigDecimal rate = resolveUsdRate(user.getCurrency());
 
-		DateRange range = resolveDateRange(count, type);
+		DateRange range = resolveDateRange(count, type, user.getId());
 
 		List<MonthlyCategoryIncome> dbRes =
 				transactionRepositoryCustomImpl.getMonthlyCategoryIncomeFromTillTo(user.getId(), range.startDate(), range.endDate());
