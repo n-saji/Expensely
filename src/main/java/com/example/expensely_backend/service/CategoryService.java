@@ -34,7 +34,6 @@ public class CategoryService {
 	@Autowired
 	private ReminderRepository reminderRepository;
 
-
 	public CategoryService(CategoryRepository categoryRepository, UserService userService
 	) {
 		this.categoryRepository = categoryRepository;
@@ -158,6 +157,7 @@ public class CategoryService {
 		}
 
 		List<Transaction> expenses = transactionRepository.findByCategoryIdAndUserIdAndType(UUID.fromString(categoryId), user.getId(), TransactionType.EXPENSE);
+		List<Transaction> incomes = transactionRepository.findByCategoryIdAndUserIdAndType(UUID.fromString(categoryId), user.getId(), TransactionType.INCOME);
 		List<RecurringExpense> rExpenses =
 				recurringExpenseRepository.findByCategoryIdAndUserId(UUID.fromString(categoryId), user.getId());
 		Budget budget =
@@ -165,6 +165,7 @@ public class CategoryService {
 		long reminderCount = reminderRepository.countByCategoryIdAndUserIdAndDeletedAtIsNull(UUID.fromString(categoryId), user.getId());
 		return CategoryDeps.builder()
 				.expenseCount(expenses.size())
+				.incomeCount(incomes.size())
 				.recurringExpenseCount(rExpenses.size())
 				.budgetCount(budget == null ? 0 : 1)
 				.reminderCount((int) reminderCount)
