@@ -79,8 +79,8 @@ public class CategoryService {
 			UUID categoryId = UUID.fromString(cId);
 			UUID userId = UUID.fromString(uId);
 			transactionRepository.deleteByUserIdAndCategoryIdAndType(userId, categoryId, TransactionType.EXPENSE);
-			budgetRepository.deleteByUserIdAndCategoryId(userId, categoryId);
 			transactionRepository.deleteByUserIdAndCategoryIdAndType(userId, categoryId, TransactionType.INCOME);
+			budgetRepository.deleteByUserIdAndCategoryId(userId, categoryId);
 			recurringExpenseRepository.deleteByUserIdAndCategoryId(userId, categoryId);
 			List<Reminder> reminders = reminderRepository.findByCategoryIdAndUserIdAndDeletedAtIsNull(categoryId, userId);
 			reminderRepository.deleteAll(reminders);
@@ -123,8 +123,9 @@ public class CategoryService {
 		if (category.getName() != null && !category.getName().isEmpty()) {
 			existingCategory.setName(category.getName());
 		}
-		if (category.getType() != null && !category.getType().isEmpty()) {
-			existingCategory.setType(category.getType());
+		if (category.getType() != null && !category.getType().isEmpty()
+				&& !category.getType().equalsIgnoreCase(existingCategory.getType())) {
+			throw new IllegalArgumentException("Category type cannot be changed after creation");
 		}
 		if (category.getIcon() != null && !category.getIcon().isBlank()) {
 			if (!ICON_PATTERN.matcher(category.getIcon()).matches()) {
