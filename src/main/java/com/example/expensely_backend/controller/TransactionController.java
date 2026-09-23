@@ -144,11 +144,31 @@ public class TransactionController {
 			@PathVariable String userId,
 			@RequestParam(value = "start_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startDate,
 			@RequestParam(value = "end_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate,
-			@RequestParam(value = "type", required = false) String type) {
+			@RequestParam(value = "type", required = false) String type,
+			@RequestParam(value = "category_id", required = false) String categoryId,
+			@RequestParam(value = "q", required = false) String q,
+			@RequestParam(value = "sort_by", required = false) String sortBy,
+			@RequestParam(value = "sort_order", required = false) String sortOrder) {
 		startDate = FormatDate.formatStartDate(startDate, false);
 		endDate = FormatDate.formatEndDate(endDate);
+		if (q == null) q = "";
+		if (sortBy != null) {
+			if (!sortBy.equals("amount") && !sortBy.equals("transactionDate") &&
+					!sortBy.equals("description") && !sortBy.equals("category") &&
+					!sortBy.equals("expenseDate") && !sortBy.equals("incomeDate")) {
+				return ResponseEntity.badRequest().body(new UserRes(null, "Error: Invalid sort column"));
+			}
+			if (sortBy.equals("expenseDate") || sortBy.equals("incomeDate")) {
+				sortBy = "transactionDate";
+			}
+			if (sortBy.equals("amount")) {
+				sortBy = "baseCurrencyAmount";
+			}
+		}
 		try {
-			String csvData = transactionService.exportTransactionsToCSV(userId, startDate, endDate, type);
+			String csvData = transactionService.exportTransactionsToCSV(
+					userId, startDate, endDate, type, categoryId, q, sortBy, sortOrder
+			);
 			return ResponseEntity.ok()
 					.header("Content-Disposition", "attachment; filename=\"transactions.csv\"")
 					.contentType(MediaType.parseMediaType("text/csv"))

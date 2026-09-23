@@ -283,15 +283,23 @@ public class TransactionService {
 		return new TransactionResList(mapTransactionsToResponse(transactions, displayCurrency), totalPages, totalElements, page);
 	}
 
-	public String exportTransactionsToCSV(String userId, LocalDateTime startDate, LocalDateTime endDate, String typeStr) {
+	public String exportTransactionsToCSV(
+			String userId, LocalDateTime startDate, LocalDateTime endDate, String typeStr,
+			String categoryId, String q, String sortBy, String sortOrder
+	) {
 		UUID userUUID = UUID.fromString(userId);
 		TransactionType type = null;
 		if (typeStr != null && !typeStr.trim().isEmpty()) {
 			type = TransactionType.valueOf(typeStr.trim().toUpperCase());
 		}
+		UUID categoryUUID = null;
+		if (categoryId != null && !categoryId.trim().isEmpty()) {
+			categoryUUID = UUID.fromString(categoryId);
+		}
 
 		List<Transaction> transactions = transactionRepositoryCustomImpl.findTransactions(
-				userUUID, type, startDate, endDate, null, "", 0, Integer.MAX_VALUE, "transactionDate", "desc", "desc"
+				userUUID, type, startDate, endDate, categoryUUID, q, 0, Integer.MAX_VALUE,
+				sortBy, sortOrder, "desc"
 		);
 
 		User user = userService.GetActiveUserById(userId);

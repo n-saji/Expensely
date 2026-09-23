@@ -5,6 +5,7 @@ import com.example.expensely_backend.model.Transaction;
 import com.example.expensely_backend.model.TransactionType;
 import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.repository.TransactionRepository;
+import com.example.expensely_backend.repository.TransactionRepositoryCustomImpl;
 import com.example.expensely_backend.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,6 +15,7 @@ import org.mockito.MockitoAnnotations;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -25,6 +27,8 @@ class TransactionServiceTest {
 
 	@Mock
 	private TransactionRepository transactionRepository;
+	@Mock
+	private TransactionRepositoryCustomImpl transactionRepositoryCustomImpl;
 	@Mock
 	private CategoryService categoryService;
 	@Mock
@@ -189,5 +193,41 @@ class TransactionServiceTest {
 				eq(new BigDecimal("100.00")),
 				eq(newDate)
 		);
+	}
+
+	@Test
+	void exportTransactionsToCSV_AppliesAllFiltersAndSorting() {
+		LocalDateTime startDate = now.minusMonths(1);
+		LocalDateTime endDate = now.plusDays(1);
+		Transaction transaction = new Transaction();
+		transaction.setId(UUID.randomUUID());
+		transaction.setUser(user);
+		transaction.setCategory(cat1);
+		transaction.setAmount(new BigDecimal("42.50"));
+		transaction.setBaseCurrencyAmount(new BigDecimal("42.50"));
+		transaction.setCurrency("USD");
+		transaction.setTransactionDate(now);
+		transaction.setDescription("Team lunch");
+		transaction.setType(TransactionType.EXPENSE);
+
+		when(transactionRepositoryCustomImpl.findTransactions(
+				eq(userId), eq(TransactionType.EXPENSE), eq(startDate), eq(endDate),
+				eq(cat1Id), eq("lunch"), eq(0), eq(Integer.MAX_VALUE),
+				eq("baseCurrencyAmount"), eq("asc"), eq("desc")
+		)).thenReturn(List.of(transaction));
+		when(userService.GetActiveUserById(userId.toString())).thenReturn(user);
+
+		String csv = transactionService.exportTransactionsToCSV(
+				userId.toString(), startDate, endDate, "EXPENSE", cat1Id.toString(),
+				"lunch", "baseCurrencyAmount", "asc"
+		);
+
+		verify(transactionRepositoryCustomImpl).findTransactions(
+				eq(userId), eq(TransactionType.EXPENSE), eq(startDate), eq(endDate),
+				eq(cat1Id), eq("lunch"), eq(0), eq(Integer.MAX_VALUE),
+				eq("baseCurrencyAmount"), eq("asc"), eq("desc")
+		);
+		org.junit.jupiter.api.Assertions.assertTrue(csv.contains("Team lunch"));
+		org.junit.jupiter.api.Assertions.assertTrue(csv.contains("Food"));
 	}
 }
