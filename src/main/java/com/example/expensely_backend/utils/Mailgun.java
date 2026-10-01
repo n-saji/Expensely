@@ -80,6 +80,10 @@ public class Mailgun {
     }
 
     public void sendHtmlMessage(String to, String subject, String htmlContent) {
+        sendHtmlMessage(to, subject, htmlContent, "Please view this email in an HTML-compatible client.");
+    }
+
+    public void sendHtmlMessage(String to, String subject, String htmlContent, String textContent) {
         String apiKey = System.getenv("MAILGUN_API_KEY");
         String domain = "expensely.store";
         String from = "Expensely <notifications@" + domain + ">";
@@ -95,6 +99,9 @@ public class Mailgun {
         }
         if (htmlContent == null) {
             throw new IllegalArgumentException("Email HTML content is required.");
+        }
+        if (textContent == null) {
+            throw new IllegalArgumentException("Email text content is required.");
         }
 
         try {
@@ -112,7 +119,7 @@ public class Mailgun {
                     "&to=" + urlEncode(to) +
                     "&subject=" + urlEncode(subject) +
                     "&html=" + urlEncode(htmlContent) +
-                    "&text=" + urlEncode("Please view this email in an HTML-compatible client.");
+                    "&text=" + urlEncode(textContent);
 
             OutputStream os = conn.getOutputStream();
             os.write(data.getBytes());
