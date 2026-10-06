@@ -1,0 +1,18 @@
+services:
+  finance-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: expensely_finance
+      POSTGRES_USER: expensely_local
+      POSTGRES_PASSWORD: expensely_local
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - expensely_finance_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U expensely_local -d expensely_finance"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+volumes:
+  expensely_finance_data:

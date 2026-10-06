@@ -14,6 +14,7 @@ import com.opencsv.CSVWriter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.io.StringWriter;
@@ -99,6 +100,15 @@ public class ExpenseService {
 					return new ExpenseResponse(expense, displayCurrency, displayAmount);
 				})
 				.collect(Collectors.toList());
+	}
+	private List<ExpenseResponse> reportExpenses(UUID userId,LocalDateTime start,LocalDateTime end,String displayCurrency) {
+		List<ExpenseResponse> result=new ArrayList<>(mapExpensesToResponse(
+			transactionRepository.findByUserIdAndTypeAndTimeFrameDesc(userId,TransactionType.EXPENSE,start,end),displayCurrency));
+		BigDecimal rate=resolveUsdRate(displayCurrency);
+		transactionRepository.findByUserIdAndTypeAndTimeFrameDesc(userId,TransactionType.DEBT_PAYMENT,start,end).stream()
+			.filter(t -> t.getInterestAmount()!=null&&t.getInterestAmount().signum()>0)
+			.forEach(t -> result.add(new ExpenseResponse(t,displayCurrency,rate,true)));
+		return result;
 	}
 
 	private ExpenseResponse mapExpenseToResponse(Transaction expense, String displayCurrency) {
@@ -453,7 +463,8 @@ public class ExpenseService {
 		return sw.toString();
 	}
 
-	public String BulkInsertExpensesFromFile(String userId, String fileId) {
+	@Transactional
+	public String BulkInsertExpensesFromFile(String userId, String fileId,Account account) {
 		UUID fileUUID = UUID.fromString(fileId);
 		UUID userUUID = UUID.fromString(userId);
 		ExpenseFiles ef =
@@ -489,16 +500,19 @@ public class ExpenseService {
 		cats.forEach(cat -> catsList.put(cat.getName(), cat));
 		List<Transaction> expenses = rows.stream().map(dto -> {
 			Transaction expense = new Transaction();
+			expense.setAccount(account);
 			expense.setAmount(normalizeAmount(BigDecimal.valueOf(dto.getAmount())));
 			expense.setCategory(catsList.get(dto.getCategory()));
 			expense.setTransactionDate(dto.getExpense_date().atStartOfDay());
 			expense.setDescription(dto.getDescription());
 			expense.setUser(user);
 			expense.setType(TransactionType.EXPENSE);
-			applyCurrencySnapshot(expense, globals.BASE_CURRENCY);
+			if(expense.getCategory()==null||!expense.getCategory().getUser().getId().equals(userUUID)||!"expense".equalsIgnoreCase(expense.getCategory().getType())||expense.getAmount().signum()<=0)throw new IllegalArgumentException("Invalid expense row");
+			applyCurrencySnapshot(expense, account.getCurrency());
 			return expense;
 		}).toList();
 		transactionRepository.saveAll(expenses);
+		for(Transaction expense:expenses)budgetService.updateBudgetAmountByUserIdAndCategoryId(userId,expense.getCategory().getId().toString(),expense.getBaseCurrencyAmount(),expense.getTransactionDate());
 		userRepository.markHasTransactions(user.getId());
 		expenseFilesRepository.deleteById(fileUUID);
 		return "Expenses inserted successfully";
@@ -598,27 +612,19 @@ public class ExpenseService {
 
 		CompletableFuture<List<ExpenseResponse>> f1 =
 				CompletableFuture.supplyAsync(() ->
-						mapExpensesToResponse(transactionRepository.findByUserIdAndTypeAndTimeFrameDesc(activeUserId, TransactionType.EXPENSE, startDate, endDate), displayCurrency), expenseExecutor);
+						reportExpenses(activeUserId,startDate,endDate,displayCurrency), expenseExecutor);
 
 		CompletableFuture<List<ExpenseResponse>> f2 =
 				CompletableFuture.supplyAsync(() ->
-						mapExpensesToResponse(transactionRepository.findByUserIdAndTypeAndTimeFrameDesc(activeUserId, TransactionType.EXPENSE, req_start_year, req_end_year), displayCurrency), expenseExecutor);
+						reportExpenses(activeUserId,req_start_year,req_end_year,displayCurrency), expenseExecutor);
 
 		CompletableFuture<List<ExpenseResponse>> f3 =
 				CompletableFuture.supplyAsync(() ->
-						mapExpensesToResponse(transactionRepository.findByUserIdAndTypeAndTimeFrameDesc(activeUserId, TransactionType.EXPENSE, req_start, req_end), displayCurrency), expenseExecutor);
-
-		CompletableFuture<List<MonthlyCategoryExpense>> monthlyCategory =
-				CompletableFuture.supplyAsync(() ->
-						getMonthlyCategoryExpense(activeUserId, req_start_year, req_end_year), expenseExecutor);
+						reportExpenses(activeUserId,req_start,req_end,displayCurrency), expenseExecutor);
 
 		CompletableFuture<Iterable<Category>> categories =
 				CompletableFuture.supplyAsync(() ->
 						categoryService.getCategoriesByUserId(userId, globals.TYPE_EXPENSE), expenseExecutor);
-
-		CompletableFuture<List<DailyExpense>> daily =
-				CompletableFuture.supplyAsync(() ->
-						getDailyExpense(activeUserId, req_start, req_end), expenseExecutor);
 
 		CompletableFuture<ExpenseResList> recentExpenses =
 				CompletableFuture.supplyAsync(() ->
@@ -644,46 +650,53 @@ public class ExpenseService {
 
 		// join all
 		CompletableFuture.allOf(
-				f1, f2, f3, monthlyCategory, categories,
-				daily, recentExpenses, budgets,
+				f1, f2, f3, categories,
+				recentExpenses, budgets,
 				prevMonthTotal, recurring
 		).join();
 
 		List<MonthlyCategoryExpense> convertedMonthly = new ArrayList<>();
-		for (MonthlyCategoryExpense dto : monthlyCategory.join()) {
+		Map<String,Double> monthlyTotals=new LinkedHashMap<>();
+		for(ExpenseResponse expense:f2.join()) {
+			String key=expense.getExpenseDate().getMonth().name()+"|"+expense.getCategoryName();
+			monthlyTotals.merge(key,expense.getDisplayAmount().doubleValue(),Double::sum);
+		}
+		for(var entry:monthlyTotals.entrySet()) {
+			String[] parts=entry.getKey().split("\\|",2);
+			String monthName=parts[0].substring(0,1)+parts[0].substring(1).toLowerCase();
+			String categoryName=parts[1];Double value=entry.getValue();
 			convertedMonthly.add(new MonthlyCategoryExpense() {
 				@Override
 				public String getMonth() {
-					return dto.getMonth();
+					return monthName;
 				}
 
 				@Override
 				public String getCategoryName() {
-					return dto.getCategoryName();
+					return categoryName;
 				}
 
 				@Override
 				public Double getTotalAmount() {
-					BigDecimal amount = BigDecimal.valueOf(dto.getTotalAmount() == null ? 0.0 : dto.getTotalAmount());
-					BigDecimal converted = amount.multiply(displayRate).setScale(2, java.math.RoundingMode.HALF_UP);
-					return converted.doubleValue();
+					return value;
 				}
 			});
 		}
 
 		List<DailyExpense> convertedDaily = new ArrayList<>();
-		for (DailyExpense dto : daily.join()) {
+		Map<String,Double> dailyTotals=new LinkedHashMap<>();
+		for(ExpenseResponse expense:f3.join())dailyTotals.merge(expense.getExpenseDate().toLocalDate().toString(),expense.getDisplayAmount().doubleValue(),Double::sum);
+		for(var entry:dailyTotals.entrySet()) {
+			String day=entry.getKey();Double value=entry.getValue();
 			convertedDaily.add(new DailyExpense() {
 				@Override
 				public String getExpenseDate() {
-					return dto.getExpenseDate();
+					return day;
 				}
 
 				@Override
 				public Double getTotalAmount() {
-					BigDecimal amount = BigDecimal.valueOf(dto.getTotalAmount() == null ? 0.0 : dto.getTotalAmount());
-					BigDecimal converted = amount.multiply(displayRate).setScale(2, java.math.RoundingMode.HALF_UP);
-					return converted.doubleValue();
+					return value;
 				}
 			});
 		}

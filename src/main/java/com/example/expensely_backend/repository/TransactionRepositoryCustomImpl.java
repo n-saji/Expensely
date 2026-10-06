@@ -130,6 +130,18 @@ public class TransactionRepositoryCustomImpl {
 			TransactionType type,
 			LocalDateTime startDate,
 			LocalDateTime endDate) {
+		if(type==TransactionType.EXPENSE) {
+			@SuppressWarnings("unchecked") List<Object[]> rows=em.createNativeQuery("""
+				SELECT TO_CHAR(DATE_TRUNC('month',transaction_date),'FMMon/YY'),
+				SUM(CASE WHEN type='DEBT_PAYMENT' THEN base_currency_amount*interest_amount/amount ELSE base_currency_amount END)
+				FROM transactions WHERE user_id=:userId AND transaction_date>=:startDate AND transaction_date<:endDate
+				AND (type='EXPENSE' OR (type='DEBT_PAYMENT' AND interest_amount>0))
+				GROUP BY DATE_TRUNC('month',transaction_date) ORDER BY DATE_TRUNC('month',transaction_date)
+				""").setParameter("userId",userId).setParameter("startDate",startDate).setParameter("endDate",endDate).getResultList();
+			LinkedHashMap<String,Double> totals=new LinkedHashMap<>();
+			for(Object[] row:rows)totals.put((String)row[0],((Number)row[1]).doubleValue());
+			return totals;
+		}
 
 		CriteriaBuilder cb = em.getCriteriaBuilder();
 		CriteriaQuery<Tuple> query = cb.createTupleQuery();
@@ -177,64 +189,26 @@ public class TransactionRepositoryCustomImpl {
 			UUID userId,
 			LocalDateTime startDate,
 			LocalDateTime endDate) {
-
-		CriteriaBuilder cb = em.getCriteriaBuilder();
-		CriteriaQuery<Tuple> query = cb.createTupleQuery();
-		Root<Transaction> transaction = query.from(Transaction.class);
-		Join<Object, Object> category = transaction.join("category", JoinType.LEFT);
-
-		Expression<LocalDateTime> monthExpr =
-				cb.function("date_trunc", LocalDateTime.class,
-						cb.literal("month"),
-						transaction.get("transactionDate"));
-
-		Expression<String> formattedMonth =
-				cb.function("to_char", String.class,
-						monthExpr,
-						cb.literal("FMMon/YY"));
-
-		query.multiselect(
-				formattedMonth.alias("month"),
-				category.get("name").alias("category"),
-				cb.sum(transaction.get("baseCurrencyAmount")).alias("total")
-		);
-
-		query.where(
-				cb.equal(transaction.get("user").get("id"), userId),
-				cb.equal(transaction.get("type"), TransactionType.EXPENSE),
-				cb.greaterThanOrEqualTo(transaction.get("transactionDate"), startDate),
-				cb.lessThan(transaction.get("transactionDate"), endDate)
-		);
-
-		query.groupBy(monthExpr, category.get("name"));
-		query.orderBy(cb.asc(monthExpr));
-		List<Tuple> results = em.createQuery(query).getResultList();
-
-		List<MonthlyCategoryExpense> monthlyCategoryExpenses = new ArrayList<>();
-		for (Tuple tuple : results) {
-			String month = tuple.get("month", String.class);
-			String categoryName = tuple.get("category", String.class);
-			Number totalNumber = tuple.get("total", Number.class);
-			Double total = totalNumber != null ? totalNumber.doubleValue() : 0.0;
-			monthlyCategoryExpenses.add(new MonthlyCategoryExpense() {
-				@Override
-				public String getMonth() {
-					return month;
-				}
-
-				@Override
-				public String getCategoryName() {
-					return categoryName;
-				}
-
-				@Override
-				public Double getTotalAmount() {
-					return total;
-				}
+		@SuppressWarnings("unchecked") List<Object[]> rows=em.createNativeQuery("""
+			SELECT TO_CHAR(DATE_TRUNC('month',t.transaction_date),'FMMon/YY'),
+			COALESCE(c.name,'Loan Interest'),
+			SUM(CASE WHEN t.type='DEBT_PAYMENT' THEN t.base_currency_amount*t.interest_amount/t.amount ELSE t.base_currency_amount END)
+			FROM transactions t LEFT JOIN categories c ON c.id=t.category_id
+			WHERE t.user_id=:userId AND t.transaction_date>=:startDate AND t.transaction_date<:endDate
+			AND (t.type='EXPENSE' OR (t.type='DEBT_PAYMENT' AND t.interest_amount>0))
+			GROUP BY DATE_TRUNC('month',t.transaction_date),COALESCE(c.name,'Loan Interest')
+			ORDER BY DATE_TRUNC('month',t.transaction_date)
+			""").setParameter("userId",userId).setParameter("startDate",startDate).setParameter("endDate",endDate).getResultList();
+		List<MonthlyCategoryExpense> result=new ArrayList<>();
+		for(Object[] row:rows) {
+			String month=(String)row[0],categoryName=(String)row[1];Double total=((Number)row[2]).doubleValue();
+			result.add(new MonthlyCategoryExpense() {
+				public String getMonth(){return month;}
+				public String getCategoryName(){return categoryName;}
+				public Double getTotalAmount(){return total;}
 			});
 		}
-
-		return monthlyCategoryExpenses;
+		return result;
 	}
 
 	public List<MonthlyCategoryIncome> getMonthlyCategoryIncomeFromTillTo(

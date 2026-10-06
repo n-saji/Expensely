@@ -17,13 +17,14 @@ public class CategoryController {
 	}
 
 	@PostMapping("/create")
-	public String createCategory(@RequestBody Category category) {
+	public String createCategory(Authentication authentication,@RequestBody Category category) {
 		if (category.getName() == null || category.getName().isEmpty()) {
 			return ResponseEntity.badRequest().body("Error: Category name must not be null or empty").getBody();
 		}
-		if (category.getUser() == null || category.getUser().getId() == null) {
-			return ResponseEntity.badRequest().body("Error: User ID must not be null").getBody();
-		}
+		if(authentication==null)return "Unauthorized";
+		var owner=new com.example.expensely_backend.model.User();
+		owner.setId(java.util.UUID.fromString((String)authentication.getPrincipal()));
+		category.setUser(owner);
 
 		try {
 			categoryService.save(category);
@@ -35,9 +36,10 @@ public class CategoryController {
 	}
 
 	@GetMapping("/{id}")
-	public ResponseEntity<Category> getCategoryById(@PathVariable String id) {
+	public ResponseEntity<Category> getCategoryById(Authentication authentication,@PathVariable String id) {
 		try {
 			Category category = categoryService.getCategoryById(id);
+			if(authentication==null||category.getUser()==null||!category.getUser().getId().toString().equals(authentication.getPrincipal()))return ResponseEntity.status(403).build();
 			return ResponseEntity.ok(category);
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(null);
@@ -73,8 +75,10 @@ public class CategoryController {
 	}
 
 	@PatchMapping("/update/{id}")
-	public ResponseEntity<?> updateCategory(@PathVariable String id, @RequestBody Category category) {
+	public ResponseEntity<?> updateCategory(Authentication authentication,@PathVariable String id, @RequestBody Category category) {
 		try {
+			Category existing=categoryService.getCategoryById(id);
+			if(authentication==null||existing.getUser()==null||!existing.getUser().getId().toString().equals(authentication.getPrincipal()))return ResponseEntity.status(403).build();
 			categoryService.updateCategory(id, category);
 			return ResponseEntity.ok(new AuthResponse("Category updated successfully!", null, null));
 		} catch (Exception e) {

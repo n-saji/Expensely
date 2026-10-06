@@ -4,6 +4,7 @@ package com.example.expensely_backend.controller;
 import com.example.expensely_backend.dto.*;
 import com.example.expensely_backend.globals.globals;
 import com.example.expensely_backend.model.Transaction;
+import com.example.expensely_backend.model.TransactionType;
 import com.example.expensely_backend.service.*;
 import com.example.expensely_backend.utils.FormatDate;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -18,6 +19,7 @@ import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/expenses")
@@ -25,22 +27,32 @@ public class ExpenseController {
 
 	private final ExpenseService expenseService;
 	private final ExpenseFilesService expenseFilesService;
+	private final TransactionService transactionService;
+	private final FinancialTransactionService financialTransactions;
+	private final FinancialLedgerService ledger;
+	private final UserService userService;
 
 	public ExpenseController(ExpenseService expenseService,
 
-	                         ExpenseFilesService expenseFilesService) {
+	                         ExpenseFilesService expenseFilesService,TransactionService transactionService,
+	                         FinancialTransactionService financialTransactions,FinancialLedgerService ledger,UserService userService) {
 		this.expenseService = expenseService;
 		this.expenseFilesService = expenseFilesService;
+		this.transactionService=transactionService;this.financialTransactions=financialTransactions;this.ledger=ledger;this.userService=userService;
 	}
 
 	@PostMapping("/create")
-	public ResponseEntity<?> createExpense(@RequestBody Transaction expense) {
+	public ResponseEntity<?> createExpense(Authentication authentication,@RequestBody Transaction expense) {
 		// Logic to create an expense
 		try {
 			if (expense.getTransactionDate() == null) {
 				expense.setTransactionDate(LocalDateTime.now());
 			}
-			Transaction exp = expenseService.save(expense);
+			String userId=(String)authentication.getPrincipal();
+			expense.setUser(userService.GetActiveUserById(userId));expense.setType(TransactionType.EXPENSE);
+			if(expense.getAccount()==null||expense.getAccount().getId()==null)throw new IllegalArgumentException("Account is required");
+			expense.setAccount(ledger.account(expense.getAccount().getId(),UUID.fromString(userId)));
+			Transaction exp = transactionService.save(expense);
 			return ResponseEntity.ok(expenseService.getExpenseResponseById(exp.getId().toString()));
 
 		} catch (Exception e) {
@@ -49,8 +61,9 @@ public class ExpenseController {
 	}
 
 	@GetMapping("/{id}")
-	public ResponseEntity<?> getExpenseById(@PathVariable String id) {
+	public ResponseEntity<?> getExpenseById(Authentication authentication,@PathVariable String id) {
 		try {
+			financialTransactions.owned(UUID.fromString(id),UUID.fromString((String)authentication.getPrincipal()));
 			return ResponseEntity.ok(expenseService.getExpenseResponseById(id));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(null);
@@ -58,9 +71,11 @@ public class ExpenseController {
 	}
 
 	@DeleteMapping("/{id}")
-	public ResponseEntity<String> deleteExpenseById(@PathVariable String id) {
+	public ResponseEntity<String> deleteExpenseById(Authentication authentication,@PathVariable String id) {
 		try {
-			expenseService.deleteExpenseById(id);
+			Transaction t=financialTransactions.owned(UUID.fromString(id),UUID.fromString((String)authentication.getPrincipal()));
+			if(t.getType()!=TransactionType.EXPENSE)throw new IllegalArgumentException("Not an expense");
+			transactionService.deleteTransactionById(id);
 			return ResponseEntity.ok("Expense deleted successfully!");
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body("Error: " + e.getMessage());
@@ -69,7 +84,8 @@ public class ExpenseController {
 
 
 	@GetMapping("/user/{userId}")
-	public ResponseEntity<?> getExpensesByUserId(@PathVariable String userId) {
+	public ResponseEntity<?> getExpensesByUserId(Authentication authentication,@PathVariable String userId) {
+		if(authentication==null||!userId.equals(authentication.getPrincipal()))return ResponseEntity.status(403).build();
 		try {
 			return ResponseEntity.ok(expenseService.getExpensesByUserId(userId));
 		} catch (Exception e) {
@@ -78,16 +94,18 @@ public class ExpenseController {
 	}
 
 	@PutMapping("/update/{id}")
-	public ResponseEntity<?> updateExpense(@PathVariable String id, @RequestBody Transaction updatedExpense) {
+	public ResponseEntity<?> updateExpense(Authentication authentication,@PathVariable String id, @RequestBody Transaction updatedExpense) {
 		try {
-			Transaction existingExpense = expenseService.getExpenseById(id);
+			Transaction existingExpense = financialTransactions.owned(UUID.fromString(id),UUID.fromString((String)authentication.getPrincipal()));
+			if(existingExpense.getType()!=TransactionType.EXPENSE)throw new IllegalArgumentException("Not an expense");
 			if (existingExpense == null) {
 				return ResponseEntity.badRequest().body(new AuthResponse("Expense not found!", null, ""));
 			}
 
 			// Save updated expense
-			Transaction exp =
-					expenseService.updateExpense(updatedExpense);
+			updatedExpense.setId(UUID.fromString(id));updatedExpense.setType(TransactionType.EXPENSE);
+			if(updatedExpense.getAccount()!=null)updatedExpense.setAccount(ledger.account(updatedExpense.getAccount().getId(),UUID.fromString((String)authentication.getPrincipal())));
+			Transaction exp = transactionService.updateTransaction(updatedExpense);
 			return ResponseEntity.ok(new AuthResponse("Expense updated " +
 					"successfully!", exp.getId().toString(), ""));
 		} catch (Exception e) {
@@ -96,7 +114,8 @@ public class ExpenseController {
 	}
 
 	@GetMapping("/user/{userId}/category/{categoryId}")
-	public ResponseEntity<?> getExpensesByCategoryIdAndUserID(@PathVariable String categoryId, @PathVariable String userId) {
+	public ResponseEntity<?> getExpensesByCategoryIdAndUserID(Authentication authentication,@PathVariable String categoryId, @PathVariable String userId) {
+		if(authentication==null||!userId.equals(authentication.getPrincipal()))return ResponseEntity.status(403).build();
 		try {
 			return ResponseEntity.ok(expenseService.getExpensesByCategoryIdAndUserID(categoryId, userId));
 		} catch (Exception e) {
@@ -107,11 +126,13 @@ public class ExpenseController {
 
 	@GetMapping("/user/{userId}/timeframe")
 	public ResponseEntity<?> getExpensesByUserIdAndTimeFrame(
+			Authentication authentication,
 			@PathVariable String userId,
 			@RequestParam(value = "start_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startDate,
 			@RequestParam(value = "end_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate,
 			@RequestParam(value = "order", required = false, defaultValue = "desc") String order) {
 
+		if(authentication==null||!userId.equals(authentication.getPrincipal()))return ResponseEntity.status(403).build();
 		startDate = FormatDate.formatStartDate(startDate, false);
 		endDate = FormatDate.formatEndDate(endDate);
 		try {
@@ -123,6 +144,7 @@ public class ExpenseController {
 
 	@GetMapping("/user/{userId}/overview")
 	public ResponseEntity<?> getExpensesOverviewByUserIdAndTimeFrame(
+			Authentication authentication,
 			@PathVariable String userId,
 			@RequestParam(value = "start_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startDate,
 			@RequestParam(value = "end_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate,
@@ -130,6 +152,7 @@ public class ExpenseController {
 			@RequestParam(value = "req_month", required = false) Integer req_month,
 			@RequestParam(value = "req_month_year", required = false) Integer req_month_year) {
 
+		if(authentication==null||!userId.equals(authentication.getPrincipal()))return ResponseEntity.status(403).build();
 		int year = LocalDateTime.now().getYear();
 		int month = LocalDateTime.now().getMonthValue();
 		req_year = req_year == null ? year : req_year;
@@ -159,9 +182,11 @@ public class ExpenseController {
 	}
 
 	@PostMapping("/user/{userId}/bulk-delete")
-	public ResponseEntity<?> bulkDeleteExpensesByUserId(@PathVariable String userId, @RequestBody List<Transaction> expenses) {
+	public ResponseEntity<?> bulkDeleteExpensesByUserId(Authentication authentication,@PathVariable String userId, @RequestBody List<Transaction> expenses) {
 		try {
-			expenseService.deleteBuUserIDAndExpenseIds(userId, expenses);
+			if(authentication==null||!userId.equals(authentication.getPrincipal()))return ResponseEntity.status(403).build();
+			for(Transaction t:expenses)if(financialTransactions.owned(t.getId(),UUID.fromString(userId)).getType()!=TransactionType.EXPENSE)throw new IllegalArgumentException("Not an expense");
+			financialTransactions.bulkDelete(UUID.fromString(userId),expenses);
 			return ResponseEntity.ok(new AuthResponse("Bulk delete expenses successfully!", null, ""));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(new AuthResponse("Bulk delete expenses failed!", null, e.getMessage()));
@@ -170,6 +195,7 @@ public class ExpenseController {
 
 	@GetMapping("/user/{userId}/fetch-with-conditions")
 	public ResponseEntity<?> fetchWithConditions(
+			Authentication authentication,
 			@PathVariable String userId,
 			@RequestParam(value = "start_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startDate,
 			@RequestParam(value = "end_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate,
@@ -182,6 +208,7 @@ public class ExpenseController {
 			@RequestParam(value = "sort_order", required = false) String customSortOrder) {
 
 
+		if(authentication==null||!userId.equals(authentication.getPrincipal()))return ResponseEntity.status(403).build();
 		startDate = FormatDate.formatStartDate(startDate, false);
 		endDate = FormatDate.formatEndDate(endDate);
 		if (q == null) q = "";
@@ -210,9 +237,10 @@ public class ExpenseController {
 	}
 
 	@GetMapping("/user/{userId}/export")
-	public ResponseEntity<?> exportExpenses(@PathVariable String userId,
+	public ResponseEntity<?> exportExpenses(Authentication authentication,@PathVariable String userId,
 	                                        @RequestParam(value = "start_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startDate,
 	                                        @RequestParam(value = "end_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate) {
+		if(authentication==null||!userId.equals(authentication.getPrincipal()))return ResponseEntity.status(403).build();
 		startDate = FormatDate.formatStartDate(startDate, false);
 		endDate = FormatDate.formatEndDate(endDate);
 		try {
@@ -249,15 +277,16 @@ public class ExpenseController {
 	}
 
 	@GetMapping("/bulk_upload/upload")
-	public ResponseEntity<?> uploadExpenseWithFileId(Authentication authentication, @RequestParam("file_id") String fileId) {
+	public ResponseEntity<?> uploadExpenseWithFileId(Authentication authentication, @RequestParam("file_id") String fileId,@RequestParam("account_id") UUID accountId) {
 		String userId = (String) authentication.getPrincipal();
 		if (fileId.isEmpty()) {
 			return ResponseEntity.badRequest().body("Please select a file to upload");
 		}
 
 		try {
-			return ResponseEntity.ok().body(expenseService.BulkInsertExpensesFromFile(userId,
-					fileId));
+			var account=ledger.account(accountId,UUID.fromString(userId));
+			if(!account.isActive())throw new IllegalArgumentException("Account is archived");
+			return ResponseEntity.ok().body(expenseService.BulkInsertExpensesFromFile(userId,fileId,account));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
 		}

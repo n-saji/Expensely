@@ -101,18 +101,14 @@ class CategoryServiceTest {
 	}
 
 	@Test
-	void deleteCategoryRemovesTransactionsBeforeItsBudget() {
+	void deleteCategoryRejectsWhenTransactionsReferenceIt() {
 		UUID userId = UUID.randomUUID();
 		UUID categoryId = UUID.randomUUID();
-
-		categoryService.deleteCategoryById(categoryId.toString(), userId.toString());
-
-		var deletionOrder = inOrder(transactionRepository, budgetRepository);
-		deletionOrder.verify(transactionRepository)
-				.deleteByUserIdAndCategoryIdAndType(userId, categoryId, TransactionType.EXPENSE);
-		deletionOrder.verify(transactionRepository)
-				.deleteByUserIdAndCategoryIdAndType(userId, categoryId, TransactionType.INCOME);
-		deletionOrder.verify(budgetRepository).deleteByUserIdAndCategoryId(userId, categoryId);
-		verify(categoryRepository).deleteById(categoryId);
+		User user = new User(); user.setId(userId);
+		Category category = new Category(); category.setId(categoryId); category.setUser(user);
+		when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
+		when(transactionRepository.existsByUserIdAndCategoryId(userId,categoryId)).thenReturn(true);
+		assertThrows(IllegalArgumentException.class, () -> categoryService.deleteCategoryById(categoryId.toString(), userId.toString()));
+		verify(categoryRepository,never()).deleteById(categoryId);
 	}
 }

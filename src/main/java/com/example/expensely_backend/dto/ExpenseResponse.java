@@ -49,13 +49,27 @@ public class ExpenseResponse {
 		this.amount = expense.getAmount();
 		this.description = expense.getDescription();
 		this.expenseDate = expense.getTransactionDate();
-		this.categoryId = expense.getCategory().getId().toString();
-		this.categoryName = expense.getCategory().getName();
+		this.categoryId = expense.getCategory()==null?null:expense.getCategory().getId().toString();
+		this.categoryName = expense.getCategory()==null?"Loan Interest":expense.getCategory().getName();
 		this.userId = expense.getUser().getId().toString();
 		this.currency = expense.getCurrency();
 		this.baseCurrencyAmount = expense.getBaseCurrencyAmount();
 		this.displayAmount = displayAmount;
 		this.displayCurrency = displayCurrency;
 		this.receiptUrl = expense.getReceiptUrl();
+	}
+
+	public ExpenseResponse(Transaction payment,String displayCurrency,BigDecimal displayRate,boolean interestProjection) {
+		BigDecimal baseInterest=payment.getBaseCurrencyAmount().multiply(payment.getInterestAmount())
+			.divide(payment.getAmount(),2,java.math.RoundingMode.HALF_UP);
+		this.id=payment.getId();this.amount=payment.getInterestAmount();
+		this.description=(payment.getDescription()==null?"Debt payment":payment.getDescription())+" interest";
+		this.expenseDate=payment.getTransactionDate();
+		this.categoryId=payment.getCategory()==null?null:payment.getCategory().getId().toString();
+		this.categoryName=payment.getCategory()==null?"Loan Interest":payment.getCategory().getName();
+		this.userId=payment.getUser().getId().toString();this.currency=payment.getCurrency();
+		this.baseCurrencyAmount=baseInterest;
+		this.displayAmount=baseInterest.multiply(displayRate).setScale(2,java.math.RoundingMode.HALF_UP);
+		this.displayCurrency=displayCurrency;this.receiptUrl=null;
 	}
 }

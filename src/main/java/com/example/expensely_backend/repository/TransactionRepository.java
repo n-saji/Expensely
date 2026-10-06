@@ -15,6 +15,8 @@ import java.util.UUID;
 
 @Repository
 public interface TransactionRepository extends JpaRepository<Transaction, UUID> {
+	boolean existsByUserIdAndCategoryId(UUID userId, UUID categoryId);
+	List<Transaction> findByUserIdAndDebtIdOrderByTransactionDateDesc(UUID userId,UUID debtId);
 
 	Transaction findByUserIdAndIdAndType(UUID userId, UUID id, TransactionType type);
 
@@ -100,9 +102,9 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
 	                                                      @Param("endDate") LocalDateTime endDate);
 
 	@Query(value = """
-			SELECT sum(t.base_currency_amount)
+			SELECT sum(CASE WHEN t.type = 'DEBT_PAYMENT' THEN t.base_currency_amount * t.interest_amount / t.amount ELSE t.base_currency_amount END)
 			            from transactions t
-			            where t.user_id = :userId AND t.type = :type
+			            where t.user_id = :userId AND (t.type = :type OR (:type = 'EXPENSE' AND t.type = 'DEBT_PAYMENT' AND t.interest_amount > 0))
 			            AND t.transaction_date >= :startDate
 			            AND t.transaction_date <= :endDate
 			""", nativeQuery = true)
@@ -122,10 +124,10 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
 	void deleteAllByUserId(@Param("userId") UUID userId);
 
 	@Query(value = "SELECT CAST(EXTRACT(YEAR FROM t.transaction_date) AS INTEGER) as year_val, " +
-	               "SUM(COALESCE(t.base_currency_amount, t.amount)) as total_val, " +
+	               "SUM(CASE WHEN t.type='DEBT_PAYMENT' THEN t.base_currency_amount*t.interest_amount/t.amount ELSE COALESCE(t.base_currency_amount,t.amount) END) as total_val, " +
 	               "COUNT(t.id) as count_val " +
 	               "FROM transactions t " +
-	               "WHERE t.user_id = :userId AND t.type = :type AND EXTRACT(MONTH FROM t.transaction_date) = :month " +
+	               "WHERE t.user_id = :userId AND (t.type = :type OR (:type='EXPENSE' AND t.type='DEBT_PAYMENT' AND t.interest_amount>0)) AND EXTRACT(MONTH FROM t.transaction_date) = :month " +
 	               "GROUP BY EXTRACT(YEAR FROM t.transaction_date) " +
 	               "ORDER BY year_val ASC", nativeQuery = true)
 	List<Object[]> findHistoricalMonthlyData(@Param("userId") UUID userId, @Param("month") int month, @Param("type") String type);

@@ -74,8 +74,17 @@ public class Transaction {
 	private String receiptUrl; // nullable, only for EXPENSE
 
 	@Enumerated(EnumType.STRING)
-	@Column(nullable = false, length = 10)
+	@Column(nullable = false, length = 32)
 	@Getter
 	@Setter
 	private TransactionType type;
+
+	@ManyToOne @Getter @Setter private Account account;
+	@ManyToOne @Getter @Setter private Account destinationAccount;
+	@ManyToOne @Getter @Setter private Debt debt;
+	@ManyToOne @Getter @Setter private SavingsGoal savingsGoal;
+	@ManyToOne @Getter @Setter private InvestmentAccount investmentAccount;
+	@Column(precision = 19, scale = 2) @Getter @Setter private BigDecimal principalAmount;
+	@Column(precision = 19, scale = 2) @Getter @Setter private BigDecimal interestAmount;
+	@Getter @Setter private String notes;
 }

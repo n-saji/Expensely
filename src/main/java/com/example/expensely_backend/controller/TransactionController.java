@@ -2,6 +2,7 @@ package com.example.expensely_backend.controller;
 
 import com.example.expensely_backend.dto.*;
 import com.example.expensely_backend.model.Transaction;
+import com.example.expensely_backend.model.TransactionType;
 import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.service.*;
 import com.example.expensely_backend.utils.FormatDate;
@@ -11,11 +12,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/transactions")
@@ -24,13 +27,19 @@ public class TransactionController {
 	private final TransactionService transactionService;
 	private final TransactionFilesService transactionFilesService;
 	private final UserService userService;
+	private final FinancialTransactionService financialTransactions;
+	private final FinancialLedgerService ledger;
 
 	public TransactionController(TransactionService transactionService,
 	                             TransactionFilesService transactionFilesService,
-	                             UserService userService) {
+	                             UserService userService,
+	                             FinancialTransactionService financialTransactions,
+	                             FinancialLedgerService ledger) {
 		this.transactionService = transactionService;
 		this.transactionFilesService = transactionFilesService;
 		this.userService = userService;
+		this.financialTransactions = financialTransactions;
+		this.ledger = ledger;
 	}
 
 	@PostMapping("/create")
@@ -45,7 +54,16 @@ public class TransactionController {
 			}
 			User user = userService.GetActiveUserById(userId);
 			transaction.setUser(user);
-			Transaction saved = transactionService.save(transaction);
+			Transaction saved;
+			if (financialTransactions.linked(transaction.getType())) {
+				saved = financialTransactions.create(UUID.fromString(userId), transaction);
+			} else {
+				if(transaction.getAccount()==null||transaction.getAccount().getId()==null)throw new IllegalArgumentException("Account is required");
+				var account=ledger.account(transaction.getAccount().getId(),UUID.fromString(userId));
+				if(!account.isActive())throw new IllegalArgumentException("Account is archived");
+				transaction.setAccount(account);
+				saved = transactionService.save(transaction);
+			}
 			return ResponseEntity.ok(transactionService.getTransactionResponseById(saved.getId().toString()));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(new AuthResponse("Transaction creation failed!", null, e.getMessage()));
@@ -59,6 +77,7 @@ public class TransactionController {
 			return ResponseEntity.status(401).body(null);
 		}
 		try {
+			financialTransactions.owned(UUID.fromString(id),UUID.fromString(userId));
 			return ResponseEntity.ok(transactionService.getTransactionResponseById(id));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(null);
@@ -72,7 +91,9 @@ public class TransactionController {
 			return ResponseEntity.status(401).body("Unauthorized");
 		}
 		try {
-			transactionService.deleteTransactionById(id);
+			Transaction target=financialTransactions.owned(UUID.fromString(id),UUID.fromString(userId));
+			if(financialTransactions.linked(target.getType()))financialTransactions.delete(UUID.fromString(userId),UUID.fromString(id));
+			else transactionService.deleteTransactionById(id);
 			return ResponseEntity.ok("Transaction deleted successfully!");
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body("Error: " + e.getMessage());
@@ -86,11 +107,18 @@ public class TransactionController {
 			return ResponseEntity.status(401).body("Unauthorized");
 		}
 		try {
-			Transaction existing = transactionService.getTransactionById(id);
+			Transaction existing = financialTransactions.owned(UUID.fromString(id),UUID.fromString(userId));
 			if (existing == null) {
 				return ResponseEntity.badRequest().body(new AuthResponse("Transaction not found!", null, ""));
 			}
-			Transaction updated = transactionService.updateTransaction(updatedTransaction);
+			updatedTransaction.setId(UUID.fromString(id));
+			Transaction updated;
+			if(financialTransactions.linked(existing.getType()))updated=financialTransactions.update(UUID.fromString(userId),UUID.fromString(id),updatedTransaction);
+			else {
+				if(updatedTransaction.getType()!=null&&updatedTransaction.getType()!=existing.getType())throw new IllegalArgumentException("Transaction type cannot change");
+				if(updatedTransaction.getAccount()!=null)updatedTransaction.setAccount(ledger.account(updatedTransaction.getAccount().getId(),UUID.fromString(userId)));
+				updated=transactionService.updateTransaction(updatedTransaction);
+			}
 			return ResponseEntity.ok(new AuthResponse("Transaction updated successfully!", updated.getId().toString(), ""));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(new AuthResponse("Transaction update failed!", null, e.getMessage()));
@@ -99,6 +127,7 @@ public class TransactionController {
 
 	@GetMapping("/user/{userId}/fetch-with-conditions")
 	public ResponseEntity<?> fetchWithConditions(
+			Authentication authentication,
 			@PathVariable String userId,
 			@RequestParam(value = "start_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startDate,
 			@RequestParam(value = "end_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate,
@@ -111,6 +140,7 @@ public class TransactionController {
 			@RequestParam(value = "sort_order", required = false) String customSortOrder,
 			@RequestParam(value = "type", required = false) String type) {
 
+		if(authentication==null||!userId.equals(authentication.getPrincipal()))return ResponseEntity.status(403).build();
 		startDate = FormatDate.formatStartDate(startDate, false);
 		endDate = FormatDate.formatEndDate(endDate);
 		if (q == null) q = "";
@@ -141,6 +171,7 @@ public class TransactionController {
 
 	@GetMapping("/user/{userId}/export")
 	public ResponseEntity<?> exportTransactions(
+			Authentication authentication,
 			@PathVariable String userId,
 			@RequestParam(value = "start_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startDate,
 			@RequestParam(value = "end_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate,
@@ -149,6 +180,7 @@ public class TransactionController {
 			@RequestParam(value = "q", required = false) String q,
 			@RequestParam(value = "sort_by", required = false) String sortBy,
 			@RequestParam(value = "sort_order", required = false) String sortOrder) {
+		if(authentication==null||!userId.equals(authentication.getPrincipal()))return ResponseEntity.status(403).build();
 		startDate = FormatDate.formatStartDate(startDate, false);
 		endDate = FormatDate.formatEndDate(endDate);
 		if (q == null) q = "";
@@ -193,22 +225,25 @@ public class TransactionController {
 	}
 
 	@GetMapping("/bulk_upload/upload")
-	public ResponseEntity<?> uploadTransactionWithFileId(Authentication authentication, @RequestParam("file_id") String fileId) {
+	public ResponseEntity<?> uploadTransactionWithFileId(Authentication authentication, @RequestParam("file_id") String fileId,@RequestParam("account_id") UUID accountId) {
 		String userId = (String) authentication.getPrincipal();
 		if (fileId.isEmpty()) {
 			return ResponseEntity.badRequest().body("Please select a file to upload");
 		}
 		try {
-			return ResponseEntity.ok().body(transactionService.BulkInsertTransactionsFromFile(userId, fileId));
+			var account=ledger.account(accountId,UUID.fromString(userId));
+			if(!account.isActive())throw new IllegalArgumentException("Account is archived");
+			return ResponseEntity.ok().body(transactionService.BulkInsertTransactionsFromFile(userId, fileId,account));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
 		}
 	}
 
 	@PostMapping("/user/{userId}/bulk-delete")
-	public ResponseEntity<?> bulkDeleteTransactionsByUserId(@PathVariable String userId, @RequestBody List<Transaction> transactions) {
+	public ResponseEntity<?> bulkDeleteTransactionsByUserId(Authentication authentication,@PathVariable String userId, @RequestBody List<Transaction> transactions) {
 		try {
-			transactionService.deleteByUserIdAndTransactionIds(userId, transactions);
+			if(authentication==null||!userId.equals(authentication.getPrincipal()))return ResponseEntity.status(403).build();
+			financialTransactions.bulkDelete(UUID.fromString(userId), transactions);
 			return ResponseEntity.ok(new AuthResponse("Bulk delete transactions successfully!", null, ""));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(new AuthResponse("Bulk delete transactions failed!", null, e.getMessage()));
@@ -222,7 +257,7 @@ public class TransactionController {
 	                                         @RequestParam(name = "fileName") String fileName) {
 		String userId = (String) authentication.getPrincipal();
 		try {
-			Transaction transaction = transactionService.getTransactionById(transactionId);
+			Transaction transaction = financialTransactions.owned(UUID.fromString(transactionId),UUID.fromString(userId));
 			if (transaction == null) {
 				return ResponseEntity.badRequest().body("Transaction not found");
 			}
@@ -240,6 +275,7 @@ public class TransactionController {
 	                                                     @RequestBody S3Resp url) {
 		String userId = (String) authentication.getPrincipal();
 		try {
+			financialTransactions.owned(UUID.fromString(transactionId),UUID.fromString(userId));
 			transactionService.UpdateTransactionAttachment(userId, transactionId, url.getUrl());
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
@@ -251,6 +287,7 @@ public class TransactionController {
 	public ResponseEntity<?> getDownloadURL(Authentication authentication, @PathVariable String eid) {
 		String userId = (String) authentication.getPrincipal();
 		try {
+			financialTransactions.owned(UUID.fromString(eid),UUID.fromString(userId));
 			return ResponseEntity.ok().body(new S3Resp("", transactionService.GenerateDownloadURLForTransaction(eid)));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(new UserRes(null, "Error: " + e.getMessage()));
@@ -261,6 +298,7 @@ public class TransactionController {
 	public ResponseEntity<?> deleteTransactionAttachment(Authentication authentication, @PathVariable String eid) {
 		String userId = (String) authentication.getPrincipal();
 		try {
+			financialTransactions.owned(UUID.fromString(eid),UUID.fromString(userId));
 			transactionService.DeleteTransactionAttachment(userId, eid);
 			return ResponseEntity.ok().body("Transaction attachment deleted successfully");
 		} catch (Exception e) {

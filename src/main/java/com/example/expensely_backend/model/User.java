@@ -152,7 +152,7 @@ public class User {
 		return "https://" + bucket + ".s3.amazonaws.com/" + profilePicFilePath;
 	}
 
-	@Column(columnDefinition = "boolean default false")
+	@Column(name = "is_oauth2_user", columnDefinition = "boolean default false")
 	@Getter
 	@Setter
 	@JsonProperty("isOauth2User")

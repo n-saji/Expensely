@@ -58,15 +58,15 @@ public class AnalyticsService {
 
 		// Fetch Selected Month Transactions for selected Type
 		boolean isExpense = globals.TYPE_EXPENSE.equalsIgnoreCase(type);
-		List<Transaction> selectedMonthExpenses = transactionRepository.findByUserIdAndTypeAndTimeFrameAsc(user.getId(), TransactionType.EXPENSE, startDateTime, endDateTime);
+		List<Transaction> selectedMonthExpenses = reportExpenses(user.getId(),startDateTime,endDateTime);
 		List<Transaction> selectedMonthIncomes = transactionRepository.findByUserIdAndTypeAndTimeFrameAsc(user.getId(), TransactionType.INCOME, startDateTime, endDateTime);
 
 		// All calculations will use the normalized rates
 		MonthlyAnalyticsResponse response = new MonthlyAnalyticsResponse();
 
 		if (isExpense) {
-			List<Transaction> prevMonthExpenses = transactionRepository.findByUserIdAndTypeAndTimeFrameAsc(user.getId(), TransactionType.EXPENSE, prevStartDateTime, prevEndDateTime);
-			List<Transaction> lastYearExpenses = transactionRepository.findByUserIdAndTypeAndTimeFrameAsc(user.getId(), TransactionType.EXPENSE, lastYearStartDateTime, lastYearEndDateTime);
+			List<Transaction> prevMonthExpenses = reportExpenses(user.getId(),prevStartDateTime,prevEndDateTime);
+			List<Transaction> lastYearExpenses = reportExpenses(user.getId(),lastYearStartDateTime,lastYearEndDateTime);
 			List<Object[]> historicalRaw = transactionRepository.findHistoricalMonthlyData(user.getId(), month, "EXPENSE");
 
 			calculateExpenseAnalytics(response, selectedMonthExpenses, prevMonthExpenses, lastYearExpenses, historicalRaw, year,
@@ -94,6 +94,19 @@ public class AnalyticsService {
 			return t.getAmount() != null ? t.getAmount() : BigDecimal.ZERO;
 		}
 		return exchangeRateService.convertToUsd(t.getAmount(), t.getCurrency());
+	}
+	private List<Transaction> reportExpenses(UUID userId,LocalDateTime start,LocalDateTime end) {
+		List<Transaction> result=new ArrayList<>(transactionRepository.findByUserIdAndTypeAndTimeFrameAsc(userId,TransactionType.EXPENSE,start,end));
+		for(Transaction payment:transactionRepository.findByUserIdAndTypeAndTimeFrameAsc(userId,TransactionType.DEBT_PAYMENT,start,end)) {
+			if(payment.getInterestAmount()==null||payment.getInterestAmount().signum()<=0)continue;
+			Transaction interest=new Transaction();interest.setId(payment.getId());interest.setUser(payment.getUser());
+			interest.setType(TransactionType.EXPENSE);interest.setCategory(payment.getCategory());
+			interest.setAmount(payment.getInterestAmount());interest.setCurrency(payment.getCurrency());
+			interest.setBaseCurrencyAmount(getUsdAmount(payment).multiply(payment.getInterestAmount()).divide(payment.getAmount(),2,RoundingMode.HALF_UP));
+			interest.setDescription((payment.getDescription()==null?"Debt payment":payment.getDescription())+" interest");
+			interest.setTransactionDate(payment.getTransactionDate());result.add(interest);
+		}
+		return result;
 	}
 
 	private void calculateExpenseAnalytics(

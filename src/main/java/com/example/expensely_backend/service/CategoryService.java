@@ -50,6 +50,9 @@ public class CategoryService {
 			throw new IllegalArgumentException("User not found");
 		}
 		category.setUser(user);
+		if (!globals.TYPE_EXPENSE.equalsIgnoreCase(category.getType()) && !globals.TYPE_INCOME.equalsIgnoreCase(category.getType())) {
+			throw new IllegalArgumentException("New categories must be expense or income");
+		}
 
 		if (category.getIcon() == null || category.getIcon().isBlank()) {
 			category.setIcon(globals.DEFAULT_CATEGORY_ICON);
@@ -78,8 +81,9 @@ public class CategoryService {
 		try {
 			UUID categoryId = UUID.fromString(cId);
 			UUID userId = UUID.fromString(uId);
-			transactionRepository.deleteByUserIdAndCategoryIdAndType(userId, categoryId, TransactionType.EXPENSE);
-			transactionRepository.deleteByUserIdAndCategoryIdAndType(userId, categoryId, TransactionType.INCOME);
+			Category category = getCategoryById(cId);
+			if(category.getUser()==null || !category.getUser().getId().equals(userId))throw new IllegalArgumentException("Category not found");
+			if(transactionRepository.existsByUserIdAndCategoryId(userId,categoryId))throw new IllegalArgumentException("Category has transactions; keep it to preserve financial history");
 			budgetRepository.deleteByUserIdAndCategoryId(userId, categoryId);
 			recurringExpenseRepository.deleteByUserIdAndCategoryId(userId, categoryId);
 			List<Reminder> reminders = reminderRepository.findByCategoryIdAndUserIdAndDeletedAtIsNull(categoryId, userId);

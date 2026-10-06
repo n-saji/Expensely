@@ -95,6 +95,7 @@ public class TransactionService {
 		return new TransactionResponse(transaction, displayCurrency, displayAmount);
 	}
 
+	@Transactional
 	public Transaction save(Transaction transaction) {
 		User user = userService.GetActiveUserById(transaction.getUser().getId().toString());
 		if (user == null) {
@@ -107,18 +108,27 @@ public class TransactionService {
 			throw new IllegalArgumentException("Category not found");
 		}
 		transaction.setCategory(category);
+		if (transaction.getType() == null || (transaction.getType() != TransactionType.EXPENSE && transaction.getType() != TransactionType.INCOME)) {
+			throw new IllegalArgumentException("Invalid income or expense type");
+		}
+		if (!category.getUser().getId().equals(user.getId()) || !category.getType().equalsIgnoreCase(transaction.getType().name())) {
+			throw new IllegalArgumentException("Category must belong to user and match transaction type");
+		}
+		if (transaction.getAmount() == null || transaction.getAmount().signum() <= 0) throw new IllegalArgumentException("Amount must be positive");
+		if (transaction.getAccount() != null && transaction.getCurrency() != null && !transaction.getAccount().getCurrency().equalsIgnoreCase(transaction.getCurrency())) {
+			throw new IllegalArgumentException("Account and transaction currencies must match");
+		}
+		if (transaction.getDestinationAccount()!=null || transaction.getDebt()!=null || transaction.getSavingsGoal()!=null || transaction.getInvestmentAccount()!=null || transaction.getPrincipalAmount()!=null || transaction.getInterestAmount()!=null) {
+			throw new IllegalArgumentException("Income and expense cannot link financial movement fields");
+		}
 
-		applyCurrencySnapshot(transaction, user.getCurrency() != null ? user.getCurrency() : globals.BASE_CURRENCY);
+		applyCurrencySnapshot(transaction, transaction.getCurrency() != null ? transaction.getCurrency() : (transaction.getAccount() != null ? transaction.getAccount().getCurrency() : (user.getCurrency() != null ? user.getCurrency() : globals.BASE_CURRENCY)));
 
 		Transaction saved = transactionRepository.save(transaction);
 		userRepository.markHasTransactions(user.getId());
 
 		if (saved.getType() == TransactionType.EXPENSE) {
-			try {
-				budgetService.updateBudgetAmountByUserIdAndCategoryId(user.getId().toString(), category.getId().toString(), saved.getBaseCurrencyAmount(), saved.getTransactionDate());
-			} catch (Exception e) {
-				dbLogService.logError("service", getClass().getName(), "save", "Budget update failed for expense creation: " + e.getMessage(), e);
-			}
+			budgetService.updateBudgetAmountByUserIdAndCategoryId(user.getId().toString(), category.getId().toString(), saved.getBaseCurrencyAmount(), saved.getTransactionDate());
 		}
 
 		return saved;
@@ -136,6 +146,7 @@ public class TransactionService {
 		return mapTransactionToResponse(t, t.getUser().getCurrency());
 	}
 
+	@Transactional
 	public void deleteTransactionById(String id) {
 		Transaction t = getTransactionById(id);
 		if (t == null) {
@@ -145,11 +156,7 @@ public class TransactionService {
 		transactionRepository.deleteById(UUID.fromString(id));
 
 		if (t.getType() == TransactionType.EXPENSE) {
-			try {
-				budgetService.updateBudgetAmountByUserIdAndCategoryId(t.getUser().getId().toString(), t.getCategory().getId().toString(), t.getBaseCurrencyAmount().negate(), t.getTransactionDate());
-			} catch (Exception e) {
-				dbLogService.logError("service", getClass().getName(), "deleteTransactionById", "Budget update failed for expense deletion: " + e.getMessage(), e);
-			}
+			budgetService.updateBudgetAmountByUserIdAndCategoryId(t.getUser().getId().toString(), t.getCategory().getId().toString(), t.getBaseCurrencyAmount().negate(), t.getTransactionDate());
 		}
 	}
 
@@ -171,13 +178,26 @@ public class TransactionService {
 		}
 	}
 
+	@Transactional
 	public Transaction updateTransaction(Transaction transaction) {
 		Transaction oldT = getTransactionById(transaction.getId().toString());
 		if (oldT == null) {
 			throw new IllegalArgumentException("Transaction not found");
 		}
+		if (transaction.getAmount() != null && transaction.getAmount().signum() <= 0) {
+			throw new IllegalArgumentException("Amount must be positive");
+		}
+		if (transaction.getCurrency() != null && oldT.getAccount() != null &&
+				!transaction.getCurrency().equalsIgnoreCase(oldT.getAccount().getCurrency()) && transaction.getAccount() == null) {
+			throw new IllegalArgumentException("Account and transaction currencies must match");
+		}
 
 		BigDecimal previousBaseAmount = oldT.getBaseCurrencyAmount();
+		if(transaction.getAccount()!=null) {
+			String requestedCurrency = transaction.getCurrency() == null ? oldT.getCurrency() : transaction.getCurrency();
+			if(!transaction.getAccount().getCurrency().equalsIgnoreCase(requestedCurrency))throw new IllegalArgumentException("Account and transaction currencies must match");
+			oldT.setAccount(transaction.getAccount());
+		}
 		boolean categoryChanged = false;
 		boolean dateChanged = false;
 
@@ -186,13 +206,12 @@ public class TransactionService {
 			if (category == null) {
 				throw new IllegalArgumentException("Category not found");
 			}
+			if (!category.getUser().getId().equals(oldT.getUser().getId()) || !category.getType().equalsIgnoreCase(oldT.getType().name())) {
+				throw new IllegalArgumentException("Category must belong to user and match transaction type");
+			}
 
 			if (oldT.getType() == TransactionType.EXPENSE) {
-				try {
-					budgetService.updateBudgetAmountByUserIdAndCategoryId(oldT.getUser().getId().toString(), oldT.getCategory().getId().toString(), oldT.getBaseCurrencyAmount().negate(), oldT.getTransactionDate());
-				} catch (Exception e) {
-					dbLogService.logError("service", getClass().getName(), "updateTransaction", "Old budget update failed: " + e.getMessage(), e);
-				}
+				budgetService.updateBudgetAmountByUserIdAndCategoryId(oldT.getUser().getId().toString(), oldT.getCategory().getId().toString(), oldT.getBaseCurrencyAmount().negate(), oldT.getTransactionDate());
 			}
 			oldT.setCategory(category);
 			categoryChanged = true;
@@ -223,11 +242,7 @@ public class TransactionService {
 		}
 		if (transaction.getTransactionDate() != null && !transaction.getTransactionDate().equals(oldT.getTransactionDate())) {
 			if (!categoryChanged && oldT.getType() == TransactionType.EXPENSE) {
-				try {
-					budgetService.updateBudgetAmountByUserIdAndCategoryId(oldT.getUser().getId().toString(), oldT.getCategory().getId().toString(), oldT.getBaseCurrencyAmount().negate(), oldT.getTransactionDate());
-				} catch (Exception e) {
-					dbLogService.logError("service", getClass().getName(), "updateTransaction", "Old budget update failed: " + e.getMessage(), e);
-				}
+				budgetService.updateBudgetAmountByUserIdAndCategoryId(oldT.getUser().getId().toString(), oldT.getCategory().getId().toString(), oldT.getBaseCurrencyAmount().negate(), oldT.getTransactionDate());
 			}
 			oldT.setTransactionDate(transaction.getTransactionDate());
 			dateChanged = true;
@@ -237,11 +252,7 @@ public class TransactionService {
 
 		if (updated.getType() == TransactionType.EXPENSE) {
 			BigDecimal diff = (categoryChanged || dateChanged) ? updated.getBaseCurrencyAmount() : updated.getBaseCurrencyAmount().subtract(previousBaseAmount);
-			try {
-				budgetService.updateBudgetAmountByUserIdAndCategoryId(updated.getUser().getId().toString(), updated.getCategory().getId().toString(), diff, updated.getTransactionDate());
-			} catch (Exception e) {
-				dbLogService.logError("service", getClass().getName(), "updateTransaction", "New budget update failed: " + e.getMessage(), e);
-			}
+			budgetService.updateBudgetAmountByUserIdAndCategoryId(updated.getUser().getId().toString(), updated.getCategory().getId().toString(), diff, updated.getTransactionDate());
 		}
 
 		return updated;
@@ -321,7 +332,7 @@ public class TransactionService {
 					displayCurrency,
 					t.getTransactionDate().toString(),
 					t.getDescription(),
-					t.getCategory().getName(),
+					t.getCategory()==null?"":t.getCategory().getName(),
 					t.getType().name()
 			});
 		}
@@ -333,7 +344,8 @@ public class TransactionService {
 		return sw.toString();
 	}
 
-	public String BulkInsertTransactionsFromFile(String userId, String fileId) {
+	@Transactional
+	public String BulkInsertTransactionsFromFile(String userId, String fileId, Account account) {
 		UUID fileUUID = UUID.fromString(fileId);
 		UUID userUUID = UUID.fromString(userId);
 
@@ -369,13 +381,16 @@ public class TransactionService {
 
 		List<Transaction> transactions = rows.stream().map(dto -> {
 			Transaction transaction = new Transaction();
+			transaction.setAccount(account);
 			transaction.setAmount(normalizeAmount(BigDecimal.valueOf(dto.getAmount())));
 			transaction.setCategory(catsList.get(dto.getCategory()));
 			transaction.setTransactionDate(dto.getTransaction_date().atStartOfDay());
 			transaction.setDescription(dto.getDescription());
 			transaction.setUser(user);
 			transaction.setType(TransactionType.valueOf(dto.getType().toUpperCase()));
-			applyCurrencySnapshot(transaction, user.getCurrency() != null ? user.getCurrency() : globals.BASE_CURRENCY);
+			if(transaction.getCategory()==null||!transaction.getCategory().getUser().getId().equals(userUUID)||!transaction.getCategory().getType().equalsIgnoreCase(transaction.getType().name()))throw new IllegalArgumentException("Category must match transaction type");
+			if(transaction.getAmount().signum()<=0)throw new IllegalArgumentException("Amount must be positive");
+			applyCurrencySnapshot(transaction, account.getCurrency());
 			return transaction;
 		}).toList();
 
@@ -384,11 +399,7 @@ public class TransactionService {
 		// Update budgets for expenses inserted
 		for (Transaction saved : transactions) {
 			if (saved.getType() == TransactionType.EXPENSE) {
-				try {
-					budgetService.updateBudgetAmountByUserIdAndCategoryId(userId, saved.getCategory().getId().toString(), saved.getBaseCurrencyAmount(), saved.getTransactionDate());
-				} catch (Exception e) {
-					dbLogService.logError("service", getClass().getName(), "BulkInsertTransactionsFromFile", "Budget update failed: " + e.getMessage(), e);
-				}
+				budgetService.updateBudgetAmountByUserIdAndCategoryId(userId, saved.getCategory().getId().toString(), saved.getBaseCurrencyAmount(), saved.getTransactionDate());
 			}
 		}
 

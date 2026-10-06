@@ -66,11 +66,15 @@ class TransactionServiceTest {
 		cat1 = new Category();
 		cat1.setId(cat1Id);
 		cat1.setName("Food");
+		cat1.setUser(user);
+		cat1.setType("expense");
 
 		cat2Id = UUID.randomUUID();
 		cat2 = new Category();
 		cat2.setId(cat2Id);
 		cat2.setName("Transport");
+		cat2.setUser(user);
+		cat2.setType("expense");
 
 		now = LocalDateTime.now();
 

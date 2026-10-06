@@ -36,6 +36,15 @@ public class TransactionResponse {
 	private final String receiptUrl;
 	@Getter
 	private final TransactionType type;
+	@Getter private final String accountId;
+	@Getter private final String destinationAccountId;
+	@Getter private final String debtId;
+	@Getter private final String savingsGoalId;
+	@Getter private final String investmentAccountId;
+	@Getter private final BigDecimal principalAmount;
+	@Getter private final BigDecimal interestAmount;
+	@Getter private final String notes;
+	@Getter private final String counterpartyName;
 
 	public TransactionResponse(
 			Transaction transaction,
@@ -46,8 +55,8 @@ public class TransactionResponse {
 		this.amount = transaction.getAmount();
 		this.description = transaction.getDescription();
 		this.transactionDate = transaction.getTransactionDate();
-		this.categoryId = transaction.getCategory().getId().toString();
-		this.categoryName = transaction.getCategory().getName();
+		this.categoryId = transaction.getCategory() == null ? null : transaction.getCategory().getId().toString();
+		this.categoryName = transaction.getCategory() == null ? null : transaction.getCategory().getName();
 		this.userId = transaction.getUser().getId().toString();
 		this.currency = transaction.getCurrency();
 		this.baseCurrencyAmount = transaction.getBaseCurrencyAmount();
@@ -55,5 +64,17 @@ public class TransactionResponse {
 		this.displayCurrency = displayCurrency;
 		this.receiptUrl = transaction.getReceiptUrl();
 		this.type = transaction.getType();
+		this.accountId = transaction.getAccount() == null ? null : transaction.getAccount().getId().toString();
+		this.destinationAccountId = transaction.getDestinationAccount() == null ? null : transaction.getDestinationAccount().getId().toString();
+		this.debtId = transaction.getDebt() == null ? null : transaction.getDebt().getId().toString();
+		this.savingsGoalId = transaction.getSavingsGoal() == null ? null : transaction.getSavingsGoal().getId().toString();
+		this.investmentAccountId = transaction.getInvestmentAccount() == null ? null : transaction.getInvestmentAccount().getId().toString();
+		this.principalAmount = transaction.getPrincipalAmount();
+		this.interestAmount = transaction.getInterestAmount();
+		this.notes = transaction.getNotes();
+		this.counterpartyName = transaction.getDebt()!=null ? transaction.getDebt().getName() :
+			transaction.getSavingsGoal()!=null ? transaction.getSavingsGoal().getName() :
+			transaction.getInvestmentAccount()!=null ? transaction.getInvestmentAccount().getName() :
+			transaction.getDestinationAccount()!=null ? transaction.getDestinationAccount().getName() : null;
 	}
 }

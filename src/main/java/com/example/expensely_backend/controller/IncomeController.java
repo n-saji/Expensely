@@ -4,9 +4,13 @@ import com.example.expensely_backend.dto.AuthResponse;
 import com.example.expensely_backend.dto.UserRes;
 import com.example.expensely_backend.globals.globals;
 import com.example.expensely_backend.model.Transaction;
+import com.example.expensely_backend.model.TransactionType;
 import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.service.IncomeService;
 import com.example.expensely_backend.service.UserService;
+import com.example.expensely_backend.service.TransactionService;
+import com.example.expensely_backend.service.FinancialTransactionService;
+import com.example.expensely_backend.service.FinancialLedgerService;
 import com.example.expensely_backend.utils.FormatDate;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.MediaType;
@@ -18,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/incomes")
@@ -25,10 +30,14 @@ public class IncomeController {
 
 	private final IncomeService incomeService;
 	private final UserService userService;
+	private final TransactionService transactionService;
+	private final FinancialTransactionService financialTransactions;
+	private final FinancialLedgerService ledger;
 
-	public IncomeController(IncomeService incomeService, UserService userService) {
+	public IncomeController(IncomeService incomeService, UserService userService,TransactionService transactionService,FinancialTransactionService financialTransactions,FinancialLedgerService ledger) {
 		this.incomeService = incomeService;
 		this.userService = userService;
+		this.transactionService=transactionService;this.financialTransactions=financialTransactions;this.ledger=ledger;
 	}
 
 	@PostMapping("/create")
@@ -43,7 +52,10 @@ public class IncomeController {
 			}
 			User user = userService.GetActiveUserById(userId);
 			income.setUser(user);
-			Transaction savedIncome = incomeService.save(income);
+			income.setType(TransactionType.INCOME);
+			if(income.getAccount()==null||income.getAccount().getId()==null)throw new IllegalArgumentException("Account is required");
+			income.setAccount(ledger.account(income.getAccount().getId(),UUID.fromString(userId)));
+			Transaction savedIncome = transactionService.save(income);
 			return ResponseEntity.ok(incomeService.getIncomeResponseById(savedIncome.getId().toString()));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(new AuthResponse("Income creation failed!", null, e.getMessage()));
@@ -57,6 +69,7 @@ public class IncomeController {
 			return ResponseEntity.status(401).body(null);
 		}
 		try {
+			financialTransactions.owned(UUID.fromString(id),UUID.fromString(userId));
 			return ResponseEntity.ok(incomeService.getIncomeResponseById(id));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(null);
@@ -70,7 +83,9 @@ public class IncomeController {
 			return ResponseEntity.status(401).body("Unauthorized");
 		}
 		try {
-			incomeService.deleteIncomeByIdForUser(id, userId);
+			Transaction target=financialTransactions.owned(UUID.fromString(id),UUID.fromString(userId));
+			if(target.getType()!=TransactionType.INCOME)throw new IllegalArgumentException("Not income");
+			transactionService.deleteTransactionById(id);
 			return ResponseEntity.ok("Income deleted successfully!");
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body("Error: " + e.getMessage());
@@ -111,13 +126,16 @@ public class IncomeController {
 			return ResponseEntity.status(401).body("Unauthorized");
 		}
 		try {
-			Transaction existingIncome = incomeService.getIncomeByIdForUser(id, userId);
+			Transaction existingIncome = financialTransactions.owned(UUID.fromString(id),UUID.fromString(userId));
+			if(existingIncome.getType()!=TransactionType.INCOME)throw new IllegalArgumentException("Not income");
 			if (existingIncome == null) {
 				return ResponseEntity.badRequest().body(new AuthResponse("Income not found!", null, ""));
 			}
 			updatedIncome.setId(existingIncome.getId());
 			updatedIncome.setUser(existingIncome.getUser());
-			Transaction savedIncome = incomeService.updateIncome(updatedIncome);
+			updatedIncome.setType(TransactionType.INCOME);
+			if(updatedIncome.getAccount()!=null)updatedIncome.setAccount(ledger.account(updatedIncome.getAccount().getId(),UUID.fromString(userId)));
+			Transaction savedIncome = transactionService.updateTransaction(updatedIncome);
 			return ResponseEntity.ok(new AuthResponse("Income updated successfully!", savedIncome.getId().toString(), ""));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(new AuthResponse("Income update failed!", null, e.getMessage()));
@@ -257,9 +275,10 @@ public class IncomeController {
 	}
 
 	@GetMapping("/user/{userId}/export")
-	public ResponseEntity<?> exportIncomes(@PathVariable String userId,
+	public ResponseEntity<?> exportIncomes(Authentication authentication,@PathVariable String userId,
 	                                       @RequestParam(value = "start_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startDate,
 	                                       @RequestParam(value = "end_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate) {
+		if(authentication==null||!userId.equals(authentication.getPrincipal()))return ResponseEntity.status(403).build();
 		startDate = FormatDate.formatStartDate(startDate, false);
 		endDate = FormatDate.formatEndDate(endDate);
 		try {
