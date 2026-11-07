@@ -5,6 +5,7 @@ with tempfile.TemporaryDirectory() as d:
  root=pathlib.Path(d); bins=root/'bin';bins.mkdir();state=root/'state';state.mkdir()
  envfile=root/'app.env';envfile.write_text('VALUE=original\n');upstream=root/'upstream';upstream.write_text('initial upstream\n')
  script=source.replace('[[ $EUID == 0 ]]','[[ true ]]').replace('ROOT=/var/lib/expensely-deploy',f'ROOT={state}').replace('ENV=/etc/expensely/app.env',f'ENV={envfile}').replace('UPSTREAM=/etc/nginx/conf.d/expensely-upstream.conf',f'UPSTREAM={upstream}')
+ script=script.replace('/run/expensely-docker.',str(root/'docker.'))
  runner=root/'deploy';runner.write_text(script)
  mocks={'aws':'echo token','docker':'if [[ ${1:-} == login ]]; then cat >/dev/null; elif [[ ${1:-} == inspect ]]; then echo true; fi','curl':'[[ ${FAIL_HEALTH:-0} != 1 ]]','nginx':'exit 0','systemctl':'exit 0','sleep':'exit 0','flock':'exit 0'}
  for name,body in mocks.items():

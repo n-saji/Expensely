@@ -13,7 +13,9 @@ action=${1:-}
 image=${2:-}
 [[ $action == deploy || $action == rollback ]] || exit 2
 candidate_env="$ROOT/candidate.env"
-trap 'rm -f "$candidate_env"' EXIT
+export DOCKER_CONFIG
+DOCKER_CONFIG=$(mktemp -d /run/expensely-docker.XXXXXX)
+trap 'rm -f "$candidate_env"; rm -rf "$DOCKER_CONFIG"' EXIT
 if [[ -n ${3:-} ]]; then
   printf '%s' "$3" | base64 -d | openssl cms -decrypt -binary -inform DER \
     -recip /etc/expensely/deploy-cert.pem -inkey /etc/expensely/deploy-key.pem > "$candidate_env"
@@ -44,7 +46,7 @@ docker run -d --name "$name" --restart unless-stopped \
   -e SPRING_JPA_HIBERNATE_DDL_AUTO=validate -e SPRING_FLYWAY_ENABLED=false "$image" >/dev/null
 healthy=false
 for ((i=0;i<90;i++)); do
-  if curl -fsS --max-time 3 "http://127.0.0.1:$port/ping" >/dev/null; then healthy=true; break; fi
+  if curl -fsS --max-time 3 "http://127.0.0.1:$port/ping" >/dev/null 2>&1; then healthy=true; break; fi
   [[ $(docker inspect --format '{{.State.Running}}' "$name") == true ]] || break
   sleep 2
 done
