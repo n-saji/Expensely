@@ -11,3 +11,9 @@ The candidate runs on loopback port 8081 or 8082 with memory limits. Direct `/pi
 Database migrations are disabled during deployment, and Hibernate validates the existing schema. Plan and apply schema migrations separately with backups and backwards compatibility before releasing code that requires them. Application rollback does not roll back database data or schema. The public domain may return a Cloudflare challenge to automated clients; the deployment verifies the EC2 origin locally without changing Cloudflare's configuration.
 
 SIT deployment is disabled. The previous Docker Hub and SSH-based production workflow is replaced by ECR and SSM. This stack does not upgrade the AWS account plan or change the instance type.
+
+## Verification
+
+Run `python3 scripts/deploy/test-deployment.py` for isolated release-state tests. These test first and second releases, preservation of the active upstream when candidate health fails, rollback selection, and rejection of an image outside the permitted registry/digest format. They do not substitute for a live app health check.
+
+The first GitHub Actions run was blocked before a runner started because the owner's GitHub account is locked due to a billing issue: https://github.com/n-saji/Expensely/actions/runs/42338279113. Resolve billing and dispatch this branch's workflow to complete the first deployment. A live rollback test requires two successful compatible releases; no previous production release exists on this new EC2 yet.
