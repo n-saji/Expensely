@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 077
+[[ $EUID == 0 ]] || { echo 'Run as root'; exit 1; }
+ROOT=/var/lib/expensely-deploy
+ENV=/etc/expensely/app.env
+UPSTREAM=/etc/nginx/conf.d/expensely-upstream.conf
+REGISTRY=993371733162.dkr.ecr.us-east-2.amazonaws.com
+mkdir -p "$ROOT"
+exec 9>"$ROOT/lock"
+flock -n 9 || { echo 'Another deployment is running'; exit 1; }
+action=${1:-}
+image=${2:-}
+[[ $action == deploy || $action == rollback ]] || exit 2
+if [[ -n ${3:-} ]]; then
+  printf '%s' "$3" | base64 -d | openssl cms -decrypt -binary -inform DER \
+    -recip /etc/expensely/deploy-cert.pem -inkey /etc/expensely/deploy-key.pem > "$ENV.new"
+  chmod 600 "$ENV.new"
+  [[ -s $ENV.new ]] || exit 1
+  mv "$ENV.new" "$ENV"
+fi
+[[ -s $ENV ]] || { echo "Configure $ENV before deploying"; exit 1; }
+old_color= old_image=
+if [[ -f $ROOT/active ]]; then read -r old_color old_image < "$ROOT/active"; fi
+if [[ $action == rollback ]]; then
+  [[ -s $ROOT/previous ]] || { echo 'No previous release to roll back to'; exit 1; }
+  read -r unused image < "$ROOT/previous"
+fi
+[[ $image =~ ^993371733162\.dkr\.ecr\.us-east-2\.amazonaws\.com/expensely@sha256:[a-f0-9]{64}$ ]] || { echo 'An immutable image digest from the expensely repository is required'; exit 2; }
+if [[ $old_color == blue ]]; then color=green; port=8082; else color=blue; port=8081; fi
+name=expensely-app-$color
+aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin "$REGISTRY" >/dev/null
+docker pull "$image"
+docker rm -f "$name" >/dev/null 2>&1 || true
+docker run -d --name "$name" --restart unless-stopped \
+  --memory 384m --memory-swap 768m --cpus 0.8 \
+  --log-opt max-size=10m --log-opt max-file=3 \
+  -p "127.0.0.1:$port:8080" --env-file "$ENV" \
+  -e JAVA_TOOL_OPTIONS='-XX:MaxRAMPercentage=60 -XX:+ExitOnOutOfMemoryError' \
+  -e SPRING_JPA_HIBERNATE_DDL_AUTO=validate -e SPRING_FLYWAY_ENABLED=false "$image" >/dev/null
+healthy=false
+for ((i=0;i<90;i++)); do
+  if curl -fsS --max-time 3 "http://127.0.0.1:$port/ping" >/dev/null; then healthy=true; break; fi
+  [[ $(docker inspect --format '{{.State.Running}}' "$name") == true ]] || break
+  sleep 2
+done
+if [[ $healthy != true ]]; then
+  docker stop "$name" >/dev/null 2>&1 || true
+  echo 'Candidate failed health check; existing upstream preserved. Inspect container logs locally.'; exit 1
+fi
+cp "$UPSTREAM" "$ROOT/upstream.backup"
+restore() {
+  cp "$ROOT/upstream.backup" "$UPSTREAM"
+  nginx -t && systemctl reload nginx
+  docker stop "$name" >/dev/null 2>&1 || true
+}
+printf 'upstream expensely_backend { server 127.0.0.1:%s; keepalive 16; }\n' "$port" > "$UPSTREAM.tmp"
+mv "$UPSTREAM.tmp" "$UPSTREAM"
+if ! nginx -t || ! systemctl reload nginx; then restore; exit 1; fi
+sleep 1
+if ! curl -fsS --max-time 10 --resolve api.expensely.store:443:127.0.0.1 \
+  -H 'CF-Connecting-IP: 127.0.0.1' https://api.expensely.store/ping >/dev/null; then
+  restore; echo 'Proxy health check failed; previous upstream restored'; exit 1
+fi
+if [[ -n $old_color ]]; then
+  printf '%s %s\n' "$old_color" "$old_image" > "$ROOT/previous.tmp"
+  mv "$ROOT/previous.tmp" "$ROOT/previous"
+fi
+printf '%s %s\n' "$color" "$image" > "$ROOT/active.tmp"
+mv "$ROOT/active.tmp" "$ROOT/active"
+if [[ -n $old_color && $old_color != "$color" ]]; then docker stop "expensely-app-$old_color" >/dev/null; fi
+echo "Healthy release active in $color; previous image retained for rollback."

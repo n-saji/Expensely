@@ -1,12 +1,11 @@
 name: Expensely-SIT-Deploy
 
 on:
-  push:
-    branches:
-      - sit
+  workflow_dispatch:
 
 jobs:
   deploy:
+    if: ${{ false }} # SIT remains inactive by owner request
     runs-on: ubuntu-latest
     environment: sit
 

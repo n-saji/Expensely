@@ -1,0 +1,117 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Expensely restricted EC2 deployment command and GitHub deployment user",
+  "Parameters": {
+    "InstanceId": {
+      "Type": "String",
+      "AllowedPattern": "i-[a-f0-9]{17}"
+    }
+  },
+  "Resources": {
+    "DeployCommand": {
+      "Type": "AWS::SSM::Document",
+      "Properties": {
+        "DocumentType": "Command",
+        "DocumentFormat": "JSON",
+        "Content": {
+          "schemaVersion": "2.2",
+          "description": "Deploy or roll back an immutable Expensely image",
+          "parameters": {
+            "Action": {
+              "type": "String",
+              "allowedValues": [
+                "deploy",
+                "rollback"
+              ]
+            },
+            "Image": {
+              "type": "String",
+              "default": "",
+              "allowedPattern": "^$|^993371733162\\.dkr\\.ecr\\.us-east-2\\.amazonaws\\.com/expensely@sha256:[a-f0-9]{64}$"
+            },
+            "EncryptedEnv": {
+              "type": "String",
+              "default": "",
+              "allowedPattern": "^[A-Za-z0-9+/=]*$",
+              "interpolationType": "ENV_VAR"
+            }
+          },
+          "mainSteps": [
+            {
+              "action": "aws:runShellScript",
+              "name": "deploy",
+              "inputs": {
+                "timeoutSeconds": "600",
+                "runCommand": [
+                  "/usr/local/sbin/expensely-deploy '{{ Action }}' '{{ Image }}' \"${SSM_EncryptedEnv:-}\""
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    "DeployUser": {
+      "Type": "AWS::IAM::User",
+      "Properties": {
+        "Policies": [
+          {
+            "PolicyName": "EcrAndRestrictedDeploy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": "ecr:GetAuthorizationToken",
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "ecr:BatchCheckLayerAvailability",
+                    "ecr:InitiateLayerUpload",
+                    "ecr:UploadLayerPart",
+                    "ecr:CompleteLayerUpload",
+                    "ecr:PutImage"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:ecr:${AWS::Region}:${AWS::AccountId}:repository/expensely"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": "ssm:SendCommand",
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/${InstanceId}"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:document/${DeployCommand}"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": "ssm:GetCommandInvocation",
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "DeployUser": {
+      "Value": {
+        "Ref": "DeployUser"
+      }
+    },
+    "DeployDocument": {
+      "Value": {
+        "Ref": "DeployCommand"
+      }
+    }
+  }
+}

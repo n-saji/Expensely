@@ -1,200 +1,105 @@
-name: Expensely-Action-Deploy
-
+name: Expensely ECR and SSM deployment
 on:
   push:
-    branches:
-      - main
-
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      action:
+        type: choice
+        options: [deploy, rollback]
+        default: deploy
+permissions:
+  contents: read
+concurrency:
+  group: expensely-production
+  cancel-in-progress: false
+env:
+  AWS_REGION: us-east-2
+  AWS_ACCOUNT_ID: '993371733162'
+  ECR_REPOSITORY: expensely
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 25
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v6.3.0
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Get Runner IP
-        id: ip
-        run: echo "ipv4=$(curl -s https://ifconfig.me)" >> $GITHUB_OUTPUT
-
-      - name: Whitelist Runner IP
+          aws-access-key-id: ${{ secrets.EXPENSELY_DEPLOY_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.EXPENSELY_DEPLOY_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+          allowed-account-ids: ${{ env.AWS_ACCOUNT_ID }}
+      - id: login
+        if: inputs.action != 'rollback'
+        uses: aws-actions/amazon-ecr-login@v2
+      - uses: docker/setup-buildx-action@v3
+        if: inputs.action != 'rollback'
+      - id: build
+        if: inputs.action != 'rollback'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.login.outputs.registry }}/expensely:sha-${{ github.sha }}
+      - name: Encrypt app environment for this EC2
+        if: inputs.action != 'rollback'
+        env:
+          DEPLOY_CERT: ${{ vars.EXPENSELY_DEPLOY_CERT }}
+          APP_DB_URL: ${{ secrets.DB_URL }}
+          APP_JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          APP_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          APP_MAILGUN_API_KEY: ${{ secrets.MAILGUN_API_KEY }}
+          APP_EXCHANGE_RATE_API_KEY: ${{ secrets.EXCHANGE_RATE_API_KEY }}
+          APP_REDIS_HOST: ${{ secrets.REDIS_HOST }}
+          APP_REDIS_PORT: ${{ secrets.REDIS_PORT }}
+          APP_REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          APP_REDIS_USERNAME: ${{ secrets.REDIS_USERNAME }}
+          APP_GITHUB_CLIENT_ID: ${{ secrets.GIT_CLIENT_ID }}
+          APP_GITHUB_CLIENT_SECRET: ${{ secrets.GIT_CLIENT_SECRET }}
+          APP_DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
+          APP_DISCORD_CLIENT_SECRET: ${{ secrets.DISCORD_CLIENT_SECRET }}
+          APP_ALLOWED_ORIGINS: ${{ vars.ALLOWED_ORIGINS }}
+          APP_FRONTEND_URL: ${{ vars.FRONTEND_URL }}
+          APP_AWS_BUCKET_NAME: ${{ secrets.AWS_BUCKET_NAME }}
+          APP_AWS_PROFILE_BUCKET_NAME: ${{ secrets.AWS_PROFILE_BUCKET_NAME || 'expensely-profiles' }}
         run: |
-          aws ec2 authorize-security-group-ingress \
-            --group-id ${{ secrets.AWS_SG_ID }} \
-            --protocol tcp \
-            --port 22 \
-            --cidr ${{ steps.ip.outputs.ipv4 }}/32
-
-      - name: Docker Hub Login
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build and Push Docker Image
+          umask 077
+          python3 - <<'PY'
+          import os, pathlib
+          values={k[4:]:v for k,v in os.environ.items() if k.startswith('APP_')}
+          for key in ('DB_URL','JWT_SECRET','REDIS_HOST'):
+              if not values.get(key): raise SystemExit('Missing required app secret: '+key)
+          values.update(AWS_REGION='us-east-2', SERVER_PORT='8080')
+          if any('\n' in v or '\r' in v for v in values.values()): raise SystemExit('Multiline environment values are not supported')
+          pathlib.Path('app.env').write_text(''.join(k+'='+v+'\n' for k,v in values.items()))
+          pathlib.Path('deploy-cert.pem').write_text(os.environ['DEPLOY_CERT'])
+          PY
+          openssl cms -encrypt -binary -aes-256-cbc -in app.env -outform DER -out app.env.enc deploy-cert.pem
+          rm -f app.env
+      - name: Deploy or roll back through restricted SSM document
+        env:
+          ACTION: ${{ inputs.action || 'deploy' }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+          INSTANCE: ${{ vars.EXPENSELY_EC2_INSTANCE_ID }}
+          DOCUMENT: ${{ vars.EXPENSELY_SSM_DOCUMENT }}
         run: |
-          IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/expensely-app
-          TAG=${{ github.sha }}
-
-          docker build -t $IMAGE:$TAG -t $IMAGE:latest .
-          docker push $IMAGE:$TAG
-          docker push $IMAGE:latest
-
-      - name: SSH to EC2 and deploy
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            mkdir -p ~/app
-            cat << EOF > ~/app/.env
-            ALLOWED_ORIGINS=${{ vars.ALLOWED_ORIGINS }}
-            JWT_SECRET=${{ secrets.JWT_SECRET }}
-            GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
-            DB_URL=${{ secrets.DB_URL }}
-            FRONTEND_URL=${{ secrets.FRONTEND_URL }}
-            PORT=${{ vars.PORT }}
-            MAILGUN_API_KEY=${{ secrets.MAILGUN_API_KEY }}
-            FRONTEND_URL=${{ vars.FRONTEND_URL }}
-            AWS_REGION=${{ vars.AWS_REGION }}
-            AWS_BUCKET_NAME=${{ secrets.AWS_BUCKET_NAME }}
-            AWS_PROFILE_BUCKET_NAME=${{ secrets.AWS_PROFILE_BUCKET_NAME || 'expensely-profiles' }}
-            EXCHANGE_RATE_API_KEY=${{ secrets.EXCHANGE_RATE_API_KEY }}
-            REDIS_HOST=${{ secrets.REDIS_HOST }}
-            REDIS_PORT=${{ secrets.REDIS_PORT }}
-            REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
-            REDIS_USERNAME=${{ secrets.REDIS_USERNAME }}
-            GITHUB_CLIENT_ID=${{ secrets.GIT_CLIENT_ID }}
-            GITHUB_CLIENT_SECRET=${{ secrets.GIT_CLIENT_SECRET }}
-            DISCORD_CLIENT_ID=${{ secrets.DISCORD_CLIENT_ID }}
-            DISCORD_CLIENT_SECRET=${{ secrets.DISCORD_CLIENT_SECRET }}
-            
-            EOF
-
-
-            IMAGE="${{ secrets.DOCKERHUB_USERNAME }}/expensely-app:latest"
-            docker pull $IMAGE
-
-            # 3. Determine active environment (Blue or Green)
-            if docker ps --format '{{.Names}}' | grep -Eq "^expensely-app-blue\$"; then
-              CURRENT="blue"
-              NEXT="green"
-              NEXT_PORT=8082
-            else
-              CURRENT="green"
-              NEXT="blue"
-              NEXT_PORT=8081
-            fi
-
-            echo "Deploying to $NEXT container on port $NEXT_PORT..."
-
-            # 4. Start the new container on the alternate port
-            docker run -d \
-              --name expensely-app-$NEXT \
-              -p $NEXT_PORT:8080 \
-              --restart unless-stopped \
-              --env-file ~/app/.env \
-              $IMAGE
-
-            # 5. Wait for the new app to initialize 
-            echo "Waiting for the new container ($NEXT) to become healthy on port $NEXT_PORT..."
-            MAX_RETRIES=30
-            RETRY_COUNT=0
-            HEALTH_URL="http://localhost:$NEXT_PORT/ping"
-
-            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-              STATUS=$(curl -s -o /dev/null -w "%{http_code}" $HEALTH_URL || echo "000")
-            
-              if [ "$STATUS" = "200" ]; then
-                echo "Container is healthy! Proceeding with traffic switch..."
-                break
-              fi
-            
-              echo "Health check returned status $STATUS. Retrying in 2 seconds... ($((RETRY_COUNT+1))/$MAX_RETRIES)"
-              sleep 2
-              RETRY_COUNT=$((RETRY_COUNT+1))
-            done
-
-            # Abort if the container never became healthy
-            if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
-              echo "Error: New container failed to become healthy in time."
-              echo "Rolling back: Stopping and removing unhealthy $NEXT container..."
-              docker stop expensely-app-$NEXT || true
-              docker rm expensely-app-$NEXT || true
-              exit 1 # Fail the GitHub Action workflow
-            fi
-
-            # 6. Set up the Nginx configuration            
-            cat << EOF > ~/app/nginx.conf
-            events {}
-            http {
-              map \$http_upgrade \$connection_upgrade {
-                  default upgrade;
-                  ''      close;
-              }
-              server {
-                  listen 80;
-                  listen 8080;
-            
-                  location / {
-                        proxy_pass http://host.docker.internal:$NEXT_PORT;
-                        proxy_http_version 1.1;
-                        proxy_set_header Upgrade \$http_upgrade;
-                        proxy_set_header Connection \$connection_upgrade;
-                        proxy_set_header Host \$host;
-                        proxy_set_header X-Real-IP \$remote_addr;
-                        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-                        proxy_set_header X-Forwarded-Proto \$scheme;
-            
-                        proxy_pass_header Set-Cookie;
-                        proxy_buffering off;
-                        proxy_request_buffering off;
-                        proxy_redirect off;
-                  }
-              }
-            }
-            EOF
-
-            # 7. Start or Reload Nginx Proxy
-            if ! docker ps --format '{{.Names}}' | grep -Eq "^expensely-proxy\$"; then
-              echo "Starting Nginx proxy..."
-              docker run -d --name expensely-proxy \
-                -p 8080:8080 \
-                -v ~/app/nginx.conf:/etc/nginx/nginx.conf:ro \
-                --add-host host.docker.internal:host-gateway \
-                --restart unless-stopped \
-                nginx:alpine
-            else
-              echo "Reloading Nginx proxy with new target..."
-              docker exec expensely-proxy nginx -s reload
-            fi
-
-            # 8. Safely shut down the old container
-            if docker ps -a --format '{{.Names}}' | grep -Eq "^expensely-app-$CURRENT\$"; then
-              echo "Stopping and removing old container ($CURRENT)..."
-              docker stop expensely-app-$CURRENT
-              docker rm expensely-app-$CURRENT
-            fi
-            
-            # 9. Clean up old images to save space
-            echo "Cleaning up unused Docker images..."
-            docker image prune -af
-            
-            echo "Deployement Complete!"
-
-      - name: Revoke Runner IP
+          python3 - <<'PY'
+          import os,json,pathlib,base64
+          rollback=os.environ['ACTION']=='rollback'
+          params={'Action':[os.environ['ACTION']], 'Image':['' if rollback else '993371733162.dkr.ecr.us-east-2.amazonaws.com/expensely@'+os.environ['DIGEST']], 'EncryptedEnv':['' if rollback else base64.b64encode(pathlib.Path('app.env.enc').read_bytes()).decode()]}
+          pathlib.Path('ssm-parameters.json').write_text(json.dumps(params))
+          PY
+          command_id=$(aws ssm send-command --instance-ids "$INSTANCE" --document-name "$DOCUMENT" --parameters file://ssm-parameters.json --query Command.CommandId --output text)
+          for i in $(seq 1 120); do
+            status=$(aws ssm get-command-invocation --command-id "$command_id" --instance-id "$INSTANCE" --query Status --output text 2>/dev/null || true)
+            case "$status" in
+              Success) echo 'EC2 deployment and local HTTPS health checks passed'; exit 0 ;;
+              Failed|Cancelled|TimedOut|Cancelling) aws ssm get-command-invocation --command-id "$command_id" --instance-id "$INSTANCE" --query '{Status:Status,Output:StandardOutputContent,Error:StandardErrorContent}'; exit 1 ;;
+            esac
+            sleep 5
+          done
+          echo 'Timed out waiting for deployment'; exit 1
+      - name: Remove runner files
         if: always()
-        run: |
-          aws ec2 revoke-security-group-ingress \
-            --group-id ${{ secrets.AWS_SG_ID }} \
-            --protocol tcp \
-            --port 22 \
-            --cidr ${{ steps.ip.outputs.ipv4 }}/32
+        run: rm -f app.env app.env.enc deploy-cert.pem ssm-parameters.json
