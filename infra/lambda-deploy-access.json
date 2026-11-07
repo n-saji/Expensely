@@ -1,0 +1,41 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Restricted GitHub Actions access for the Portfolio RAG Lambda only",
+  "Resources": {
+    "PortfolioLambdaDeployUser": {
+      "Type": "AWS::IAM::User",
+      "Properties": {
+        "UserName": "ExpenselyPortfolioLambdaDeployUser",
+        "Path": "/github/",
+        "Tags": [
+          {"Key": "Project", "Value": "Expensely"},
+          {"Key": "Purpose", "Value": "Portfolio RAG Lambda GitHub Actions"}
+        ],
+        "Policies": [
+          {
+            "PolicyName": "DeployPortfolioRagLambdaOnly",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "lambda:GetFunctionConfiguration",
+                    "lambda:UpdateFunctionCode",
+                    "lambda:UpdateFunctionConfiguration"
+                  ],
+                  "Resource": "arn:aws:lambda:us-east-2:993371733162:function:rag-portfolio"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "PortfolioLambdaDeployUser": {
+      "Value": {"Ref": "PortfolioLambdaDeployUser"}
+    }
+  }
+}
