@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 077
+[[ $EUID == 0 ]] || { echo 'Run as root'; exit 1; }
+install -d -m 700 /etc/expensely /var/lib/expensely-deploy
+if [[ ! -f /etc/expensely/deploy-key.pem ]]; then
+  openssl req -x509 -newkey rsa:3072 -nodes -keyout /etc/expensely/deploy-key.pem \
+    -out /etc/expensely/deploy-cert.pem -days 365 -subj /CN=expensely-deploy
+fi
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+install -m 700 "$script_dir/expensely-deploy" /usr/local/sbin/expensely-deploy.new
+bash -n /usr/local/sbin/expensely-deploy.new
+mv /usr/local/sbin/expensely-deploy.new /usr/local/sbin/expensely-deploy
+site=$(readlink -f /etc/nginx/sites-enabled/api.expensely.store)
+[[ -f /etc/expensely/nginx-site.original ]] || cp "$site" /etc/expensely/nginx-site.original
+if [[ ! -f /etc/nginx/conf.d/expensely-upstream.conf ]]; then
+  printf 'upstream expensely_backend { server 127.0.0.1:8080; keepalive 16; }\n' > /etc/nginx/conf.d/expensely-upstream.conf
+fi
+cp "$site" /etc/expensely/nginx-site.before-install
+sed -i 's#proxy_pass http://localhost:8080;#proxy_pass http://expensely_backend;#g' "$site"
+if ! nginx -t; then cp /etc/expensely/nginx-site.before-install "$site"; exit 1; fi
+systemctl reload nginx
