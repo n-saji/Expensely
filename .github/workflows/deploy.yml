@@ -62,7 +62,7 @@ jobs:
           APP_ALLOWED_ORIGINS: ${{ vars.ALLOWED_ORIGINS }}
           APP_FRONTEND_URL: ${{ vars.FRONTEND_URL }}
           APP_AWS_BUCKET_NAME: ${{ secrets.AWS_BUCKET_NAME }}
-          APP_AWS_PROFILE_BUCKET_NAME: ${{ secrets.AWS_PROFILE_BUCKET_NAME || 'expensely-profiles' }}
+          APP_AWS_PROFILE_BUCKET_NAME: ${{ secrets.AWS_PROFILE_BUCKET_NAME || 'expensely-profiles-993371733162' }}
         run: |
           umask 077
           python3 - <<'PY'
