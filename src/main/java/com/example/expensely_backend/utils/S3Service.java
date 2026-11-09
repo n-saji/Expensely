@@ -20,7 +20,7 @@ public class S3Service {
 	Region region = Region.of(AWS_REGION);
 
 	String BUCKET_NAME = System.getenv("AWS_BUCKET_NAME");
-	String PROFILE_BUCKET_NAME = System.getenv("AWS_PROFILE_BUCKET_NAME") != null ? System.getenv("AWS_PROFILE_BUCKET_NAME") : "expensely-profiles";
+	String PROFILE_BUCKET_NAME = System.getenv("AWS_PROFILE_BUCKET_NAME") != null ? System.getenv("AWS_PROFILE_BUCKET_NAME") : "expensely-profiles-993371733162";
 
 	public String getProfileBucketName() {
 		return PROFILE_BUCKET_NAME;

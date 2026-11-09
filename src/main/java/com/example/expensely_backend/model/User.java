@@ -138,18 +138,27 @@ public class User {
 		if (profilePicFilePath == null || profilePicFilePath.isBlank()) {
 			return null;
 		}
-		if (profilePicFilePath.startsWith("http://") || profilePicFilePath.startsWith("https://")) {
-			return profilePicFilePath;
+		String key = profilePicFilePath;
+		for (String legacyPrefix : new String[]{
+				"https://expensely-profiles.s3.amazonaws.com/",
+				"https://expensely-profiles.s3.us-east-2.amazonaws.com/"}) {
+			if (key.startsWith(legacyPrefix)) {
+				key = key.substring(legacyPrefix.length());
+				break;
+			}
+		}
+		if (key.startsWith("http://") || key.startsWith("https://")) {
+			return key;
 		}
 		String bucket = System.getenv("AWS_PROFILE_BUCKET_NAME");
 		if (bucket == null || bucket.isBlank()) {
-			bucket = "expensely-profiles";
+			bucket = "expensely-profiles-993371733162";
 		}
 		String region = System.getenv("AWS_REGION");
 		if (region != null && !region.isBlank()) {
-			return "https://" + bucket + ".s3." + region + ".amazonaws.com/" + profilePicFilePath;
+			return "https://" + bucket + ".s3." + region + ".amazonaws.com/" + key;
 		}
-		return "https://" + bucket + ".s3.amazonaws.com/" + profilePicFilePath;
+		return "https://" + bucket + ".s3.amazonaws.com/" + key;
 	}
 
 	@Column(name = "is_oauth2_user", columnDefinition = "boolean default false")
