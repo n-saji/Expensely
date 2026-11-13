@@ -5,6 +5,7 @@ import com.example.expensely_backend.model.Category;
 import com.example.expensely_backend.model.Transaction;
 import com.example.expensely_backend.model.TransactionType;
 import com.example.expensely_backend.model.RecurringExpense;
+import com.example.expensely_backend.model.RecurringExpenseNotification;
 import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.repository.CategoryRepository;
 import com.example.expensely_backend.repository.TransactionRepository;
@@ -15,6 +16,12 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.UUID;
 
 @Service
@@ -62,6 +69,7 @@ public class RecurringExpenseService {
 		recurringExpense.setRecurrence(recExpenseDTO.getRecurrence());
 		recurringExpense.setActive(true);
 		recurringExpense.setDate(recExpenseDTO.getDate());
+		configureNotifications(recurringExpense, recExpenseDTO);
 		LocalDate localDate = recExpenseDTO.getDate();
 
 		if (localDate.isBefore(LocalDate.now())) {
@@ -125,18 +133,7 @@ public class RecurringExpenseService {
 		UUID uuid = UUID.fromString(id);
 		RecurringExpense rEM =
 				recurringExpenseRepository.findById(uuid).orElseThrow(() -> new IllegalArgumentException("Recurring expense not found"));
-		return new RecurringExpenseDTO(
-				rEM.getId().toString(),
-				rEM.getUser().getId().toString(),
-				rEM.getCategory().getId().toString(),
-				rEM.getAmount(),
-				rEM.getCurrency(),
-				rEM.getDescription(),
-				rEM.getRecurrence(),
-				rEM.getDate(),
-				rEM.getNextOccurrence(),
-				rEM.isActive()
-		);
+		return toDto(rEM);
 	}
 
 	public void updateRecurringExpense(String id,
@@ -152,6 +149,14 @@ public class RecurringExpenseService {
 		}
 		if (recExpenseDTO.getDescription() != null) {
 			existingExpense.setDescription(recExpenseDTO.getDescription());
+		}
+		if (recExpenseDTO.getRecurrence() != null) {
+			existingExpense.setRecurrence(recExpenseDTO.getRecurrence());
+		}
+		if (recExpenseDTO.getEmailNotificationEnabled() != null ||
+				recExpenseDTO.getInAppNotificationEnabled() != null ||
+				recExpenseDTO.getNotificationDaysBefore() != null) {
+			configureNotifications(existingExpense, recExpenseDTO);
 		}
 
 		if (recExpenseDTO.getDate() != null && !recExpenseDTO.getDate().isEqual(existingExpense.getDate())) {
@@ -229,18 +234,69 @@ public class RecurringExpenseService {
 	public List<RecurringExpenseDTO> findRecurringExpenseByUserId(String userId) {
 		UUID uuid = UUID.fromString(userId);
 
-		return recurringExpenseRepository.findByUserIdOrderByCreatedAtDesc(uuid).stream().map(expense -> new RecurringExpenseDTO(
-				expense.getId().toString(),
-				expense.getUser().getId().toString(),
-				expense.getCategory().getId().toString(),
-				expense.getAmount(),
-				expense.getCurrency(),
-				expense.getDescription(),
-				expense.getRecurrence(),
-				expense.getDate(),
-				expense.getNextOccurrence(),
-				expense.isActive()
-		)).toList();
+		return recurringExpenseRepository.findByUserIdOrderByCreatedAtDesc(uuid).stream()
+				.map(this::toDto)
+				.toList();
+	}
+
+	private void configureNotifications(RecurringExpense recurringExpense, RecurringExpenseDTO dto) {
+		boolean emailEnabled = Boolean.TRUE.equals(dto.getEmailNotificationEnabled());
+		boolean inAppEnabled = Boolean.TRUE.equals(dto.getInAppNotificationEnabled());
+		List<Integer> requestedOffsets = dto.getNotificationDaysBefore() == null
+				? List.of()
+				: new ArrayList<>(new LinkedHashSet<>(dto.getNotificationDaysBefore()));
+
+		if (!emailEnabled && !inAppEnabled) {
+			recurringExpense.getNotifications().clear();
+			return;
+		}
+		if (requestedOffsets.isEmpty()) {
+			throw new IllegalArgumentException("Select at least one notification time");
+		}
+		if (requestedOffsets.stream().anyMatch(days -> days == null || days < 1 || days > 365)) {
+			throw new IllegalArgumentException("Notification days must be between 1 and 365");
+		}
+
+		Map<Integer, RecurringExpenseNotification> existingByOffset = recurringExpense.getNotifications().stream()
+				.collect(Collectors.toMap(RecurringExpenseNotification::getDaysBefore, Function.identity()));
+		List<RecurringExpenseNotification> configured = requestedOffsets.stream()
+				.sorted(Comparator.reverseOrder())
+				.map(days -> {
+					RecurringExpenseNotification notification = existingByOffset.getOrDefault(
+							days, new RecurringExpenseNotification());
+					notification.setRecurringExpense(recurringExpense);
+					notification.setDaysBefore(days);
+					notification.setEmailEnabled(emailEnabled);
+					notification.setInAppEnabled(inAppEnabled);
+					return notification;
+				})
+				.toList();
+		recurringExpense.getNotifications().clear();
+		recurringExpense.getNotifications().addAll(configured);
+	}
+
+	private RecurringExpenseDTO toDto(RecurringExpense expense) {
+		List<RecurringExpenseNotification> notifications = expense.getNotifications() == null
+				? List.of()
+				: expense.getNotifications();
+		return RecurringExpenseDTO.builder()
+				.id(expense.getId().toString())
+				.userId(expense.getUser().getId().toString())
+				.categoryId(expense.getCategory().getId().toString())
+				.amount(expense.getAmount())
+				.currency(expense.getCurrency())
+				.description(expense.getDescription())
+				.recurrence(expense.getRecurrence())
+				.date(expense.getDate())
+				.nextOccurrence(expense.getNextOccurrence())
+				.active(expense.isActive())
+				.emailNotificationEnabled(notifications.stream().anyMatch(RecurringExpenseNotification::isEmailEnabled))
+				.inAppNotificationEnabled(notifications.stream().anyMatch(RecurringExpenseNotification::isInAppEnabled))
+				.notificationDaysBefore(notifications.stream()
+						.map(RecurringExpenseNotification::getDaysBefore)
+						.sorted(Comparator.reverseOrder())
+						.toList())
+				.build();
 	}
 }
 

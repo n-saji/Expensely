@@ -9,6 +9,8 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -45,6 +47,9 @@ public class RecurringExpense {
 	private LocalDateTime createdAt;
 
 	private LocalDateTime updatedAt;
+
+	@OneToMany(mappedBy = "recurringExpense", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+	private List<RecurringExpenseNotification> notifications = new ArrayList<>();
 
 	@PrePersist
 	protected void onCreate() {
