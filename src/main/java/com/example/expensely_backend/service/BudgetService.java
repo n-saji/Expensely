@@ -165,9 +165,14 @@ public class BudgetService {
 			}
 		}
 		budget.setAmountSpent(total_amount);
-		syncThresholdFlags(budget,
-				calculatePercentage(budget.getAmountSpent(), budget.getBaseCurrencyAmount()));
-		return budgetRepository.save(budget);
+		float percentage = calculatePercentage(budget.getAmountSpent(), budget.getBaseCurrencyAmount());
+		int highestNewlyCrossedThreshold = resolveHighestNewlyCrossedThreshold(budget, percentage);
+		syncThresholdFlags(budget, percentage);
+		Budget savedBudget = budgetRepository.save(budget);
+		if (highestNewlyCrossedThreshold > 0) {
+			sendBudgetThresholdAlert(savedBudget, percentage);
+		}
+		return savedBudget;
 	}
 
 	public Budget findById(String id) {
