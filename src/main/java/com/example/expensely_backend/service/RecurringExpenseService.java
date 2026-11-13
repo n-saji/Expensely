@@ -11,6 +11,7 @@ import com.example.expensely_backend.repository.CategoryRepository;
 import com.example.expensely_backend.repository.TransactionRepository;
 import com.example.expensely_backend.repository.RecurringExpenseRepository;
 import com.example.expensely_backend.repository.UserRepository;
+import com.example.expensely_backend.utils.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -140,7 +141,7 @@ public class RecurringExpenseService {
 	                                   RecurringExpenseDTO recExpenseDTO) {
 		UUID uuid = UUID.fromString(id);
 		RecurringExpense existingExpense =
-				recurringExpenseRepository.findById(uuid).orElseThrow(() -> new IllegalArgumentException("Recurring expense not found"));
+				recurringExpenseRepository.findById(uuid).orElseThrow(() -> new ResourceNotFoundException("Recurring expense not found"));
 		if (recExpenseDTO.getAmount() != null) {
 			existingExpense.setAmount(exchangeRateService.normalizeDisplayAmount(recExpenseDTO.getAmount()));
 		}
