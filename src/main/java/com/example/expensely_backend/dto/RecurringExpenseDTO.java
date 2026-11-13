@@ -5,6 +5,7 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 @Getter
 @Setter
@@ -22,4 +23,7 @@ public class RecurringExpenseDTO {
 	private LocalDate date; // The date when the recurring expense starts
 	private LocalDate nextOccurrence;
 	private boolean active;
+	private Boolean emailNotificationEnabled;
+	private Boolean inAppNotificationEnabled;
+	private List<Integer> notificationDaysBefore;
 }
