@@ -81,7 +81,7 @@ public class RecurringExpenseController {
 			recurringExpenseService.updateRecurringExpense(id, recExpenseDTO);
 			return ResponseEntity.ok("Recurring expense updated successfully");
 		} catch (IllegalArgumentException e) {
-			return ResponseEntity.status(404).body(e.getMessage());
+			return ResponseEntity.badRequest().body(e.getMessage());
 		}
 	}
 
