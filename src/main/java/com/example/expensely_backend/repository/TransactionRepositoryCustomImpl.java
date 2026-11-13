@@ -82,6 +82,7 @@ public class TransactionRepositoryCustomImpl {
 				orders.add(cb.asc(transaction.get("transactionDate")));
 			}
 		}
+		orders.add(cb.desc(transaction.get("id")));
 
 		query.orderBy(orders);
 		return em.createQuery(query)
