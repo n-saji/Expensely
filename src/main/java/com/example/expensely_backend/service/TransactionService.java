@@ -106,9 +106,12 @@ public class TransactionService {
 		if (category == null) {
 			throw new IllegalArgumentException("Category not found");
 		}
+		if (!category.getUser().getId().equals(user.getId())) throw new SecurityException("Category access denied");
 		transaction.setCategory(category);
 
-		applyCurrencySnapshot(transaction, user.getCurrency() != null ? user.getCurrency() : globals.BASE_CURRENCY);
+		String requestedCurrency = transaction.getCurrency();
+		applyCurrencySnapshot(transaction, requestedCurrency == null || requestedCurrency.isBlank()
+				? (user.getCurrency() != null ? user.getCurrency() : globals.BASE_CURRENCY) : requestedCurrency);
 
 		Transaction saved = transactionRepository.save(transaction);
 		userRepository.markHasTransactions(user.getId());
@@ -186,6 +189,7 @@ public class TransactionService {
 			if (category == null) {
 				throw new IllegalArgumentException("Category not found");
 			}
+			if (!category.getUser().getId().equals(oldT.getUser().getId())) throw new SecurityException("Category access denied");
 
 			if (oldT.getType() == TransactionType.EXPENSE) {
 				try {

@@ -2,6 +2,7 @@ package com.example.expensely_backend.controller;
 
 import com.example.expensely_backend.dto.RecurringExpenseDTO;
 import com.example.expensely_backend.service.RecurringExpenseService;
+import com.example.expensely_backend.service.ResourceAccess;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -11,9 +12,11 @@ import org.springframework.web.bind.annotation.*;
 public class RecurringExpenseController {
 
 	private final RecurringExpenseService recurringExpenseService;
+	private final ResourceAccess access;
 
-	public RecurringExpenseController(RecurringExpenseService recurringExpenseService) {
+	public RecurringExpenseController(RecurringExpenseService recurringExpenseService, ResourceAccess access) {
 		this.recurringExpenseService = recurringExpenseService;
+		this.access = access;
 	}
 
 	@GetMapping("/fetch-all")
@@ -36,6 +39,7 @@ public class RecurringExpenseController {
 			return ResponseEntity.status(401).body("Unauthorized");
 		}
 		try {
+			access.category(authentication, recurringExpense.getCategoryId());
 			recurringExpense.setUserId(userId);
 			recurringExpenseService.createRecurringExpense(recurringExpense);
 			return ResponseEntity.ok("Recurring expense created successfully");
@@ -46,6 +50,7 @@ public class RecurringExpenseController {
 
 	@GetMapping("/{id}")
 	public ResponseEntity<?> getRecurringExpenseById(Authentication authentication, @PathVariable String id) {
+		access.recurring(authentication, id);
 		String userId = (String) authentication.getPrincipal();
 		if (userId == null) {
 			return ResponseEntity.status(401).body("Unauthorized");
@@ -59,6 +64,7 @@ public class RecurringExpenseController {
 
 	@DeleteMapping("/{id}")
 	public ResponseEntity<?> deleteRecurringExpenseById(Authentication authentication, @PathVariable String id) {
+		access.recurring(authentication, id);
 		String userId = (String) authentication.getPrincipal();
 		if (userId == null) {
 			return ResponseEntity.status(401).body("Unauthorized");
@@ -73,6 +79,9 @@ public class RecurringExpenseController {
 
 	@PutMapping("/{id}")
 	public ResponseEntity<?> updateRecurringExpense(Authentication authentication, @PathVariable String id, @RequestBody RecurringExpenseDTO recExpenseDTO) {
+		access.recurring(authentication, id);
+		if (recExpenseDTO.getCategoryId() != null) access.category(authentication, recExpenseDTO.getCategoryId());
+		recExpenseDTO.setUserId(access.userId(authentication).toString());
 		String userId = (String) authentication.getPrincipal();
 		if (userId == null) {
 			return ResponseEntity.status(401).body("Unauthorized");
@@ -87,6 +96,7 @@ public class RecurringExpenseController {
 
 	@PutMapping("/deactivate/{id}")
 	public ResponseEntity<?> deactivateRecurringExpense(Authentication authentication, @PathVariable String id) {
+		access.recurring(authentication, id);
 		String userId = (String) authentication.getPrincipal();
 		if (userId == null) {
 			return ResponseEntity.status(401).body("Unauthorized");
@@ -101,6 +111,7 @@ public class RecurringExpenseController {
 
 	@PutMapping("/activate/{id}")
 	public ResponseEntity<?> activateRecurringExpense(Authentication authentication, @PathVariable String id) {
+		access.recurring(authentication, id);
 		String userId = (String) authentication.getPrincipal();
 		if (userId == null) {
 			return ResponseEntity.status(401).body("Unauthorized");

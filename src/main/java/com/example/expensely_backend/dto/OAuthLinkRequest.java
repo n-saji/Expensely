@@ -11,4 +11,5 @@ public class OAuthLinkRequest {
     private String provider;
     private String providerUserId;
     private String providerEmail;
+    private String token;
 }

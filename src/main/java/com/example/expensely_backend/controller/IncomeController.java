@@ -7,6 +7,7 @@ import com.example.expensely_backend.model.Transaction;
 import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.service.IncomeService;
 import com.example.expensely_backend.service.UserService;
+import com.example.expensely_backend.service.ResourceAccess;
 import com.example.expensely_backend.utils.FormatDate;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.MediaType;
@@ -25,14 +26,18 @@ public class IncomeController {
 
 	private final IncomeService incomeService;
 	private final UserService userService;
+	private final ResourceAccess access;
 
-	public IncomeController(IncomeService incomeService, UserService userService) {
+	public IncomeController(IncomeService incomeService, UserService userService, ResourceAccess access) {
 		this.incomeService = incomeService;
 		this.userService = userService;
+		this.access = access;
 	}
 
 	@PostMapping("/create")
 	public ResponseEntity<?> createIncome(Authentication authentication, @RequestBody Transaction income) {
+		if (income.getCategory() == null || income.getCategory().getId() == null) return ResponseEntity.badRequest().body("Category is required");
+		access.category(authentication, income.getCategory().getId().toString());
 		String userId = (String) authentication.getPrincipal();
 		if (userId == null) {
 			return ResponseEntity.status(401).body("Unauthorized");
@@ -52,6 +57,7 @@ public class IncomeController {
 
 	@GetMapping("/{id}")
 	public ResponseEntity<?> getIncomeById(Authentication authentication, @PathVariable String id) {
+		access.transaction(authentication, id);
 		String userId = (String) authentication.getPrincipal();
 		if (userId == null) {
 			return ResponseEntity.status(401).body(null);
@@ -65,6 +71,7 @@ public class IncomeController {
 
 	@DeleteMapping("/{id}")
 	public ResponseEntity<String> deleteIncomeById(Authentication authentication, @PathVariable String id) {
+		access.transaction(authentication, id);
 		String userId = (String) authentication.getPrincipal();
 		if (userId == null) {
 			return ResponseEntity.status(401).body("Unauthorized");
@@ -93,6 +100,7 @@ public class IncomeController {
 	@GetMapping("/user/category/{categoryId}")
 	public ResponseEntity<?> getIncomesByCategoryIdAndUserID(Authentication authentication,
 	                                                         @PathVariable String categoryId) {
+		access.category(authentication, categoryId);
 		String userId = (String) authentication.getPrincipal();
 		if (userId == null) {
 			return ResponseEntity.status(401).body("Unauthorized");
@@ -106,6 +114,9 @@ public class IncomeController {
 
 	@PutMapping("/update/{id}")
 	public ResponseEntity<?> updateIncome(Authentication authentication, @PathVariable String id, @RequestBody Transaction updatedIncome) {
+		access.transaction(authentication, id);
+		if (updatedIncome.getCategory() != null && updatedIncome.getCategory().getId() != null)
+			access.category(authentication, updatedIncome.getCategory().getId().toString());
 		String userId = (String) authentication.getPrincipal();
 		if (userId == null) {
 			return ResponseEntity.status(401).body("Unauthorized");
@@ -211,6 +222,7 @@ public class IncomeController {
 	                                             @RequestParam(value = "sort_by", required = false) String customSortBy,
 	                                             @RequestParam(value = "sort_order", required = false) String customSortOrder) {
 
+		if (categoryId != null && !categoryId.isBlank()) access.category(authentication, categoryId);
 		String userId = (String) authentication.getPrincipal();
 		if (userId == null) {
 			return ResponseEntity.status(401).body("Unauthorized");
@@ -244,6 +256,7 @@ public class IncomeController {
 
 	@PostMapping("/bulk-delete")
 	public ResponseEntity<?> bulkDeleteIncomes(Authentication authentication, @RequestBody List<Transaction> incomes) {
+		for (Transaction income : incomes) access.transaction(authentication, income.getId().toString());
 		String userId = (String) authentication.getPrincipal();
 		if (userId == null) {
 			return ResponseEntity.status(401).body("Unauthorized");
@@ -257,9 +270,10 @@ public class IncomeController {
 	}
 
 	@GetMapping("/user/{userId}/export")
-	public ResponseEntity<?> exportIncomes(@PathVariable String userId,
+	public ResponseEntity<?> exportIncomes(Authentication authentication, @PathVariable String userId,
 	                                       @RequestParam(value = "start_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startDate,
 	                                       @RequestParam(value = "end_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate) {
+		access.sameUser(authentication, userId);
 		startDate = FormatDate.formatStartDate(startDate, false);
 		endDate = FormatDate.formatEndDate(endDate);
 		try {

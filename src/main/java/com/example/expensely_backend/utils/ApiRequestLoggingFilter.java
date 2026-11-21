@@ -50,15 +50,20 @@ public class ApiRequestLoggingFilter extends OncePerRequestFilter {
             log.setRequestId(requestId);
             log.setMethod(requestWrapper.getMethod());
             log.setPath(requestWrapper.getRequestURI());
-            log.setQueryString(requestWrapper.getQueryString());
+            log.setQueryString(safeQuery(requestWrapper.getQueryString()));
             log.setIpAddress(resolveIp(requestWrapper));
             log.setUserAgent(requestWrapper.getHeader("User-Agent"));
             log.setStatusCode(responseWrapper.getStatus());
             log.setDurationMs(duration);
             log.setRequestHeaders(extractHeaders(requestWrapper));
             log.setResponseHeaders(extractHeaders(responseWrapper));
-            log.setRequestBody(readRequestBody(requestWrapper));
-            log.setResponseBody(readResponseBody(responseWrapper));
+            if (hasSensitiveBody(requestWrapper.getRequestURI())) {
+                log.setRequestBody(null);
+                log.setResponseBody(null);
+            } else {
+                log.setRequestBody(readRequestBody(requestWrapper));
+                log.setResponseBody(readResponseBody(responseWrapper));
+            }
             log.setUserId(resolveUserId());
 
             dbLogService.logApi(log);
@@ -96,6 +101,10 @@ public class ApiRequestLoggingFilter extends OncePerRequestFilter {
         Enumeration<String> headerNames = request.getHeaderNames();
         while (headerNames != null && headerNames.hasMoreElements()) {
             String name = headerNames.nextElement();
+            if (sensitiveHeader(name)) {
+                builder.append(name).append(": [redacted]\n");
+                continue;
+            }
             Enumeration<String> values = request.getHeaders(name);
             while (values.hasMoreElements()) {
                 builder.append(name).append(": ").append(values.nextElement()).append("\n");
@@ -107,11 +116,32 @@ public class ApiRequestLoggingFilter extends OncePerRequestFilter {
     private String extractHeaders(HttpServletResponse response) {
         StringBuilder builder = new StringBuilder();
         for (String name : response.getHeaderNames()) {
+            if (sensitiveHeader(name)) {
+                builder.append(name).append(": [redacted]\n");
+                continue;
+            }
             for (String value : response.getHeaders(name)) {
                 builder.append(name).append(": ").append(value).append("\n");
             }
         }
         return builder.toString();
+    }
+
+    private boolean sensitiveHeader(String name) {
+        return name.equalsIgnoreCase("Authorization") || name.equalsIgnoreCase("Cookie") ||
+                name.equalsIgnoreCase("Set-Cookie") || name.equalsIgnoreCase("Proxy-Authorization");
+    }
+
+    private boolean hasSensitiveBody(String path) {
+        return path.startsWith("/api/users") || path.startsWith("/api/mobile/auth") ||
+                path.contains("presigned-url") || path.contains("download-url");
+    }
+
+    private String safeQuery(String query) {
+        if (query == null) return null;
+        String lower = query.toLowerCase(java.util.Locale.ROOT);
+        return lower.contains("token") || lower.contains("password") || lower.contains("otp") ||
+                lower.contains("secret") || lower.contains("code") ? "[redacted]" : query;
     }
 
     private String readRequestBody(ContentCachingRequestWrapper request) {

@@ -27,6 +27,8 @@ class RedisSessionTest {
 		redisSession = new RedisSession("localhost", 6379, "", "", false);
 		ReflectionTestUtils.setField(redisSession, "redis", mockRedis);
 		ReflectionTestUtils.setField(redisSession, "userRepository", mockUserRepository);
+		ReflectionTestUtils.setField(redisSession, "alertHandler", mock(org.springframework.beans.factory.ObjectProvider.class));
+		ReflectionTestUtils.setField(redisSession, "dbLogService", mock(DbLogService.class));
 	}
 
 	@Test
@@ -50,8 +52,9 @@ class RedisSessionTest {
 		verify(mockRedis, never()).srem(setKey, "token1");
 
 		assertEquals(1, result.size());
-		assertTrue(result.containsKey("token1"));
-		assertEquals("true", result.get("token1").get("current"));
+		assertEquals(64, result.keySet().iterator().next().length());
+		assertFalse(result.containsKey("token1"));
+		assertEquals("true", result.values().iterator().next().get("current"));
 		assertFalse(result.containsKey("token2"));
 	}
 
@@ -77,5 +80,31 @@ class RedisSessionTest {
 
 		verifyNoInteractions(mockUserRepository);
 		assertTrue(activeUsers.isEmpty());
+	}
+
+	@Test
+	void mobileRefreshIsStoredAsHashAndRotationDependsOnAtomicRedisResult() {
+		redisSession.createMobileSession("user", "session", "refresh-secret", "phone", "127.0.0.1");
+		org.mockito.ArgumentCaptor<Map<String, String>> fields = org.mockito.ArgumentCaptor.forClass(Map.class);
+		verify(mockRedis).hset(eq("mobile:session:session"), fields.capture());
+		assertEquals("user", fields.getValue().get("userId"));
+		assertNotEquals("refresh-secret", fields.getValue().get("refreshHash"));
+		assertEquals(64, fields.getValue().get("refreshHash").length());
+		when(mockRedis.eval(anyString(), anyList(), anyList())).thenReturn(1L, 0L);
+		assertTrue(redisSession.rotateMobileRefresh("user", "session", "refresh-secret", "next-secret"));
+		assertFalse(redisSession.rotateMobileRefresh("user", "session", "refresh-secret", "another-secret"));
+	}
+
+	@Test
+	void opaqueWebSessionHandleRevokesOnlyOwnedSession() throws Exception {
+		String userId = "user123";
+		String token = "web-refresh-secret";
+		when(mockRedis.smembers("user:sessions:" + userId)).thenReturn(Set.of(token));
+		when(mockRedis.hget("session:" + token, "userId")).thenReturn(userId);
+		String handle = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+				.digest(token.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+		redisSession.revokeSessionByHandle(userId, handle);
+		verify(mockRedis).del("session:" + token);
+		verify(mockRedis).srem("user:sessions:" + userId, token);
 	}
 }

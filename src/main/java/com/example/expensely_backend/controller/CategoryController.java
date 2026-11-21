@@ -3,6 +3,8 @@ package com.example.expensely_backend.controller;
 import com.example.expensely_backend.dto.AuthResponse;
 import com.example.expensely_backend.model.Category;
 import com.example.expensely_backend.service.CategoryService;
+import com.example.expensely_backend.service.ResourceAccess;
+import com.example.expensely_backend.model.User;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -11,13 +13,18 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/categories")
 public class CategoryController {
 	private final CategoryService categoryService;
+	private final ResourceAccess access;
 
-	public CategoryController(CategoryService categoryService) {
+	public CategoryController(CategoryService categoryService, ResourceAccess access) {
 		this.categoryService = categoryService;
+		this.access = access;
 	}
 
 	@PostMapping("/create")
-	public String createCategory(@RequestBody Category category) {
+	public String createCategory(Authentication authentication, @RequestBody Category category) {
+		User owner = new User();
+		owner.setId(access.userId(authentication));
+		category.setUser(owner);
 		if (category.getName() == null || category.getName().isEmpty()) {
 			return ResponseEntity.badRequest().body("Error: Category name must not be null or empty").getBody();
 		}
@@ -35,7 +42,8 @@ public class CategoryController {
 	}
 
 	@GetMapping("/{id}")
-	public ResponseEntity<Category> getCategoryById(@PathVariable String id) {
+	public ResponseEntity<Category> getCategoryById(Authentication authentication, @PathVariable String id) {
+		access.category(authentication, id);
 		try {
 			Category category = categoryService.getCategoryById(id);
 			return ResponseEntity.ok(category);
@@ -49,6 +57,7 @@ public class CategoryController {
 	public ResponseEntity<String> deleteCategoryById(Authentication authentication,
 	                                                 @PathVariable String id) {
 		String userId = (String) authentication.getPrincipal();
+		access.category(authentication, id);
 		try {
 			categoryService.deleteCategoryById(id, userId);
 			return ResponseEntity.ok("Category deleted successfully!");
@@ -73,7 +82,8 @@ public class CategoryController {
 	}
 
 	@PatchMapping("/update/{id}")
-	public ResponseEntity<?> updateCategory(@PathVariable String id, @RequestBody Category category) {
+	public ResponseEntity<?> updateCategory(Authentication authentication, @PathVariable String id, @RequestBody Category category) {
+		access.category(authentication, id);
 		try {
 			categoryService.updateCategory(id, category);
 			return ResponseEntity.ok(new AuthResponse("Category updated successfully!", null, null));
@@ -84,6 +94,7 @@ public class CategoryController {
 
 	@GetMapping("/find-category-dependencies/{id}")
 	public ResponseEntity<?> getCategoryDependencies(Authentication authentication, @PathVariable String id) {
+		access.category(authentication, id);
 		String userId = (String) authentication.getPrincipal();
 		if (userId == null) {
 			return ResponseEntity.status(403).body("Error: You are not authorized to access category dependencies for this user");

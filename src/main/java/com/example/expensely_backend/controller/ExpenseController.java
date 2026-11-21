@@ -25,16 +25,23 @@ public class ExpenseController {
 
 	private final ExpenseService expenseService;
 	private final ExpenseFilesService expenseFilesService;
+	private final ResourceAccess access;
 
 	public ExpenseController(ExpenseService expenseService,
 
-	                         ExpenseFilesService expenseFilesService) {
+	                         ExpenseFilesService expenseFilesService, ResourceAccess access) {
 		this.expenseService = expenseService;
 		this.expenseFilesService = expenseFilesService;
+		this.access = access;
 	}
 
 	@PostMapping("/create")
-	public ResponseEntity<?> createExpense(@RequestBody Transaction expense) {
+	public ResponseEntity<?> createExpense(Authentication authentication, @RequestBody Transaction expense) {
+		if (expense.getCategory() == null || expense.getCategory().getId() == null) return ResponseEntity.badRequest().body("Category is required");
+		access.category(authentication, expense.getCategory().getId().toString());
+		com.example.expensely_backend.model.User owner = new com.example.expensely_backend.model.User();
+		owner.setId(access.userId(authentication));
+		expense.setUser(owner);
 		// Logic to create an expense
 		try {
 			if (expense.getTransactionDate() == null) {
@@ -49,7 +56,8 @@ public class ExpenseController {
 	}
 
 	@GetMapping("/{id}")
-	public ResponseEntity<?> getExpenseById(@PathVariable String id) {
+	public ResponseEntity<?> getExpenseById(Authentication authentication, @PathVariable String id) {
+		access.transaction(authentication, id);
 		try {
 			return ResponseEntity.ok(expenseService.getExpenseResponseById(id));
 		} catch (Exception e) {
@@ -58,7 +66,8 @@ public class ExpenseController {
 	}
 
 	@DeleteMapping("/{id}")
-	public ResponseEntity<String> deleteExpenseById(@PathVariable String id) {
+	public ResponseEntity<String> deleteExpenseById(Authentication authentication, @PathVariable String id) {
+		access.transaction(authentication, id);
 		try {
 			expenseService.deleteExpenseById(id);
 			return ResponseEntity.ok("Expense deleted successfully!");
@@ -69,7 +78,8 @@ public class ExpenseController {
 
 
 	@GetMapping("/user/{userId}")
-	public ResponseEntity<?> getExpensesByUserId(@PathVariable String userId) {
+	public ResponseEntity<?> getExpensesByUserId(Authentication authentication, @PathVariable String userId) {
+		access.sameUser(authentication, userId);
 		try {
 			return ResponseEntity.ok(expenseService.getExpensesByUserId(userId));
 		} catch (Exception e) {
@@ -78,7 +88,11 @@ public class ExpenseController {
 	}
 
 	@PutMapping("/update/{id}")
-	public ResponseEntity<?> updateExpense(@PathVariable String id, @RequestBody Transaction updatedExpense) {
+	public ResponseEntity<?> updateExpense(Authentication authentication, @PathVariable String id, @RequestBody Transaction updatedExpense) {
+		access.transaction(authentication, id);
+		if (updatedExpense.getCategory() != null && updatedExpense.getCategory().getId() != null)
+			access.category(authentication, updatedExpense.getCategory().getId().toString());
+		updatedExpense.setId(java.util.UUID.fromString(id));
 		try {
 			Transaction existingExpense = expenseService.getExpenseById(id);
 			if (existingExpense == null) {
@@ -96,7 +110,9 @@ public class ExpenseController {
 	}
 
 	@GetMapping("/user/{userId}/category/{categoryId}")
-	public ResponseEntity<?> getExpensesByCategoryIdAndUserID(@PathVariable String categoryId, @PathVariable String userId) {
+	public ResponseEntity<?> getExpensesByCategoryIdAndUserID(Authentication authentication, @PathVariable String categoryId, @PathVariable String userId) {
+		access.sameUser(authentication, userId);
+		access.category(authentication, categoryId);
 		try {
 			return ResponseEntity.ok(expenseService.getExpensesByCategoryIdAndUserID(categoryId, userId));
 		} catch (Exception e) {
@@ -107,11 +123,13 @@ public class ExpenseController {
 
 	@GetMapping("/user/{userId}/timeframe")
 	public ResponseEntity<?> getExpensesByUserIdAndTimeFrame(
+			Authentication authentication,
 			@PathVariable String userId,
 			@RequestParam(value = "start_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startDate,
 			@RequestParam(value = "end_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate,
 			@RequestParam(value = "order", required = false, defaultValue = "desc") String order) {
 
+		access.sameUser(authentication, userId);
 		startDate = FormatDate.formatStartDate(startDate, false);
 		endDate = FormatDate.formatEndDate(endDate);
 		try {
@@ -123,6 +141,7 @@ public class ExpenseController {
 
 	@GetMapping("/user/{userId}/overview")
 	public ResponseEntity<?> getExpensesOverviewByUserIdAndTimeFrame(
+			Authentication authentication,
 			@PathVariable String userId,
 			@RequestParam(value = "start_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startDate,
 			@RequestParam(value = "end_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate,
@@ -130,6 +149,7 @@ public class ExpenseController {
 			@RequestParam(value = "req_month", required = false) Integer req_month,
 			@RequestParam(value = "req_month_year", required = false) Integer req_month_year) {
 
+		access.sameUser(authentication, userId);
 		int year = LocalDateTime.now().getYear();
 		int month = LocalDateTime.now().getMonthValue();
 		req_year = req_year == null ? year : req_year;
@@ -159,7 +179,9 @@ public class ExpenseController {
 	}
 
 	@PostMapping("/user/{userId}/bulk-delete")
-	public ResponseEntity<?> bulkDeleteExpensesByUserId(@PathVariable String userId, @RequestBody List<Transaction> expenses) {
+	public ResponseEntity<?> bulkDeleteExpensesByUserId(Authentication authentication, @PathVariable String userId, @RequestBody List<Transaction> expenses) {
+		access.sameUser(authentication, userId);
+		for (Transaction expense : expenses) access.transaction(authentication, expense.getId().toString());
 		try {
 			expenseService.deleteBuUserIDAndExpenseIds(userId, expenses);
 			return ResponseEntity.ok(new AuthResponse("Bulk delete expenses successfully!", null, ""));
@@ -170,6 +192,7 @@ public class ExpenseController {
 
 	@GetMapping("/user/{userId}/fetch-with-conditions")
 	public ResponseEntity<?> fetchWithConditions(
+			Authentication authentication,
 			@PathVariable String userId,
 			@RequestParam(value = "start_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startDate,
 			@RequestParam(value = "end_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate,
@@ -182,6 +205,8 @@ public class ExpenseController {
 			@RequestParam(value = "sort_order", required = false) String customSortOrder) {
 
 
+		access.sameUser(authentication, userId);
+		if (categoryId != null && !categoryId.isBlank()) access.category(authentication, categoryId);
 		startDate = FormatDate.formatStartDate(startDate, false);
 		endDate = FormatDate.formatEndDate(endDate);
 		if (q == null) q = "";
@@ -210,9 +235,10 @@ public class ExpenseController {
 	}
 
 	@GetMapping("/user/{userId}/export")
-	public ResponseEntity<?> exportExpenses(@PathVariable String userId,
+	public ResponseEntity<?> exportExpenses(Authentication authentication, @PathVariable String userId,
 	                                        @RequestParam(value = "start_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startDate,
 	                                        @RequestParam(value = "end_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate) {
+		access.sameUser(authentication, userId);
 		startDate = FormatDate.formatStartDate(startDate, false);
 		endDate = FormatDate.formatEndDate(endDate);
 		try {
@@ -304,6 +330,7 @@ public class ExpenseController {
 	                                         @RequestParam(name = "fileName") String fileName
 	) {
 
+		access.transaction(authentication, expenseID);
 		String userId = (String) authentication.getPrincipal();
 
 		try {
@@ -329,6 +356,7 @@ public class ExpenseController {
 
 	) {
 
+		access.transaction(authentication, expenseID);
 		String userId = (String) authentication.getPrincipal();
 		try {
 			expenseService.UpdateExpenseAttachment(userId, expenseID, url.getUrl());
@@ -343,6 +371,7 @@ public class ExpenseController {
 	public ResponseEntity<?> getDownloadURL(Authentication authentication,
 	                                        @PathVariable String eid
 	) {
+		access.transaction(authentication, eid);
 
 		String userId = (String) authentication.getPrincipal();
 		try {
@@ -358,6 +387,7 @@ public class ExpenseController {
 	public ResponseEntity<?> deleteExpenseAttachment(Authentication authentication,
 	                                                 @PathVariable String eid
 	) {
+		access.transaction(authentication, eid);
 		String userId = (String) authentication.getPrincipal();
 		try {
 			expenseService.DeleteExpenseAttachment(userId, eid);

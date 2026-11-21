@@ -7,10 +7,6 @@ import com.example.expensely_backend.service.*;
 import com.example.expensely_backend.utils.JwtUtil;
 import com.example.expensely_backend.utils.Mailgun;
 import com.example.expensely_backend.utils.S3Service;
-import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
-import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
-import com.google.api.client.http.javanet.NetHttpTransport;
-import com.google.api.client.json.jackson2.JacksonFactory;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -35,12 +31,15 @@ public class UserController {
 	private final RedisSession redisSession;
 	private final S3Service s3Service;
 	private final OAuthService oAuthService;
+	private final OAuthIdentityVerifier identityVerifier;
+	private final ResourceAccess access;
 
 	public UserController(UserService userService, JwtUtil jwtUtil,
 	                      ExpiredTokenService expiredTokenService, Environment environment, Mailgun mailgun,
 	                      EmailOtpService emailOtpService,
 	                      DbLogService dbLogService, RedisSession redisSession,
-	                      S3Service s3Service, OAuthService oAuthService) {
+	                      S3Service s3Service, OAuthService oAuthService, OAuthIdentityVerifier identityVerifier,
+	                      ResourceAccess access) {
 		this.userService = userService;
 		this.jwtUtil = jwtUtil;
 		this.expiredTokenService = expiredTokenService;
@@ -51,6 +50,8 @@ public class UserController {
 		this.redisSession = redisSession;
 		this.s3Service = s3Service;
 		this.oAuthService = oAuthService;
+		this.identityVerifier = identityVerifier;
+		this.access = access;
 	}
 
 	private String getCookieValue(HttpServletRequest request, String name) {
@@ -69,12 +70,12 @@ public class UserController {
 		String accessToken = getCookieValue(request, "accessToken");
 		String subject = null;
 		if (accessToken != null) {
-			subject = jwtUtil.GetStringFromToken(accessToken);
+			subject = jwtUtil.getWebAccessSubject(accessToken);
 		}
 		if (subject == null) {
 			String refreshToken = getCookieValue(request, "refreshToken");
 			if (refreshToken != null) {
-				subject = jwtUtil.GetStringFromToken(refreshToken);
+				subject = jwtUtil.getWebRefreshSubject(refreshToken);
 			}
 		}
 		return subject;
@@ -172,9 +173,9 @@ public class UserController {
 					}
 				}
 
-				if (refreshToken != null && redisSession.isSessionActive(refreshToken)) {
-					String subject = jwtUtil.GetStringFromToken(refreshToken);
-					if (subject != null) {
+				if (refreshToken != null && redisSession.isWebSessionActive(client.getId().toString(), refreshToken)) {
+					String subject = jwtUtil.getWebRefreshSubject(refreshToken);
+					if (client.getId().toString().equals(subject)) {
 						// Generate new access token
 						Map<String, String> tokens =
 								jwtUtil.GenerateToken(client.getId().toString());
@@ -394,10 +395,10 @@ public class UserController {
 
 			userService.UpdateUser(existingUser);
 			if (emailUpdated) {
-				String otp = emailOtpService.createOrUpdateOtp(user);
-				mailgun.sendSimpleMessage(user.getEmail(), "Verify your email",
+				String otp = emailOtpService.createOrUpdateOtp(existingUser);
+				mailgun.sendSimpleMessage(existingUser.getEmail(), "Verify your email",
 						"Your OTP is " + otp + ". It expires in 10 minutes.");
-				return ResponseEntity.ok(new AuthResponse("Verification OTP sent", user.getId().toString(), ""));
+				return ResponseEntity.ok(new AuthResponse("Verification OTP sent", existingUser.getId().toString(), ""));
 			}
 			return ResponseEntity.ok(new UserRes(existingUser, null));
 		} catch (Exception e) {
@@ -406,9 +407,9 @@ public class UserController {
 	}
 
 	@PatchMapping("/update-settings")
-	public ResponseEntity<?> updateSettings(@RequestBody User user) {
+	public ResponseEntity<?> updateSettings(Authentication authentication, @RequestBody User user) {
 		try {
-			User existingUser = userService.GetActiveUserById(user.getId().toString());
+			User existingUser = userService.GetActiveUserById(access.userId(authentication).toString());
 			if (existingUser == null) {
 				return ResponseEntity.status(404).body(new UserRes(null, "User not found"));
 			}
@@ -428,10 +429,6 @@ public class UserController {
 				existingUser.setThemeColor(ThemeColor.normalize(user.getThemeColor()));
 			if (user.getCurrency() != null)
 				existingUser.setCurrency(user.getCurrency());
-			if (user.getIsActive() != null)
-				existingUser.setIsActive(user.getIsActive());
-			if (user.getIsAdmin() != null)
-				existingUser.setIsAdmin(user.getIsAdmin());
 			userService.UpdateUser(existingUser);
 			return ResponseEntity.ok(new UserRes(existingUser, null));
 		} catch (Exception e) {
@@ -440,9 +437,9 @@ public class UserController {
 	}
 
 	@PatchMapping("/update-password")
-	public ResponseEntity<?> updatePassword(@RequestBody User user) {
+	public ResponseEntity<?> updatePassword(Authentication authentication, @RequestBody User user) {
 		try {
-			User existingUser = userService.GetActiveUserById(user.getId().toString());
+			User existingUser = userService.GetActiveUserById(access.userId(authentication).toString());
 			if (existingUser == null) {
 				return ResponseEntity.status(404).body(new UserRes(null, "User not found"));
 			}
@@ -462,9 +459,7 @@ public class UserController {
 			Authentication authentication,
 			@RequestBody Map<String, String> payload) {
 		try {
-			String userId = (authentication != null && authentication.getPrincipal() != null)
-					? authentication.getPrincipal().toString()
-					: (payload != null ? payload.get("userId") : null);
+			String userId = access.userId(authentication).toString();
 			if (userId == null || userId.isEmpty()) {
 				return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("valid", false, "message", "User identity required"));
 			}
@@ -485,8 +480,9 @@ public class UserController {
 
 	@DeleteMapping("/delete-account/{id}")
 	public ResponseEntity<?> deleteUser(
+			Authentication authentication,
 			@PathVariable String id) {
-
+		access.sameUser(authentication, id);
 
 		try {
 			User user = userService.GetUserById(id);
@@ -495,6 +491,7 @@ public class UserController {
 			}
 			user.setIsActive(false);
 			userService.deleteUser(user);
+			redisSession.revokeAllSessions(id);
 			return ResponseEntity.ok(new UserRes(null, null));
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(new UserRes(null, e.getMessage()));
@@ -528,7 +525,8 @@ public class UserController {
 	}
 
 	@PatchMapping("/{id}/update-profile-picture")
-	public ResponseEntity<?> updateProfilePicture(@PathVariable String id, @RequestParam(value = "filepath", required = false, defaultValue = "") String filePath) {
+	public ResponseEntity<?> updateProfilePicture(Authentication authentication, @PathVariable String id, @RequestParam(value = "filepath", required = false, defaultValue = "") String filePath) {
+		access.sameUser(authentication, id);
 		try {
 			User user = userService.GetActiveUserById(id);
 			if (user == null) {
@@ -555,37 +553,13 @@ public class UserController {
 	                                          @RequestHeader(value = "Authorization", required = false) String authHeader,
 	                                          @RequestBody OAuthLoginRequest oAuthRequest) {
 		try {
-			String provider = oAuthRequest.getProvider() != null ? oAuthRequest.getProvider() : "google";
-			String providerUserId = oAuthRequest.getProviderUserId();
-			String email = oAuthRequest.getEmail();
-			String name = oAuthRequest.getName();
-
-			if (authHeader != null && authHeader.startsWith("Bearer ") && provider.equalsIgnoreCase("google")) {
-				String token = authHeader.replace("Bearer ", "");
-				try {
-					GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
-							new NetHttpTransport(),
-							JacksonFactory.getDefaultInstance()
-					)
-							.setAudience(Collections.singletonList(environment.getProperty("GOOGLE_CLIENT_ID")))
-							.build();
-					GoogleIdToken idToken = verifier.verify(token);
-					if (idToken != null) {
-						GoogleIdToken.Payload payload = idToken.getPayload();
-						if (email == null || email.isBlank()) email = payload.getEmail();
-						if (name == null || name.isBlank()) name = (String) payload.get("name");
-						if (providerUserId == null || providerUserId.isBlank()) providerUserId = payload.getSubject();
-					}
-				} catch (Exception ignored) {
-					// Fallback to request params
-				}
-			}
-
-			if ((email == null || email.isBlank()) && (providerUserId == null || providerUserId.isBlank())) {
-				return ResponseEntity.badRequest().body(new AuthResponse("Email or provider user ID is required!", null, "email or provider user ID is required"));
-			}
-
-			User user = oAuthService.processOAuthLogin(provider, providerUserId, email, name);
+			String provider = oAuthRequest.getProvider();
+			String proof = "google".equalsIgnoreCase(provider) && authHeader != null && authHeader.startsWith("Bearer ")
+					? authHeader.substring(7) : oAuthRequest.getToken();
+			OAuthIdentityVerifier.Identity identity = identityVerifier.verify(provider, proof);
+			User user = oAuthService.processOAuthLogin(identity.provider(), identity.providerUserId(), identity.email(), identity.name());
+			if (!Boolean.TRUE.equals(user.getIsActive()))
+				return ResponseEntity.status(403).body(new AuthResponse("Account is inactive", null, "Account is inactive"));
 
 			String existingRefreshToken = null;
 			if (request.getCookies() != null) {
@@ -596,8 +570,8 @@ public class UserController {
 				}
 			}
 
-			if (existingRefreshToken != null && redisSession.isSessionActive(existingRefreshToken)) {
-				String subject = jwtUtil.GetStringFromToken(existingRefreshToken);
+			if (existingRefreshToken != null && redisSession.isWebSessionActive(user.getId().toString(), existingRefreshToken)) {
+				String subject = jwtUtil.getWebRefreshSubject(existingRefreshToken);
 				if (subject != null && subject.equals(user.getId().toString())) {
 					Map<String, String> tokens = jwtUtil.GenerateToken(user.getId().toString());
 					ResponseCookie accessCookie = ResponseCookie.from("accessToken", tokens.get("accessToken"))
@@ -649,7 +623,7 @@ public class UserController {
 					.body(new AuthResponse(message, user.getId().toString(), ""));
 
 		} catch (Exception e) {
-			return ResponseEntity.badRequest().body(new AuthResponse("OAuth authentication failed: " + e.getMessage(), null, e.getMessage()));
+			return ResponseEntity.status(401).body(new AuthResponse("OAuth identity could not be verified", null, "Invalid provider proof"));
 		}
 	}
 
@@ -675,7 +649,8 @@ public class UserController {
 		}
 		try {
 			java.util.UUID userId = java.util.UUID.fromString(userIdStr);
-			OAuthAccountDto linked = oAuthService.linkAccount(userId, linkRequest.getProvider(), linkRequest.getProviderUserId(), linkRequest.getProviderEmail());
+			OAuthIdentityVerifier.Identity identity = identityVerifier.verify(linkRequest.getProvider(), linkRequest.getToken());
+			OAuthAccountDto linked = oAuthService.linkAccount(userId, identity.provider(), identity.providerUserId(), identity.email());
 			return ResponseEntity.ok(linked);
 		} catch (IllegalStateException e) {
 			return ResponseEntity.status(HttpStatus.CONFLICT).body(new AuthResponse(e.getMessage(), null, e.getMessage()));
@@ -734,17 +709,17 @@ public class UserController {
 			return ResponseEntity.status(401).body("Refresh token missing");
 		}
 
-		String subject = jwtUtil.GetStringFromToken(refreshToken);
+		String subject = jwtUtil.getWebRefreshSubject(refreshToken);
 		if (subject == null) {
 			return ResponseEntity.status(401).body("Invalid refresh token");
 		}
 
-		if (!redisSession.isSessionActive(refreshToken)) {
+		if (!redisSession.isWebSessionActive(subject, refreshToken)) {
 			return ResponseEntity.status(401).body("Session revoked");
 		}
 
 		User user = resolveUserFromSubject(subject);
-		if (user == null) {
+		if (user == null || !Boolean.TRUE.equals(user.getIsActive())) {
 			return ResponseEntity.status(401).body("Invalid refresh token");
 		}
 		if (!user.isEmailVerified()) {
@@ -802,7 +777,9 @@ public class UserController {
 
 	@GetMapping("/send-mail-test")
 	public ResponseEntity<?> sendMailTest(@RequestParam(name = "to") String to,
-	                                      @RequestParam(required = false, name = "subject") String subject, @RequestParam(name = "text") String text) {
+	                                      @RequestParam(required = false, name = "subject") String subject, @RequestParam(name = "text") String text,
+	                                      Authentication authentication) {
+		access.admin(authentication);
 		try {
 			mailgun.sendSimpleMessage(to, subject, text);
 			return ResponseEntity.ok("Mail sent successfully!");
@@ -849,7 +826,7 @@ public class UserController {
 			return ResponseEntity.status(401).body(new AuthResponse("Unauthorized", null, "Unauthorized"));
 		}
 		try {
-			redisSession.revokeSession(userId, id);
+			redisSession.revokeSessionByHandle(userId, id);
 			return ResponseEntity.ok()
 					.body(new AuthResponse("Session revoked", userId, ""));
 		} catch (Exception e) {

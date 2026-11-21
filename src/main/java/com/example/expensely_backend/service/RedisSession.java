@@ -8,6 +8,7 @@ import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.repository.UserRepository;
 import jakarta.annotation.PreDestroy;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import redis.clients.jedis.DefaultJedisClientConfig;
@@ -17,19 +18,31 @@ import redis.clients.jedis.params.ScanParams;
 import redis.clients.jedis.resps.ScanResult;
 
 import java.util.*;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 
 @Service
 public class RedisSession {
 	private static final int SESSION_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
 	private static final String SESSION_PREFIX = "session:";
 	private static final String USER_SESSIONS_PREFIX = "user:sessions:";
+	private static final String MOBILE_SESSION_PREFIX = "mobile:session:";
+	private static final String MOBILE_USER_SESSIONS_PREFIX = "mobile:user:sessions:";
+	private static final String ROTATE_MOBILE_REFRESH = "if redis.call('HGET', KEYS[1], 'userId') ~= ARGV[1] then return 0 end " +
+			"if redis.call('HGET', KEYS[1], 'refreshHash') ~= ARGV[2] then " +
+			"redis.call('DEL', KEYS[1]) redis.call('SREM', KEYS[2], ARGV[6]) return -1 end " +
+			"redis.call('HSET', KEYS[1], 'refreshHash', ARGV[3], 'lastSeen', ARGV[4]) " +
+			"redis.call('EXPIRE', KEYS[1], tonumber(ARGV[5])) " +
+			"redis.call('EXPIRE', KEYS[2], tonumber(ARGV[5])) return 1";
 
 	private final JedisPooled redis;
 	@Autowired
 	private UserRepository userRepository;
 
 	@Autowired
-	private AlertHandler alertHandler;
+	private ObjectProvider<AlertHandler> alertHandler;
 
 	@Autowired
 	private DbLogService dbLogService;
@@ -61,6 +74,48 @@ public class RedisSession {
 
 	private String userSessionsKey(String userId) {
 		return USER_SESSIONS_PREFIX + userId;
+	}
+
+	private String mobileSessionKey(String sessionId) { return MOBILE_SESSION_PREFIX + sessionId; }
+	private String mobileUserSessionsKey(String userId) { return MOBILE_USER_SESSIONS_PREFIX + userId; }
+
+	private static String tokenHash(String token) {
+		try {
+			return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8)));
+		} catch (NoSuchAlgorithmException e) { throw new IllegalStateException("SHA-256 unavailable", e); }
+	}
+
+	public void createMobileSession(String userId, String sessionId, String refreshToken, String device, String ipAddress) {
+		Map<String, String> fields = new HashMap<>();
+		fields.put("userId", userId);
+		fields.put("refreshHash", tokenHash(refreshToken));
+		fields.put("deviceId", device == null || device.isBlank() ? "unknown" : device);
+		fields.put("ipAddress", ipAddress == null ? "" : ipAddress);
+		fields.put("lastSeen", String.valueOf(System.currentTimeMillis()));
+		String key = mobileSessionKey(sessionId);
+		redis.hset(key, fields);
+		redis.expire(key, SESSION_TTL_SECONDS);
+		redis.sadd(mobileUserSessionsKey(userId), sessionId);
+		redis.expire(mobileUserSessionsKey(userId), SESSION_TTL_SECONDS);
+	}
+
+	public boolean isMobileSessionActive(String userId, String sessionId) {
+		try { return userId.equals(redis.hget(mobileSessionKey(sessionId), "userId")); }
+		catch (RuntimeException e) { return false; }
+	}
+
+	public boolean rotateMobileRefresh(String userId, String sessionId, String oldToken, String nextToken) {
+		try {
+			Object result = redis.eval(ROTATE_MOBILE_REFRESH, List.of(mobileSessionKey(sessionId), mobileUserSessionsKey(userId)),
+					List.of(userId, tokenHash(oldToken), tokenHash(nextToken), String.valueOf(System.currentTimeMillis()), String.valueOf(SESSION_TTL_SECONDS), sessionId));
+			return result instanceof Number && ((Number) result).longValue() == 1L;
+		} catch (RuntimeException e) { return false; }
+	}
+
+	public void revokeMobileSession(String userId, String sessionId) {
+		if (!isMobileSessionActive(userId, sessionId)) return;
+		redis.del(mobileSessionKey(sessionId));
+		redis.srem(mobileUserSessionsKey(userId), sessionId);
 	}
 
 
@@ -98,12 +153,13 @@ public class RedisSession {
 			if (sessionId == null || sessionId.isBlank() || userId == null) {
 				return;
 			}
+			if (!userId.equals(redis.hget(sessionKey(sessionId), "userId"))) return;
 			redis.del(sessionKey(sessionId));
 			if (!userId.isBlank()) {
 				redis.srem(userSessionsKey(userId), sessionId);
 			}
-			alertHandler.sendSessionLogOut(UUID.fromString(userId), sessionId
-					,
+			AlertHandler handler = alertHandler.getIfAvailable();
+			if (handler != null) handler.sendSessionLogOut(UUID.fromString(userId), sessionId,
 					MessageDTO.builder().message("User: " + userId + " is booted").type(globals.MessageType.LOGOUT).build());
 
 		} catch (Exception e) {
@@ -111,6 +167,16 @@ public class RedisSession {
 					"Failed to revoke session: " + e.getMessage(), e);
 			System.out.println("Failed to revoke session");
 			throw new RuntimeException("Failed to revoke session");
+		}
+	}
+
+	public void revokeSessionByHandle(String userId, String handle) {
+		if (userId == null || handle == null || handle.isBlank()) return;
+		for (String token : redis.smembers(userSessionsKey(userId))) {
+			if (tokenHash(token).equals(handle)) {
+				revokeSession(userId, token);
+				return;
+			}
 		}
 	}
 
@@ -128,6 +194,12 @@ public class RedisSession {
 		}
 	}
 
+	public boolean isWebSessionActive(String userId, String refreshToken) {
+		if (userId == null || refreshToken == null || refreshToken.isBlank()) return false;
+		try { return userId.equals(redis.hget(sessionKey(refreshToken), "userId")); }
+		catch (RuntimeException e) { return false; }
+	}
+
 	public void revokeAllSessions(String userId) {
 		try {
 			if (userId == null || userId.isBlank()) {
@@ -139,6 +211,9 @@ public class RedisSession {
 				redis.del(sessionKey(session));
 			}
 			redis.del(setKey);
+			String mobileSetKey = mobileUserSessionsKey(userId);
+			for (String sessionId : redis.smembers(mobileSetKey)) redis.del(mobileSessionKey(sessionId));
+			redis.del(mobileSetKey);
 
 		} catch (Exception e) {
 			dbLogService.logError("redis-service", getClass().getName(), "revokeAllSessions",
@@ -185,7 +260,7 @@ public class RedisSession {
 					} else {
 						responseCopy.put("current", "false");
 					}
-					result.put(session, responseCopy);
+					result.put(tokenHash(session), responseCopy);
 				}
 			}
 			return result;

@@ -7,6 +7,8 @@ import com.example.expensely_backend.model.User;
 import com.example.expensely_backend.repository.MessagesRepository;
 import com.example.expensely_backend.service.DbLogService;
 import com.example.expensely_backend.service.UserService;
+import com.example.expensely_backend.service.RedisSession;
+import com.example.expensely_backend.utils.JwtUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
@@ -28,14 +30,18 @@ public class AlertHandler extends TextWebSocketHandler {
 	private final UserService userService;
 	private final ObjectMapper objectMapper;
 	private final DbLogService dbLogService;
+	private final RedisSession redisSession;
+	private final JwtUtil jwtUtil;
 
 
 	public AlertHandler(MessagesRepository messageRepository, UserService userService, ObjectMapper objectMapper,
-	                    DbLogService dbLogService) {
+	                    DbLogService dbLogService, RedisSession redisSession, JwtUtil jwtUtil) {
 		this.messageRepository = messageRepository;
 		this.userService = userService;
 		this.objectMapper = objectMapper;
 		this.dbLogService = dbLogService;
+		this.redisSession = redisSession;
+		this.jwtUtil = jwtUtil;
 	}
 
 	@Override
@@ -52,7 +58,14 @@ public class AlertHandler extends TextWebSocketHandler {
 			session.close();
 			return;
 		}
-		UUID userId = UUID.fromString(uuidParam);
+		UUID userId;
+		try { userId = UUID.fromString(uuidParam); }
+		catch (IllegalArgumentException e) { session.close(); return; }
+		if (!userId.toString().equals(jwtUtil.getWebRefreshSubject(refreshToken)) ||
+				!redisSession.isWebSessionActive(userId.toString(), refreshToken)) {
+			session.close();
+			return;
+		}
 		userSessions
 				.computeIfAbsent(userId, k -> new ConcurrentHashMap<>())
 				.put(refreshToken, session);
@@ -97,7 +110,9 @@ public class AlertHandler extends TextWebSocketHandler {
 
 		if (uuidParam == null || refreshToken == null) return;
 
-		UUID userId = UUID.fromString(uuidParam);
+		UUID userId;
+		try { userId = UUID.fromString(uuidParam); }
+		catch (IllegalArgumentException e) { return; }
 		Map<String, WebSocketSession> sessions = userSessions.get(userId);
 		if (sessions != null) {
 			sessions.remove(refreshToken);

@@ -24,17 +24,22 @@ public class TransactionController {
 	private final TransactionService transactionService;
 	private final TransactionFilesService transactionFilesService;
 	private final UserService userService;
+	private final ResourceAccess access;
 
 	public TransactionController(TransactionService transactionService,
 	                             TransactionFilesService transactionFilesService,
-	                             UserService userService) {
+	                             UserService userService, ResourceAccess access) {
 		this.transactionService = transactionService;
 		this.transactionFilesService = transactionFilesService;
 		this.userService = userService;
+		this.access = access;
 	}
 
 	@PostMapping("/create")
 	public ResponseEntity<?> createTransaction(Authentication authentication, @RequestBody Transaction transaction) {
+		if (transaction.getCategory() == null || transaction.getCategory().getId() == null)
+			return ResponseEntity.badRequest().body("Category is required");
+		access.category(authentication, transaction.getCategory().getId().toString());
 		String userId = (String) authentication.getPrincipal();
 		if (userId == null) {
 			return ResponseEntity.status(401).body("Unauthorized");
@@ -54,6 +59,7 @@ public class TransactionController {
 
 	@GetMapping("/{id}")
 	public ResponseEntity<?> getTransactionById(Authentication authentication, @PathVariable String id) {
+		access.transaction(authentication, id);
 		String userId = (String) authentication.getPrincipal();
 		if (userId == null) {
 			return ResponseEntity.status(401).body(null);
@@ -67,6 +73,7 @@ public class TransactionController {
 
 	@DeleteMapping("/{id}")
 	public ResponseEntity<String> deleteTransactionById(Authentication authentication, @PathVariable String id) {
+		access.transaction(authentication, id);
 		String userId = (String) authentication.getPrincipal();
 		if (userId == null) {
 			return ResponseEntity.status(401).body("Unauthorized");
@@ -81,6 +88,10 @@ public class TransactionController {
 
 	@PutMapping("/update/{id}")
 	public ResponseEntity<?> updateTransaction(Authentication authentication, @PathVariable String id, @RequestBody Transaction updatedTransaction) {
+		access.transaction(authentication, id);
+		if (updatedTransaction.getCategory() != null && updatedTransaction.getCategory().getId() != null)
+			access.category(authentication, updatedTransaction.getCategory().getId().toString());
+		updatedTransaction.setId(java.util.UUID.fromString(id));
 		String userId = (String) authentication.getPrincipal();
 		if (userId == null) {
 			return ResponseEntity.status(401).body("Unauthorized");
@@ -99,6 +110,7 @@ public class TransactionController {
 
 	@GetMapping("/user/{userId}/fetch-with-conditions")
 	public ResponseEntity<?> fetchWithConditions(
+			Authentication authentication,
 			@PathVariable String userId,
 			@RequestParam(value = "start_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startDate,
 			@RequestParam(value = "end_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate,
@@ -111,6 +123,8 @@ public class TransactionController {
 			@RequestParam(value = "sort_order", required = false) String customSortOrder,
 			@RequestParam(value = "type", required = false) String type) {
 
+		access.sameUser(authentication, userId);
+		if (categoryId != null && !categoryId.isBlank()) access.category(authentication, categoryId);
 		startDate = FormatDate.formatStartDate(startDate, false);
 		endDate = FormatDate.formatEndDate(endDate);
 		if (q == null) q = "";
@@ -141,6 +155,7 @@ public class TransactionController {
 
 	@GetMapping("/user/{userId}/export")
 	public ResponseEntity<?> exportTransactions(
+			Authentication authentication,
 			@PathVariable String userId,
 			@RequestParam(value = "start_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startDate,
 			@RequestParam(value = "end_date", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endDate,
@@ -149,6 +164,8 @@ public class TransactionController {
 			@RequestParam(value = "q", required = false) String q,
 			@RequestParam(value = "sort_by", required = false) String sortBy,
 			@RequestParam(value = "sort_order", required = false) String sortOrder) {
+		access.sameUser(authentication, userId);
+		if (categoryId != null && !categoryId.isBlank()) access.category(authentication, categoryId);
 		startDate = FormatDate.formatStartDate(startDate, false);
 		endDate = FormatDate.formatEndDate(endDate);
 		if (q == null) q = "";
@@ -206,7 +223,9 @@ public class TransactionController {
 	}
 
 	@PostMapping("/user/{userId}/bulk-delete")
-	public ResponseEntity<?> bulkDeleteTransactionsByUserId(@PathVariable String userId, @RequestBody List<Transaction> transactions) {
+	public ResponseEntity<?> bulkDeleteTransactionsByUserId(Authentication authentication, @PathVariable String userId, @RequestBody List<Transaction> transactions) {
+		access.sameUser(authentication, userId);
+		for (Transaction transaction : transactions) access.transaction(authentication, transaction.getId().toString());
 		try {
 			transactionService.deleteByUserIdAndTransactionIds(userId, transactions);
 			return ResponseEntity.ok(new AuthResponse("Bulk delete transactions successfully!", null, ""));
@@ -220,6 +239,7 @@ public class TransactionController {
 	                                         @RequestParam(name = "transactionId") String transactionId,
 	                                         @RequestParam(name = "contentType") String contentType,
 	                                         @RequestParam(name = "fileName") String fileName) {
+		access.transaction(authentication, transactionId);
 		String userId = (String) authentication.getPrincipal();
 		try {
 			Transaction transaction = transactionService.getTransactionById(transactionId);
@@ -238,6 +258,7 @@ public class TransactionController {
 	public ResponseEntity<?> updateTransactionAttachment(Authentication authentication,
 	                                                     @PathVariable(name = "eid") String transactionId,
 	                                                     @RequestBody S3Resp url) {
+		access.transaction(authentication, transactionId);
 		String userId = (String) authentication.getPrincipal();
 		try {
 			transactionService.UpdateTransactionAttachment(userId, transactionId, url.getUrl());
@@ -249,6 +270,7 @@ public class TransactionController {
 
 	@GetMapping("/get-download-url/eid/{eid}")
 	public ResponseEntity<?> getDownloadURL(Authentication authentication, @PathVariable String eid) {
+		access.transaction(authentication, eid);
 		String userId = (String) authentication.getPrincipal();
 		try {
 			return ResponseEntity.ok().body(new S3Resp("", transactionService.GenerateDownloadURLForTransaction(eid)));
@@ -259,6 +281,7 @@ public class TransactionController {
 
 	@DeleteMapping("/delete-attachment/eid/{eid}")
 	public ResponseEntity<?> deleteTransactionAttachment(Authentication authentication, @PathVariable String eid) {
+		access.transaction(authentication, eid);
 		String userId = (String) authentication.getPrincipal();
 		try {
 			transactionService.DeleteTransactionAttachment(userId, eid);

@@ -4,6 +4,7 @@ import com.example.expensely_backend.dto.BudgetResponse;
 import com.example.expensely_backend.dto.BudgetResponseList;
 import com.example.expensely_backend.model.Budget;
 import com.example.expensely_backend.service.BudgetService;
+import com.example.expensely_backend.service.ResourceAccess;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -12,9 +13,11 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/budgets")
 public class BudgetController {
 	private final BudgetService budgetService;
+	private final ResourceAccess access;
 
-	public BudgetController(BudgetService budgetService) {
+	public BudgetController(BudgetService budgetService, ResourceAccess access) {
 		this.budgetService = budgetService;
+		this.access = access;
 	}
 
 	@PostMapping("/create")
@@ -28,9 +31,10 @@ public class BudgetController {
 			return ResponseEntity.badRequest().body(new BudgetResponse("Budget limit must not be null", null));
 		}
 
-		if (budget.getCategory() == null || budget.getCategory().toString().isEmpty()) {
+		if (budget.getCategory() == null || budget.getCategory().getId() == null) {
 			return ResponseEntity.badRequest().body(new BudgetResponse("Category must not be null", null));
 		}
+		access.category(authentication, budget.getCategory().getId().toString());
 
 		try {
 			Budget budgetRes = budgetService.save(userId, budget);
@@ -45,7 +49,8 @@ public class BudgetController {
 	}
 
 	@GetMapping("/{id}")
-	public ResponseEntity<Budget> getBudgetById(@PathVariable String id) {
+	public ResponseEntity<Budget> getBudgetById(Authentication authentication, @PathVariable String id) {
+		access.budget(authentication, id);
 		try {
 			Budget budget = budgetService.findById(id);
 			return ResponseEntity.ok(budget);
@@ -55,7 +60,8 @@ public class BudgetController {
 	}
 
 	@DeleteMapping("/{id}")
-	public ResponseEntity<?> deleteBudgetById(@PathVariable String id) {
+	public ResponseEntity<?> deleteBudgetById(Authentication authentication, @PathVariable String id) {
+		access.budget(authentication, id);
 		try {
 			budgetService.softDeleteById(id);
 			return ResponseEntity.status(204).body(new BudgetResponse("", "Successfully deleted"));
@@ -65,7 +71,8 @@ public class BudgetController {
 	}
 
 	@GetMapping("/all")
-	public ResponseEntity<?> getAllBudgets() {
+	public ResponseEntity<?> getAllBudgets(Authentication authentication) {
+		access.admin(authentication);
 		try {
 			return ResponseEntity.ok(new BudgetResponseList(budgetService.findAll()));
 		} catch (Exception e) {
@@ -74,7 +81,8 @@ public class BudgetController {
 	}
 
 	@GetMapping("/user/{userId}")
-	public ResponseEntity<?> getBudgetsByUserId(@PathVariable String userId) {
+	public ResponseEntity<?> getBudgetsByUserId(Authentication authentication, @PathVariable String userId) {
+		access.sameUser(authentication, userId);
 		try {
 			return ResponseEntity.ok(budgetService.getBudgetsByUserId(userId));
 		} catch (Exception e) {
@@ -94,6 +102,9 @@ public class BudgetController {
 			return ResponseEntity.badRequest().body(new BudgetResponse(
 					"budget id must not be empty", null));
 		}
+		access.budget(authentication, id);
+		if (budget.getCategory() != null && budget.getCategory().getId() != null)
+			access.category(authentication, budget.getCategory().getId().toString());
 		try {
 			Budget budgetRes = budgetService.updateBudget(userId, id, budget);
 			budgetRes.setUser(null);

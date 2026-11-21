@@ -2,6 +2,7 @@ package com.example.expensely_backend.controller;
 
 import com.example.expensely_backend.dto.RecurringExpenseDTO;
 import com.example.expensely_backend.service.RecurringExpenseService;
+import com.example.expensely_backend.service.ResourceAccess;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -22,6 +23,9 @@ class RecurringExpenseControllerTest {
     private RecurringExpenseService recurringExpenseService;
 
     @Mock
+    private ResourceAccess access;
+
+    @Mock
     private Authentication authentication;
 
     @InjectMocks
@@ -31,6 +35,7 @@ class RecurringExpenseControllerTest {
     void updateReturnsBadRequestForInvalidNotificationDays() {
         RecurringExpenseDTO request = new RecurringExpenseDTO();
         when(authentication.getPrincipal()).thenReturn("user-id");
+        when(access.userId(authentication)).thenReturn(java.util.UUID.randomUUID());
         doThrow(new IllegalArgumentException("Notification days must be between 1 and 365"))
                 .when(recurringExpenseService).updateRecurringExpense("expense-id", request);
 
