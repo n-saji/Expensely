@@ -96,6 +96,30 @@ class RedisSessionTest {
 	}
 
 	@Test
+	void mobileRefreshRequiresCurrentTokenHash() throws Exception {
+		when(mockRedis.hget("mobile:session:session", "userId")).thenReturn("user");
+		String hash = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+				.digest("current-token".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+		when(mockRedis.hget("mobile:session:session", "refreshHash")).thenReturn(hash);
+		assertTrue(redisSession.isMobileRefreshActive("user", "session", "current-token"));
+		assertFalse(redisSession.isMobileRefreshActive("user", "session", "rotated-token"));
+		assertFalse(redisSession.isMobileRefreshActive("other-user", "session", "current-token"));
+	}
+
+	@Test
+	void mobileSessionListingHidesRefreshHashAndMarksCurrentSession() {
+		when(mockRedis.smembers("mobile:user:sessions:user")).thenReturn(Set.of("current", "expired"));
+		when(mockRedis.hgetAll("mobile:session:current")).thenReturn(Map.of("userId", "user", "deviceId", "iPhone", "refreshHash", "secret-hash"));
+		when(mockRedis.hgetAll("mobile:session:expired")).thenReturn(Map.of());
+		Map<String, Map<String, String>> result = redisSession.fetchMobileSessionsForUser("user", "current");
+		assertEquals(1, result.size());
+		assertEquals("true", result.get("current").get("current"));
+		assertEquals("mobile", result.get("current").get("platform"));
+		assertFalse(result.get("current").containsKey("refreshHash"));
+		verify(mockRedis).srem("mobile:user:sessions:user", "expired");
+	}
+
+	@Test
 	void opaqueWebSessionHandleRevokesOnlyOwnedSession() throws Exception {
 		String userId = "user123";
 		String token = "web-refresh-secret";

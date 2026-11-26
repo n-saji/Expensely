@@ -9,6 +9,7 @@ import com.example.expensely_backend.service.DbLogService;
 import com.example.expensely_backend.service.UserService;
 import com.example.expensely_backend.service.RedisSession;
 import com.example.expensely_backend.utils.JwtUtil;
+import io.jsonwebtoken.Claims;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
@@ -61,14 +62,15 @@ public class AlertHandler extends TextWebSocketHandler {
 		UUID userId;
 		try { userId = UUID.fromString(uuidParam); }
 		catch (IllegalArgumentException e) { session.close(); return; }
-		if (!userId.toString().equals(jwtUtil.getWebRefreshSubject(refreshToken)) ||
-				!redisSession.isWebSessionActive(userId.toString(), refreshToken)) {
+		String connectionKey = connectionKey(userId, refreshToken);
+		if (connectionKey == null) {
 			session.close();
 			return;
 		}
+		session.getAttributes().put("connectionKey", connectionKey);
 		userSessions
 				.computeIfAbsent(userId, k -> new ConcurrentHashMap<>())
-				.put(refreshToken, session);
+				.put(connectionKey, session);
 		try {
 			User user = userService.GetUserById(userId.toString());
 			List<Messages> pendingMessages =
@@ -115,13 +117,24 @@ public class AlertHandler extends TextWebSocketHandler {
 		catch (IllegalArgumentException e) { return; }
 		Map<String, WebSocketSession> sessions = userSessions.get(userId);
 		if (sessions != null) {
-			sessions.remove(refreshToken);
+			Object connectionKey = session.getAttributes().get("connectionKey");
+			if (connectionKey instanceof String key) sessions.remove(key, session);
 			if (sessions.isEmpty()) {
 				userSessions.remove(userId);
 			}
 		}
 		dbLogService.logMessage("handler", getClass().getName(), "afterConnectionClosed",
 				"User disconnected: " + session.getId());
+	}
+
+	private String connectionKey(UUID userId, String refreshToken) {
+		Claims mobile = jwtUtil.parseMobileToken(refreshToken, "mobile_refresh");
+		if (mobile != null && userId.toString().equals(mobile.getSubject())) {
+			String sessionId = mobile.get("sid", String.class);
+			return redisSession.isMobileRefreshActive(userId.toString(), sessionId, refreshToken) ? "mobile:" + sessionId : null;
+		}
+		return userId.toString().equals(jwtUtil.getWebRefreshSubject(refreshToken)) &&
+				redisSession.isWebSessionActive(userId.toString(), refreshToken) ? refreshToken : null;
 	}
 
 	public boolean isUserOnline(UUID userId, String refreshToken) {

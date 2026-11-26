@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.UUID;
 
 @RestController
@@ -84,6 +85,45 @@ public class MobileAuthController {
 		if (claims == null || authentication == null || !claims.getSubject().equals(authentication.getPrincipal())) return unauthorized();
 		sessions.revokeMobileSession(claims.getSubject(), claims.get("sid", String.class));
 		return ResponseEntity.noContent().build();
+	}
+
+	@GetMapping("/sessions")
+	public ResponseEntity<?> sessions(Authentication authentication, @RequestHeader("Authorization") String authorization) {
+		Claims claims = authenticatedMobileClaims(authentication, authorization);
+		if (claims == null) return unauthorized();
+		Map<String, Map<String, String>> all = new HashMap<>(sessions.fetchAllSessionsForUser(claims.getSubject(), null));
+		all.values().forEach(session -> session.put("platform", "web"));
+		all.putAll(sessions.fetchMobileSessionsForUser(claims.getSubject(), claims.get("sid", String.class)));
+		return ResponseEntity.ok(all);
+	}
+
+	@DeleteMapping("/sessions/{id}")
+	public ResponseEntity<?> revokeSession(Authentication authentication, @RequestHeader("Authorization") String authorization,
+	                                      @PathVariable String id) {
+		Claims claims = authenticatedMobileClaims(authentication, authorization);
+		if (claims == null) return unauthorized();
+		if (id.equals(claims.get("sid", String.class)))
+			return ResponseEntity.badRequest().body(Map.of("code", "CURRENT_SESSION", "message", "Use logout to end this session"));
+		if (sessions.isMobileSessionActive(claims.getSubject(), id)) sessions.revokeMobileSession(claims.getSubject(), id);
+		else sessions.revokeSessionByHandle(claims.getSubject(), id);
+		return ResponseEntity.noContent().build();
+	}
+
+	@DeleteMapping("/sessions/others")
+	public ResponseEntity<?> revokeOtherSessions(Authentication authentication, @RequestHeader("Authorization") String authorization) {
+		Claims claims = authenticatedMobileClaims(authentication, authorization);
+		if (claims == null) return unauthorized();
+		sessions.revokeOtherMobileSessions(claims.getSubject(), claims.get("sid", String.class));
+		for (String handle : sessions.fetchAllSessionsForUser(claims.getSubject(), null).keySet())
+			sessions.revokeSessionByHandle(claims.getSubject(), handle);
+		return ResponseEntity.noContent().build();
+	}
+
+	private Claims authenticatedMobileClaims(Authentication authentication, String authorization) {
+		if (authentication == null || authorization == null || !authorization.startsWith("Bearer ")) return null;
+		Claims claims = jwt.parseMobileToken(authorization.substring(7), "mobile_access");
+		return claims != null && claims.getSubject().equals(authentication.getPrincipal()) &&
+				sessions.isMobileSessionActive(claims.getSubject(), claims.get("sid", String.class)) ? claims : null;
 	}
 
 	private ResponseEntity<Map<String, String>> unauthorized() {

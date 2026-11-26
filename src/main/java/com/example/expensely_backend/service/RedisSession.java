@@ -104,6 +104,11 @@ public class RedisSession {
 		catch (RuntimeException e) { return false; }
 	}
 
+	public boolean isMobileRefreshActive(String userId, String sessionId, String refreshToken) {
+		if (refreshToken == null || !isMobileSessionActive(userId, sessionId)) return false;
+		return tokenHash(refreshToken).equals(redis.hget(mobileSessionKey(sessionId), "refreshHash"));
+	}
+
 	public boolean rotateMobileRefresh(String userId, String sessionId, String oldToken, String nextToken) {
 		try {
 			Object result = redis.eval(ROTATE_MOBILE_REFRESH, List.of(mobileSessionKey(sessionId), mobileUserSessionsKey(userId)),
@@ -116,6 +121,33 @@ public class RedisSession {
 		if (!isMobileSessionActive(userId, sessionId)) return;
 		redis.del(mobileSessionKey(sessionId));
 		redis.srem(mobileUserSessionsKey(userId), sessionId);
+		AlertHandler handler = alertHandler.getIfAvailable();
+		if (handler != null) handler.sendSessionLogOut(UUID.fromString(userId), "mobile:" + sessionId,
+				MessageDTO.builder().message("Session revoked").type(globals.MessageType.LOGOUT).build());
+	}
+
+	public Map<String, Map<String, String>> fetchMobileSessionsForUser(String userId, String currentSessionId) {
+		Map<String, Map<String, String>> result = new HashMap<>();
+		String setKey = mobileUserSessionsKey(userId);
+		for (String sessionId : redis.smembers(setKey)) {
+			Map<String, String> fields = redis.hgetAll(mobileSessionKey(sessionId));
+			if (fields == null || fields.isEmpty() || !userId.equals(fields.get("userId"))) {
+				redis.srem(setKey, sessionId);
+				continue;
+			}
+			Map<String, String> visible = new HashMap<>(fields);
+			visible.remove("refreshHash");
+			visible.put("current", String.valueOf(sessionId.equals(currentSessionId)));
+			visible.put("platform", "mobile");
+			result.put(sessionId, visible);
+		}
+		return result;
+	}
+
+	public void revokeOtherMobileSessions(String userId, String currentSessionId) {
+		for (String sessionId : redis.smembers(mobileUserSessionsKey(userId))) {
+			if (!sessionId.equals(currentSessionId)) revokeMobileSession(userId, sessionId);
+		}
 	}
 
 
